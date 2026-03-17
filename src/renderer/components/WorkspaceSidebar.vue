@@ -2,11 +2,11 @@
   <div class="workspace-sidebar" :class="{ collapsed }">
     <div class="panel-header">
       <div class="panel-title-group">
-        <span class="panel-title">工作台</span>
+        <span class="panel-title">{{ t('workspaceSidebar.title') }}</span>
         <span v-if="!collapsed && sidebarSubtitle" class="panel-subtitle">{{ sidebarSubtitle }}</span>
       </div>
       <div class="header-actions">
-        <button @click="$emit('toggle-collapse')" :title="collapsed ? '展开工作台' : '收起工作台'" :aria-label="collapsed ? '展开工作台' : '收起工作台'">
+        <button @click="$emit('toggle-collapse')" :title="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')" :aria-label="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline v-if="collapsed" points="9 18 15 12 9 6"/>
             <polyline v-else points="15 18 9 12 15 6"/>
@@ -18,13 +18,13 @@
     <div class="panel-content">
       <div v-if="collapsed" class="collapsed-list">
         <div class="collapsed-action-stack">
-          <button class="collapsed-open-btn" @click="newFile" title="新建文件" aria-label="新建文件">
+          <button class="collapsed-open-btn" @click="newFile" :title="t('workspaceSidebar.newFile')" :aria-label="t('workspaceSidebar.newFile')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </button>
-          <button class="collapsed-open-btn" @click="openFileDialog" title="打开文件" aria-label="打开文件">
+          <button class="collapsed-open-btn" @click="openFileDialog" :title="t('workspaceSidebar.openFile')" :aria-label="t('workspaceSidebar.openFile')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
           </button>
-          <button class="collapsed-open-btn" @click="openFolderDialog" title="打开目录" aria-label="打开目录">
+          <button class="collapsed-open-btn" @click="openFolderDialog" :title="t('workspaceSidebar.openFolder')" :aria-label="t('workspaceSidebar.openFolder')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/></svg>
           </button>
         </div>
@@ -44,34 +44,39 @@
       </div>
 
       <template v-else>
-        <div class="action-grid sidebar-section sidebar-section--actions">
-          <button class="action-card primary" @click="newFile">
-            <span class="action-card-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <div class="quick-toolbar sidebar-section sidebar-section--actions">
+          <button class="quick-primary-btn" @click="newFile">
+            <span class="quick-primary-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             </span>
-            <span class="action-card-label">新建文件</span>
+            <span>{{ t('workspaceSidebar.new') }}</span>
           </button>
-          <button class="action-card" @click="openFileDialog">
-            <span class="action-card-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
-            </span>
-            <span class="action-card-label">打开文件</span>
+          <button class="quick-tool-btn" @click="openFileDialog" :title="t('workspaceSidebar.openFile')" :aria-label="t('workspaceSidebar.openFile')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
           </button>
-          <button class="action-card" @click="openFolderDialog">
-            <span class="action-card-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/></svg>
-            </span>
-            <span class="action-card-label">打开目录</span>
+          <button class="quick-tool-btn" @click="openFolderDialog" :title="t('workspaceSidebar.openFolder')" :aria-label="t('workspaceSidebar.openFolder')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/></svg>
+          </button>
+          <button v-if="currentRootPath" class="quick-tool-btn" @click="refreshWorkspace" :title="t('workspaceSidebar.refreshCurrent')" :aria-label="t('workspaceSidebar.refreshCurrent')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
           </button>
         </div>
 
         <div v-if="currentRootPath" class="file-group workspace-group sidebar-section sidebar-section--workspace">
-          <div class="group-header">
+          <div class="group-header workspace-header">
             <div class="group-heading">
-              <div class="group-title">当前目录</div>
+              <div class="group-eyebrow">{{ t('workspaceSidebar.currentWorkspace') }}</div>
+              <div class="group-title group-title--workspace">{{ workspaceDisplayName }}</div>
             </div>
             <div class="group-actions">
-              <button class="group-action-btn" @click="toggleWorkspaceExpansion" :title="showWorkspaceSection ? '收起当前目录' : '展开当前目录'" :aria-label="showWorkspaceSection ? '收起当前目录' : '展开当前目录'">
+              <button class="group-action-btn" @click.stop="showWorkspaceRootMenuFromButton" :title="t('workspaceSidebar.moreActions')" :aria-label="t('workspaceSidebar.moreActions')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+                  <circle cx="19" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+                  <circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+                </svg>
+              </button>
+              <button class="group-action-btn" @click="toggleWorkspaceExpansion" :title="showWorkspaceSection ? t('workspaceSidebar.collapseCurrentDir') : t('workspaceSidebar.expandCurrentDir')" :aria-label="showWorkspaceSection ? t('workspaceSidebar.collapseCurrentDir') : t('workspaceSidebar.expandCurrentDir')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polyline v-if="showWorkspaceSection" points="18 15 12 9 6 15"/>
                   <polyline v-else points="6 9 12 15 18 9"/>
@@ -81,31 +86,34 @@
           </div>
           <div class="workspace-summary" :class="{ collapsed: !showWorkspaceSection }">
             <span class="workspace-path" :title="currentRootPath">{{ currentRootPath }}</span>
-            <span class="workspace-count">{{ fileTreeNodes.length }} 项</span>
+            <span class="workspace-count">{{ workspaceNodeSummary }}</span>
           </div>
           <template v-if="showWorkspaceSection">
+            <div class="workspace-filter-shell">
+              <label class="workspace-filter" :aria-label="t('workspaceSidebar.filterAria')">
+                <span class="workspace-filter-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </span>
+                <input v-model="workspaceFilter" type="text" :placeholder="t('workspaceSidebar.filterPlaceholder')" spellcheck="false">
+                <button v-if="workspaceFilter" class="workspace-filter-clear" @click="workspaceFilter = ''" :title="t('workspaceSidebar.clearFilter')" :aria-label="t('workspaceSidebar.clearFilter')">
+                  ×
+                </button>
+              </label>
+            </div>
             <div class="workspace-toolbar">
-              <button class="workspace-icon-btn" @click="createWorkspaceFile()" title="新建文件" aria-label="新建文件">
+              <button class="workspace-icon-btn" @click="createWorkspaceFile()" :title="t('workspaceSidebar.newFile')" :aria-label="t('workspaceSidebar.newFile')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
               </button>
-              <button class="workspace-icon-btn" @click="createWorkspaceFolder()" title="新建文件夹" aria-label="新建文件夹">
+              <button class="workspace-icon-btn" @click="createWorkspaceFolder()" :title="t('workspaceSidebar.newFolder')" :aria-label="t('workspaceSidebar.newFolder')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>
               </button>
-              <button class="workspace-icon-btn" @click="collapseWorkspaceTree" title="折叠全部" aria-label="折叠全部">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/><path d="M6 5l6 6 6-6"/></svg>
-              </button>
-              <button class="workspace-icon-btn" @click="refreshWorkspace" title="刷新" aria-label="刷新">
+              <button class="workspace-icon-btn" @click="refreshWorkspace" :title="t('workspaceSidebar.refresh')" :aria-label="t('workspaceSidebar.refresh')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-              </button>
-              <button class="workspace-icon-btn" @click="openFolderDialog" title="更换目录" aria-label="更换目录">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/><path d="M12 11h6"/><path d="M15 8l3 3-3 3"/></svg>
-              </button>
-              <button class="workspace-icon-btn" @click="closeWorkspace" title="关闭目录" aria-label="关闭目录">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/><path d="M10 10l4 4"/><path d="M14 10l-4 4"/></svg>
               </button>
             </div>
             <div ref="workspaceTreeShellRef" class="workspace-tree-shell" @contextmenu.prevent="showWorkspaceRootMenu">
-              <div v-if="fileTreeNodes.length === 0" class="workspace-tree-empty">当前目录暂无可显示内容</div>
+              <div v-if="fileTreeNodes.length === 0" class="workspace-tree-empty">{{ t('workspaceSidebar.emptyCurrentDir') }}</div>
+              <div v-else-if="workspaceFilter && !hasFilteredWorkspaceNodes" class="workspace-tree-empty">{{ t('workspaceSidebar.noMatch', { query: workspaceFilter }) }}</div>
               <div v-else class="workspace-tree">
                 <FileNode
                   v-for="node in fileTreeNodes"
@@ -113,6 +121,7 @@
                   :node="node"
                   :active-path="activeFilePath"
                   :selected-path="selectedWorkspacePath"
+                  :search-query="workspaceFilter"
                   @open-file="handleOpenFile"
                   @context-menu="showWorkspaceNodeMenu"
                   @select-node="handleSelectWorkspaceNode"
@@ -126,18 +135,18 @@
           <div class="empty-icon" aria-hidden="true">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
           </div>
-          <p>从这里开始新的工作，或继续最近打开的内容。</p>
+          <p>{{ t('workspaceSidebar.startMessage') }}</p>
         </div>
 
         <div v-else class="grouped-files">
           <div v-if="showPinnedGroup" class="file-group pinned-group sidebar-section" :class="currentRootPath ? 'sidebar-section--muted' : 'sidebar-section--emphasis'">
             <div class="group-header">
               <div class="group-heading">
-                <div class="group-title">已固定</div>
-                <div class="group-meta">{{ filteredPinnedFiles.length }} 项</div>
+                <div class="group-title">{{ t('workspaceSidebar.pinnedItems') }}</div>
+                <div class="group-meta">{{ t('workspaceSidebar.itemCount', { count: filteredPinnedFiles.length }) }}</div>
               </div>
               <div class="group-actions">
-                <button v-if="currentRootPath" class="group-action-btn" @click="togglePinnedExpansion" :title="showPinnedSection ? '收起已固定' : '展开已固定'" :aria-label="showPinnedSection ? '收起已固定' : '展开已固定'">
+                <button v-if="currentRootPath" class="group-action-btn" @click="togglePinnedExpansion" :title="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')" :aria-label="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline v-if="showPinnedSection" points="18 15 12 9 6 15"/>
                     <polyline v-else points="6 9 12 15 18 9"/>
@@ -173,27 +182,27 @@
                   <span class="file-name" :title="file.path">{{ getFileName(file.path) }}</span>
                   <span class="file-path" :title="file.path">{{ file.path }}</span>
                 </div>
-                <span v-if="file.path === activeFilePath" class="file-badge">打开中</span>
-                <button class="pin-btn active" @click.stop="togglePin(file.path)" title="取消固定" aria-label="取消固定">
+                <span v-if="file.path === activeFilePath" class="file-badge">{{ t('workspaceSidebar.openInProgress') }}</span>
+                <button class="pin-btn active" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.unpin')" :aria-label="t('workspaceSidebar.unpin')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
                 </button>
-                <button class="remove-btn" @click.stop="removeRecent(file.path)" title="从列表中移除">×</button>
+                <button class="remove-btn" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
               </div>
-              <div v-if="filteredPinnedFiles.length === 0" class="drop-placeholder">拖到这里即可固定到顶部</div>
+              <div v-if="filteredPinnedFiles.length === 0" class="drop-placeholder">{{ t('workspaceSidebar.dropToPin') }}</div>
             </div>
           </div>
 
           <div v-if="showUnpinnedGroup" class="file-group recent-group sidebar-section" :class="currentRootPath ? 'sidebar-section--muted' : 'sidebar-section--primary'">
             <div class="group-header">
               <div class="group-heading">
-                <div class="group-title">最近文件</div>
-                <div class="group-meta">{{ filteredUnpinnedFiles.length }} 项</div>
+                <div class="group-title">{{ t('workspaceSidebar.recentOpened') }}</div>
+                <div class="group-meta">{{ t('workspaceSidebar.itemCount', { count: filteredUnpinnedFiles.length }) }}</div>
               </div>
               <div class="group-actions">
-                <button v-if="unpinnedRecentFiles.length > 0" class="group-action-btn" @click="clearRecent" title="清空最近文件" aria-label="清空最近文件">
+                <button v-if="unpinnedRecentFiles.length > 0" class="group-action-btn" @click="clearRecent" :title="t('workspaceSidebar.clearRecentFiles')" :aria-label="t('workspaceSidebar.clearRecentFiles')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
-                <button v-if="currentRootPath" class="group-action-btn" @click="toggleRecentFilesExpansion" :title="showRecentFilesSection ? '收起最近文件' : '展开最近文件'" :aria-label="showRecentFilesSection ? '收起最近文件' : '展开最近文件'">
+                <button v-if="currentRootPath" class="group-action-btn" @click="toggleRecentFilesExpansion" :title="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')" :aria-label="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline v-if="showRecentFilesSection" points="18 15 12 9 6 15"/>
                     <polyline v-else points="6 9 12 15 18 9"/>
@@ -229,27 +238,27 @@
                   <span class="file-name" :title="file.path">{{ getFileName(file.path) }}</span>
                   <span class="file-path" :title="file.path">{{ file.path }}</span>
                 </div>
-                <span v-if="file.path === activeFilePath" class="file-badge">打开中</span>
-                <button class="pin-btn" @click.stop="togglePin(file.path)" title="固定到顶部" aria-label="固定到顶部">
+                <span v-if="file.path === activeFilePath" class="file-badge">{{ t('workspaceSidebar.openInProgress') }}</span>
+                <button class="pin-btn" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.pinTop')" :aria-label="t('workspaceSidebar.pinTop')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
                 </button>
-                <button class="remove-btn" @click.stop="removeRecent(file.path)" title="从列表中移除">×</button>
+                <button class="remove-btn" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
               </div>
-              <div v-if="filteredUnpinnedFiles.length === 0" class="drop-placeholder">拖到这里即可移回最近列表</div>
+              <div v-if="filteredUnpinnedFiles.length === 0" class="drop-placeholder">{{ t('workspaceSidebar.dropToRecent') }}</div>
             </div>
           </div>
 
           <div v-if="recentFolders.length > 0" class="file-group secondary-group sidebar-section" :class="currentRootPath ? 'sidebar-section--muted' : 'sidebar-section--secondary'">
             <div class="group-header">
               <div class="group-heading">
-                <div class="group-title">最近目录</div>
-                <div class="group-meta">{{ recentFolders.length }} 个目录</div>
+                <div class="group-title">{{ t('workspaceSidebar.recentFolders') }}</div>
+                <div class="group-meta">{{ t('workspaceSidebar.folderCount', { count: recentFolders.length }) }}</div>
               </div>
               <div class="group-actions">
-                <button class="group-action-btn" @click="clearRecentFolders" title="清空最近目录" aria-label="清空最近目录">
+                <button class="group-action-btn" @click="clearRecentFolders" :title="t('workspaceSidebar.clearRecentFolders')" :aria-label="t('workspaceSidebar.clearRecentFolders')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
-                <button v-if="currentRootPath" class="group-action-btn" @click="toggleRecentFoldersExpansion" :title="showRecentFoldersSection ? '收起最近目录' : '展开最近目录'" :aria-label="showRecentFoldersSection ? '收起最近目录' : '展开最近目录'">
+                <button v-if="currentRootPath" class="group-action-btn" @click="toggleRecentFoldersExpansion" :title="showRecentFoldersSection ? t('workspaceSidebar.collapseRecentFolders') : t('workspaceSidebar.expandRecentFolders')" :aria-label="showRecentFoldersSection ? t('workspaceSidebar.collapseRecentFolders') : t('workspaceSidebar.expandRecentFolders')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline v-if="showRecentFoldersSection" points="18 15 12 9 6 15"/>
                     <polyline v-else points="6 9 12 15 18 9"/>
@@ -272,7 +281,7 @@
                   <span class="folder-name">{{ getFileName(folder.path) }}</span>
                   <span class="folder-path">{{ folder.path }}</span>
                 </span>
-                <span v-if="folder.path === currentRootPath" class="folder-badge">当前</span>
+                <span v-if="folder.path === currentRootPath" class="folder-badge">{{ t('workspaceSidebar.current') }}</span>
                 <span class="folder-remove" @click.stop="removeRecentFolder(folder.path)">×</span>
               </button>
             </div>
@@ -290,21 +299,29 @@
         :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
       >
         <template v-if="contextMenu.type === 'recent'">
-          <div class="menu-item" @click="handleContextAction('open')">打开</div>
-          <div class="menu-item" @click="handleContextAction('togglePin')">{{ contextMenu.file?.pinned ? '取消固定' : '固定到顶部' }}</div>
-          <div class="menu-item" @click="handleContextAction('remove')">从列表中移除</div>
+          <div class="menu-item" @click="handleContextAction('open')">{{ t('workspaceSidebar.menuOpen') }}</div>
+          <div class="menu-item" @click="handleContextAction('togglePin')">{{ contextMenu.file?.pinned ? t('workspaceSidebar.unpin') : t('workspaceSidebar.pinTop') }}</div>
+          <div class="menu-item" @click="handleContextAction('remove')">{{ t('workspaceSidebar.remove') }}</div>
           <div class="menu-separator"></div>
-          <div class="menu-item" @click="handleContextAction('clearUnpinned')">清理未固定记录</div>
+          <div class="menu-item" @click="handleContextAction('clearUnpinned')">{{ t('workspaceSidebar.menuClearUnpinned') }}</div>
         </template>
         <template v-else-if="contextMenu.type === 'workspace'">
-          <div class="menu-item" @click="handleContextAction('workspace-open')">{{ contextMenu.node?.isDirectory ? (contextMenu.node?.expanded ? '收起目录' : '展开目录') : '打开文件' }}</div>
-          <div class="menu-item" @click="handleContextAction('workspace-create-file')">新建文件</div>
-          <div class="menu-item" @click="handleContextAction('workspace-create-folder')">新建文件夹</div>
-          <div class="menu-item" @click="handleContextAction('workspace-reveal')">在资源管理器中显示</div>
-          <template v-if="!contextMenu.node?.isRoot">
+          <template v-if="contextMenu.node?.isRoot">
+            <div class="menu-item" @click="handleContextAction('workspace-collapse-all')">{{ t('workspaceSidebar.menuCollapseAll') }}</div>
             <div class="menu-separator"></div>
-            <div class="menu-item" @click="handleContextAction('workspace-rename')">重命名</div>
-            <div class="menu-item danger" @click="handleContextAction('workspace-delete')">删除</div>
+            <div class="menu-item" @click="handleContextAction('workspace-change-root')">{{ t('workspaceSidebar.menuChangeRoot') }}</div>
+            <div class="menu-item" @click="handleContextAction('workspace-reveal')">{{ t('workspaceSidebar.menuReveal') }}</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item danger" @click="handleContextAction('workspace-close-root')">{{ t('workspaceSidebar.menuCloseRoot') }}</div>
+          </template>
+          <template v-else>
+            <div class="menu-item" @click="handleContextAction('workspace-open')">{{ contextMenu.node?.isDirectory ? (contextMenu.node?.expanded ? t('workspaceSidebar.menuCollapseDir') : t('workspaceSidebar.menuExpandDir')) : t('workspaceSidebar.menuOpen') }}</div>
+            <div class="menu-item" @click="handleContextAction('workspace-create-file')">{{ t('workspaceSidebar.menuCreateFile') }}</div>
+            <div class="menu-item" @click="handleContextAction('workspace-create-folder')">{{ t('workspaceSidebar.menuCreateFolder') }}</div>
+            <div class="menu-item" @click="handleContextAction('workspace-reveal')">{{ t('workspaceSidebar.menuReveal') }}</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" @click="handleContextAction('workspace-rename')">{{ t('workspaceSidebar.menuRename') }}</div>
+            <div class="menu-item danger" @click="handleContextAction('workspace-delete')">{{ t('workspaceSidebar.menuDelete') }}</div>
           </template>
         </template>
       </div>
@@ -331,8 +348,8 @@
         </div>
       </template>
       <template #footer>
-        <button class="modal-btn" @click="handleDialogClose">取消</button>
-        <button class="modal-btn primary" @click="handleDialogConfirm">确定</button>
+        <button class="modal-btn" @click="handleDialogClose">{{ t('common.cancel') }}</button>
+        <button class="modal-btn primary" @click="handleDialogConfirm">{{ t('common.confirm') }}</button>
       </template>
     </ModalDialog>
   </div>
@@ -340,11 +357,14 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import FileIcon from './FileIcon.vue'
 import FileNode from './FileNode.vue'
 import ModalDialog from './ModalDialog.vue'
+
+const { t } = useI18n()
 
 defineProps({
   collapsed: {
@@ -363,6 +383,7 @@ const showPinnedSection = ref(true)
 const showRecentFilesSection = ref(true)
 const showRecentFoldersSection = ref(true)
 const selectedWorkspacePath = ref('')
+const workspaceFilter = ref('')
 const recentDrag = ref({ dragPath: null, targetPath: null, targetPinned: null, position: 'before' })
 const contextMenu = ref({ visible: false, x: 0, y: 0, type: 'recent', file: null, node: null })
 const contextMenuRef = ref(null)
@@ -382,13 +403,25 @@ const totalRecentCount = computed(() => fileStore.recentFiles.length)
 const recentFolders = computed(() => fileStore.recentFolders)
 const currentRootPath = computed(() => fileStore.rootPath || '')
 const fileTreeNodes = computed(() => fileStore.fileTree || [])
+const workspaceDisplayName = computed(() => getFileName(currentRootPath.value) || t('workspaceSidebar.title'))
+const filteredWorkspaceNodeCount = computed(() => countMatchingTreeNodes(fileTreeNodes.value, workspaceFilter.value))
+const hasFilteredWorkspaceNodes = computed(() => filteredWorkspaceNodeCount.value > 0)
+const workspaceNodeSummary = computed(() => {
+  if (!workspaceFilter.value) {
+    return t('workspaceSidebar.itemCount', { count: fileTreeNodes.value.length })
+  }
+
+  return t('workspaceSidebar.matchCount', { count: filteredWorkspaceNodeCount.value })
+})
 const activeFilePath = computed(() => editorStore.getActiveTab()?.filePath || '')
 const sidebarSubtitle = computed(() => {
   if (fileStore.rootPath) {
     return ''
   }
 
-  return totalRecentCount.value > 0 ? `${totalRecentCount.value} 个最近文件 · ${recentFolders.value.length} 个目录` : '快速进入 Markdown / JSON / SQL / Log 工作流'
+  return totalRecentCount.value > 0
+    ? t('workspaceSidebar.subtitleCounts', { files: totalRecentCount.value, folders: recentFolders.value.length })
+    : t('workspaceSidebar.subtitleWorkflow')
 })
 
 const filteredEntries = computed(() => fileStore.recentFiles)
@@ -448,10 +481,10 @@ async function createWorkspaceEntry(type, basePath) {
   const parentPath = resolveDirectoryPath(basePath)
   if (!parentPath) return
 
-  const defaultName = type === 'file' ? 'untitled.md' : '新建文件夹'
+  const defaultName = type === 'file' ? 'untitled.md' : t('workspaceSidebar.newFolderDefault')
   const inputName = await openInputDialog({
-    title: type === 'file' ? '新建文件' : '新建文件夹',
-    message: type === 'file' ? '请输入新文件名' : '请输入新文件夹名',
+    title: type === 'file' ? t('workspaceSidebar.createFileTitle') : t('workspaceSidebar.createFolderTitle'),
+    message: type === 'file' ? t('workspaceSidebar.createFileMessage') : t('workspaceSidebar.createFolderMessage'),
     defaultValue: defaultName,
     placeholder: defaultName
   })
@@ -472,8 +505,8 @@ async function createWorkspaceEntry(type, basePath) {
 
 async function renameWorkspaceNode(node) {
   const nextName = await openInputDialog({
-    title: '重命名',
-    message: `请输入“${node.name}”的新名称`,
+    title: t('workspaceSidebar.renameTitle'),
+    message: t('workspaceSidebar.renameMessage', { name: node.name }),
     defaultValue: node.name,
     placeholder: node.name
   })
@@ -487,8 +520,8 @@ async function renameWorkspaceNode(node) {
 
 async function deleteWorkspaceNode(node) {
   const confirmed = await openConfirmDialog({
-    title: '删除项目',
-    message: `确定要删除“${node.name}”吗？`
+    title: t('workspaceSidebar.deleteTitle'),
+    message: t('workspaceSidebar.deleteMessage', { name: node.name })
   })
   if (!confirmed) return
 
@@ -570,6 +603,19 @@ function showWorkspaceRootMenu(event) {
   nextTick(() => adjustContextMenuPosition(pointerX, pointerY))
 }
 
+function showWorkspaceRootMenuFromButton(event) {
+  if (!currentRootPath.value) return
+
+  const button = event.currentTarget
+  const rect = button?.getBoundingClientRect?.()
+  if (!rect) return
+
+  showWorkspaceRootMenu({
+    clientX: Math.round(rect.right),
+    clientY: Math.round(rect.bottom + 6)
+  })
+}
+
 function adjustContextMenuPosition(pointerX, pointerY) {
   const menuEl = contextMenuRef.value
   if (!menuEl) return
@@ -622,6 +668,12 @@ async function handleWorkspaceContextAction(action) {
 
   try {
     switch (action) {
+      case 'workspace-refresh':
+        await refreshWorkspace()
+        break
+      case 'workspace-collapse-all':
+        collapseWorkspaceTree()
+        break
       case 'workspace-open':
         if (node.isDirectory && !node.isRoot) {
           await fileStore.expandFolder(node)
@@ -637,6 +689,12 @@ async function handleWorkspaceContextAction(action) {
         break
       case 'workspace-reveal':
         await window.electronAPI.showItemInFolder(node.path)
+        break
+      case 'workspace-change-root':
+        await openFolderDialog()
+        break
+      case 'workspace-close-root':
+        closeWorkspace()
         break
       case 'workspace-rename':
         await renameWorkspaceNode(node)
@@ -701,8 +759,8 @@ function onRecentDragEnd() {
 
 function clearRecent() {
   openConfirmDialog({
-    title: '清空最近文件',
-    message: '确定要清空未固定的最近文件记录吗？'
+    title: t('workspaceSidebar.clearRecentTitle'),
+    message: t('workspaceSidebar.clearRecentMessage')
   }).then((confirmed) => {
     if (!confirmed) return
     fileStore.clearRecentFiles()
@@ -711,8 +769,8 @@ function clearRecent() {
 
 function clearRecentFolders() {
   openConfirmDialog({
-    title: '清空最近目录',
-    message: '确定要清空最近目录记录吗？'
+    title: t('workspaceSidebar.clearRecentFoldersTitle'),
+    message: t('workspaceSidebar.clearRecentFoldersMessage')
   }).then((confirmed) => {
     if (!confirmed) return
     fileStore.clearRecentFolders()
@@ -887,6 +945,32 @@ function findTreeNodeByPath(path, nodes) {
   return null
 }
 
+function countMatchingTreeNodes(nodes, keyword) {
+  const normalizedKeyword = String(keyword || '').trim().toLowerCase()
+  if (!normalizedKeyword) {
+    return (nodes || []).length
+  }
+
+  let total = 0
+
+  for (const node of nodes || []) {
+    if (treeNodeMatches(node, normalizedKeyword)) {
+      total += 1
+    }
+  }
+
+  return total
+}
+
+function treeNodeMatches(node, normalizedKeyword) {
+  const nodeName = String(node?.name || '').toLowerCase()
+  if (nodeName.includes(normalizedKeyword)) {
+    return true
+  }
+
+  return (node?.children || []).some(child => treeNodeMatches(child, normalizedKeyword))
+}
+
 onMounted(() => {
   document.addEventListener('click', closeContextMenu)
   window.addEventListener('resize', closeContextMenu)
@@ -900,6 +984,7 @@ watch(currentRootPath, (path) => {
   showRecentFilesSection.value = !hasWorkspace
   showRecentFoldersSection.value = !hasWorkspace
   selectedWorkspacePath.value = hasWorkspace ? path : ''
+  workspaceFilter.value = ''
 }, { immediate: true })
 
 watch([currentRootPath, activeFilePath], async () => {
@@ -1020,7 +1105,8 @@ onUnmounted(() => {
 .header-actions button:hover,
 .collapsed-open-btn:hover,
 .collapsed-file:hover,
-.action-card:hover,
+.quick-primary-btn:hover,
+.quick-tool-btn:hover,
 .folder-item:hover,
 .recent-file:hover,
 .section-link:hover {
@@ -1033,7 +1119,8 @@ onUnmounted(() => {
 .header-actions button:focus-visible,
 .collapsed-open-btn:focus-visible,
 .collapsed-file:focus-visible,
-.action-card:focus-visible,
+.quick-primary-btn:focus-visible,
+.quick-tool-btn:focus-visible,
 .folder-item:focus-visible,
 .recent-file:focus-visible,
 .menu-item:focus-visible,
@@ -1048,24 +1135,24 @@ onUnmounted(() => {
 .panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 0 18px;
+  padding: 12px 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   scrollbar-gutter: stable;
 }
 
 .sidebar-section {
   position: relative;
   margin: 0 16px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 92%, rgba(var(--accent-primary-rgb), 0.1));
+  border: 1px solid color-mix(in srgb, var(--glass-border) 94%, rgba(var(--accent-primary-rgb), 0.06));
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 95%, rgba(var(--accent-primary-rgb), 0.02));
-  box-shadow: var(--panel-inner-shadow);
+  background: color-mix(in srgb, var(--glass-bg) 98%, rgba(var(--accent-primary-rgb), 0.01));
+  box-shadow: none;
 }
 
 .sidebar-section--actions {
-  background: color-mix(in srgb, var(--glass-bg) 92%, rgba(var(--accent-primary-rgb), 0.04));
+  background: color-mix(in srgb, var(--glass-bg) 96%, rgba(var(--accent-primary-rgb), 0.03));
 }
 
 .sidebar-section--session {
@@ -1078,23 +1165,23 @@ onUnmounted(() => {
 }
 
 .sidebar-section--workspace {
-  border-color: color-mix(in srgb, var(--glass-border) 76%, rgba(var(--accent-primary-rgb), 0.18));
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.045));
+  border-color: color-mix(in srgb, var(--glass-border) 82%, rgba(var(--accent-primary-rgb), 0.14));
+  background: color-mix(in srgb, var(--glass-bg) 95%, rgba(var(--accent-primary-rgb), 0.028));
 }
 
 .sidebar-section--muted {
-  background: color-mix(in srgb, var(--glass-bg) 98%, rgba(var(--accent-primary-rgb), 0.008));
-  border-color: color-mix(in srgb, var(--glass-border) 95%, rgba(var(--accent-primary-rgb), 0.04));
+  background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.006));
+  border-color: color-mix(in srgb, var(--glass-border) 96%, rgba(var(--accent-primary-rgb), 0.03));
   box-shadow: none;
 }
 
 .sidebar-section--emphasis {
-  border-color: color-mix(in srgb, var(--glass-border) 75%, rgba(var(--accent-primary-rgb), 0.22));
-  background: color-mix(in srgb, var(--glass-bg) 92%, rgba(var(--accent-primary-rgb), 0.05));
+  border-color: color-mix(in srgb, var(--glass-border) 82%, rgba(var(--accent-primary-rgb), 0.14));
+  background: color-mix(in srgb, var(--glass-bg) 95%, rgba(var(--accent-primary-rgb), 0.028));
 }
 
 .sidebar-section--primary {
-  background: color-mix(in srgb, var(--glass-bg) 96%, rgba(var(--accent-primary-rgb), 0.018));
+  background: color-mix(in srgb, var(--glass-bg) 98%, rgba(var(--accent-primary-rgb), 0.012));
 }
 
 .sidebar-section--empty {
@@ -1145,55 +1232,53 @@ onUnmounted(() => {
   box-shadow: 0 0 0 1px rgba(var(--accent-primary-rgb), 0.08);
 }
 
-.action-grid {
+.quick-toolbar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) repeat(3, 32px);
   gap: 8px;
   padding: 10px;
-}
-
-.action-card {
-  min-height: 44px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.02));
-  color: var(--text-main);
-  display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 8px;
-  text-align: left;
+}
+
+.quick-primary-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.16);
+  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.12) 62%, var(--glass-bg));
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
+  font-size: 12px;
+  font-weight: var(--ui-font-weight-semibold);
 }
 
-.action-card.primary {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.14) 70%, var(--glass-bg));
-}
-
-.action-card:disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
-}
-
-.action-card-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 8px;
-  background: rgba(var(--accent-primary-rgb), 0.06);
+.quick-primary-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(var(--accent-primary-rgb), 0.12);
+  color: var(--accent-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent-primary);
   flex-shrink: 0;
 }
 
-.action-card-label {
-  font-size: 11px;
-  font-weight: var(--ui-font-weight-medium);
-  line-height: 1.25;
-  white-space: nowrap;
+.quick-tool-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--icon-button-bg);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
 }
 
 .section-card {
@@ -1264,6 +1349,15 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+.group-eyebrow {
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: var(--ui-font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .section-card-title,
 .group-title {
   font-size: 11px;
@@ -1272,6 +1366,14 @@ onUnmounted(() => {
   color: var(--accent-primary);
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+.group-title--workspace {
+  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-main);
 }
 
 .section-card-desc {
@@ -1384,6 +1486,20 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.workspace-header {
+  align-items: flex-start;
+}
+
+.workspace-header .group-actions {
+  gap: 8px;
+}
+
+.workspace-header .group-action-btn {
+  width: var(--icon-button-size-md);
+  height: var(--icon-button-size-md);
+  border-radius: calc(var(--icon-button-radius) + 1px);
+}
+
 .workspace-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1396,8 +1512,8 @@ onUnmounted(() => {
 }
 
 .workspace-path {
-  color: var(--text-main);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
   line-height: 1.45;
   word-break: break-word;
 }
@@ -1409,12 +1525,77 @@ onUnmounted(() => {
   padding-top: 1px;
 }
 
+.workspace-filter-shell {
+  padding-top: 2px;
+}
+
+.workspace-filter {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 92%, rgba(var(--accent-primary-rgb), 0.08));
+  background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.012));
+}
+
+.workspace-filter:focus-within {
+  border-color: rgba(var(--accent-primary-rgb), 0.24);
+  box-shadow: var(--field-focus-ring);
+}
+
+.workspace-filter-icon {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-filter input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.workspace-filter input:focus {
+  outline: none;
+}
+
+.workspace-filter input::placeholder {
+  color: var(--text-dim);
+}
+
+.workspace-filter-clear {
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.workspace-filter-clear:hover {
+  color: var(--text-main);
+  background: var(--interactive-hover-bg);
+}
+
 .workspace-toolbar {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   align-items: center;
-  padding-top: 2px;
+  padding-top: 0;
 }
 
 .workspace-icon-btn {
@@ -1474,9 +1655,9 @@ onUnmounted(() => {
 }
 
 .workspace-tree-shell {
-  border: 1px solid var(--glass-border);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 94%, rgba(var(--accent-primary-rgb), 0.06));
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--glass-bg) 97%, rgba(var(--accent-primary-rgb), 0.015));
+  background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.008));
   overflow: hidden;
 }
 
@@ -1486,7 +1667,7 @@ onUnmounted(() => {
   max-height: clamp(420px, 58vh, 780px);
   min-height: 340px;
   overflow: auto;
-  padding: 6px 0;
+  padding: 8px 0;
 }
 
 .workspace-tree-empty {
@@ -1521,8 +1702,8 @@ onUnmounted(() => {
   gap: 10px;
   padding: 9px 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 97%, rgba(var(--accent-primary-rgb), 0.015));
+  border: 1px solid color-mix(in srgb, var(--glass-border) 96%, rgba(var(--accent-primary-rgb), 0.03));
+  background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.008));
   color: var(--text-main);
   cursor: pointer;
 }
@@ -1605,7 +1786,7 @@ onUnmounted(() => {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: color-mix(in srgb, var(--glass-bg) 96%, rgba(var(--accent-primary-rgb), 0.02));
+  background: color-mix(in srgb, var(--glass-bg) 98%, rgba(var(--accent-primary-rgb), 0.012));
 }
 
 .workspace-group .workspace-tree-shell,
@@ -1615,7 +1796,7 @@ onUnmounted(() => {
 }
 
 .grouped-files {
-  gap: 14px;
+  gap: 10px;
 }
 
 .sidebar-section--muted .group-title {
@@ -1630,8 +1811,8 @@ onUnmounted(() => {
 }
 
 .recent-file {
-  padding: 10px 12px 10px 14px;
-  min-height: 52px;
+  padding: 9px 12px 9px 14px;
+  min-height: 48px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1654,21 +1835,20 @@ onUnmounted(() => {
 }
 
 .recent-file.pinned {
-  background: rgba(var(--accent-primary-rgb), 0.04);
+  background: rgba(var(--accent-primary-rgb), 0.025);
 }
 
 .recent-file.active {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.12) 76%, var(--glass-bg));
+  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.08) 82%, var(--glass-bg));
   box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.72);
 }
 
 .recent-file:hover {
   background: var(--interactive-hover-bg);
-  box-shadow: var(--interactive-hover-ring);
 }
 
 .recent-file.active:hover {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.14) 76%, var(--glass-bg));
+  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.1) 80%, var(--glass-bg));
 }
 
 .recent-file .file-name {
@@ -1815,8 +1995,8 @@ onUnmounted(() => {
 }
 
 @media (max-width: 720px) {
-  .action-grid {
-    grid-template-columns: 1fr;
+  .quick-toolbar {
+    grid-template-columns: minmax(0, 1fr) repeat(2, 32px);
   }
 }
 
@@ -1839,19 +2019,10 @@ onUnmounted(() => {
     padding: 10px;
   }
 
-  .action-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .quick-toolbar {
+    grid-template-columns: minmax(0, 1fr) repeat(3, 30px);
     gap: 6px;
     padding: 8px;
-  }
-
-  .action-card {
-    min-height: 40px;
-    padding: 8px 6px;
-  }
-
-  .action-card-label {
-    font-size: 10px;
   }
 
   .workspace-summary {
@@ -1938,16 +2109,15 @@ onUnmounted(() => {
     width: 30px;
     height: 30px;
   }
+
+  .workspace-header .group-actions {
+    gap: 6px;
+  }
 }
 
 @container workspace-sidebar (max-width: 280px) {
-  .action-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .action-card {
-    justify-content: flex-start;
-    padding-inline: 10px;
+  .quick-toolbar {
+    grid-template-columns: minmax(0, 1fr) repeat(2, 30px);
   }
 
   .workspace-toolbar {
@@ -1980,7 +2150,7 @@ onUnmounted(() => {
 }
 
 @container workspace-sidebar (max-width: 260px) {
-  .action-card-label,
+  .quick-primary-btn span:last-child,
   .session-badge,
   .folder-badge,
   .file-badge,
@@ -1988,14 +2158,13 @@ onUnmounted(() => {
     display: none;
   }
 
-  .action-card {
-    justify-content: center;
-    min-height: 38px;
-    padding: 8px;
+  .quick-toolbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .action-card-icon {
-    margin: 0;
+  .quick-primary-btn {
+    padding: 0;
+    justify-content: center;
   }
 
   .recent-file,
@@ -2052,6 +2221,14 @@ onUnmounted(() => {
   .panel-title {
     font-size: 11px;
     letter-spacing: 0.02em;
+  }
+
+  .workspace-filter {
+    grid-template-columns: 14px minmax(0, 1fr);
+  }
+
+  .workspace-filter-clear {
+    display: none;
   }
 }
 </style>

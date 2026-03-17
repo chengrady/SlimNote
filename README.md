@@ -1,111 +1,207 @@
+<div align="center">
+
+<img src="public/logo.svg" alt="SlimNote Logo" width="120" height="120">
+
 # SlimNote
 
-<p align="center">
-  <img src="public/logo.svg" alt="SlimNote Logo" width="120" height="120">
-</p>
+**A Modern Cross-Platform Text & Code Editor**
+**一个现代化的跨平台文本与代码编辑器**
 
-<p align="center">
-  <strong>一个现代化的跨平台文本与代码编辑器</strong>
-</p>
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/chengrady/SlimNote)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Electron](https://img.shields.io/badge/Electron-28-47848f?logo=electron)](https://www.electronjs.org/)
+[![Vue](https://img.shields.io/badge/Vue-3.4-42b883?logo=vue.js)](https://vuejs.org/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
-<p align="center">
-  基于 Electron + Vue 3 + Monaco Editor + Milkdown 构建的轻量级编辑器
-</p>
+**English** | [**简体中文**](#简体中文)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.1-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/Electron-28-green.svg" alt="Electron">
-  <img src="https://img.shields.io/badge/Vue-3.4-brightgreen.svg" alt="Vue">
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
-</p>
+</div>
 
 ---
 
-## 功能特性
+## English
 
-### 编辑器核心
+### 👀 Overview
 
-- **Monaco Editor** - VS Code 同款编辑器引擎
-  - 语法高亮（支持 50+ 种语言）
-  - 代码自动补全
-  - 代码折叠
-  - 小地图预览
-  - 多光标编辑
-  - 查找替换
+SlimNote is a lightweight yet powerful text and code editor built with **Electron**, **Vue 3**, **Monaco Editor**, and **Milkdown**. It provides a seamless editing experience for both code and Markdown documents.
 
-- **Milkdown Markdown 编辑器**
-  - 所见即所得的 Markdown 编辑体验
-  - 实时预览
-  - GFM (GitHub Flavored Markdown) 支持
-  - 数学公式 (KaTeX)
-  - 代码块语法高亮 (Prism)
-  - 图片上传支持
+### ✨ Features
 
-### 文件管理
+#### 🖥️ Code Editor (Monaco)
+- Syntax highlighting for 50+ languages
+- Intelligent code completion
+- Code folding & minimap
+- Multi-cursor editing
+- Find & replace with regex support
 
+#### 📝 Markdown Editor (Milkdown)
+- WYSIWYG editing experience
+- Real-time preview
+- GFM (GitHub Flavored Markdown) support
+- KaTeX math formulas
+- Prism code highlighting
+- Image upload support
+- Export to PDF & Image
+
+#### 🗂️ File Management
+- Multi-tab editing
+- File tree explorer
+- Auto encoding detection
+- Recent files list
+- Auto-save support
+
+#### 🛠️ Developer Tools
+- **JSON Toolkit**: Format, compress, diff, tree view, schema generation, repair, JMESPath query
+- **SQL Toolkit**: Format with multiple dialects support
+- **Markdown Toolkit**: Export to PDF & Image
+
+#### 🎨 User Experience
+- Light/Dark theme switching
+- Resizable sidebar
+- Pin floating window (always on top)
+- Status bar with file info
+- Customizable editor settings
+
+### 📦 Installation
+
+Download the latest release for your platform:
+
+| Platform | Download |
+|----------|----------|
+| Windows | `.exe` (Installer) / `.exe` (Portable) |
+| macOS | `.dmg` |
+| Linux | `.AppImage` / `.deb` |
+
+### 🚀 Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/chengrady/SlimNote.git
+
+# Navigate to directory
+cd SlimNote
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+### 🔨 Build
+
+```bash
+# Build for Windows
+npm run build:win
+
+# Build for macOS
+npm run build:mac
+
+# Build for Linux
+npm run build:linux
+
+# Build for all platforms
+npm run build
+```
+
+Build artifacts will be in the `release` directory.
+
+### 📁 Supported File Formats
+
+| Category | Extensions |
+|----------|------------|
+| Text | txt, text, md, markdown, mdx, log |
+| Data | json, jsonc, yaml, yml, xml, toml, csv, tsv |
+| Config | ini, conf, config, properties |
+| Web | html, htm, css, scss, sass, less, js, ts, jsx, tsx, vue |
+| Programming | py, java, c, cpp, cs, sh, bash, ps1, bat, sql |
+
+### ⌨️ Keyboard Shortcuts
+
+| Action | Windows/Linux | macOS |
+|--------|---------------|-------|
+| New File | Ctrl+N | Cmd+N |
+| Open File | Ctrl+O | Cmd+O |
+| Open Folder | Ctrl+Shift+O | Cmd+Shift+O |
+| Save | Ctrl+S | Cmd+S |
+| Save As | Ctrl+Shift+S | Cmd+Shift+S |
+| Find | Ctrl+F | Cmd+F |
+| Replace | Ctrl+H | Cmd+H |
+| Toggle Theme | Ctrl+T | Cmd+T |
+| Developer Tools | F12 | F12 |
+
+### 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## 简体中文
+
+[**English**](#english) | **简体中文**
+
+### 👀 项目简介
+
+SlimNote 是一个基于 **Electron**、**Vue 3**、**Monaco Editor** 和 **Milkdown** 构建的轻量级文本与代码编辑器，为代码和 Markdown 文档提供流畅的编辑体验。
+
+### ✨ 功能特性
+
+#### 🖥️ 代码编辑器 (Monaco)
+- 支持 50+ 种语言的语法高亮
+- 智能代码补全
+- 代码折叠与小地图
+- 多光标编辑
+- 支持正则表达式的查找替换
+
+#### 📝 Markdown 编辑器 (Milkdown)
+- 所见即所得的编辑体验
+- 实时预览
+- GFM (GitHub Flavored Markdown) 支持
+- KaTeX 数学公式
+- Prism 代码高亮
+- 图片上传支持
+- 导出为 PDF 和图片
+
+#### 🗂️ 文件管理
 - 多标签页编辑
 - 文件树浏览器
-- 支持多种文件格式
-- 文件编码自动检测
+- 自动检测文件编码
 - 最近打开文件列表
-- 自动保存
+- 自动保存支持
 
-### 实用工具
+#### 🛠️ 开发工具
+- **JSON 工具箱**：格式化、压缩、Diff 对比、树形视图、Schema 生成、修复、JMESPath 查询
+- **SQL 工具箱**：支持多种方言的格式化
+- **Markdown 工具箱**：导出为 PDF 和图片
 
-- **JSON 工具**
-  - JSON 格式化
-  - JSON 压缩
-  - JSON Diff 对比
-  - JSON 树形视图
-  - JSON Schema 生成
-  - JSON 修复
-  - JMESPath 查询
-
-- **SQL 工具**
-  - SQL 格式化
-  - 支持多种 SQL 方言
-
-- **Markdown 工具**
-  - 导出为 PDF
-  - 导出为图片
-
-### 界面体验
-
+#### 🎨 用户体验
 - 浅色/深色主题切换
 - 可调整侧边栏
-- Pin 浮动窗口（置顶显示选中内容）
+- Pin 浮动窗口（始终置顶）
 - 状态栏显示文件信息
-- 自定义编辑器设置（字体、字号、Tab 宽度等）
+- 可自定义编辑器设置
 
-## 支持的文件格式
+### 📦 安装
 
-| 类型 | 扩展名 |
-|------|--------|
-| 文本 | txt, text, md, markdown, mdx, log |
-| 数据 | json, jsonc, yaml, yml, xml, toml, csv, tsv |
-| 配置 | ini, conf, config, properties |
-| Web | html, htm, css, scss, sass, less, js, ts, jsx, tsx, vue |
-| 编程 | py, java, c, cpp, cs, sh, bash, ps1, bat, sql |
+下载适合您平台的最新版本：
 
-## 技术栈
+| 平台 | 下载 |
+|------|------|
+| Windows | `.exe` (安装包) / `.exe` (便携版) |
+| macOS | `.dmg` |
+| Linux | `.AppImage` / `.deb` |
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Electron | 28 | 跨平台桌面应用框架 |
-| Vue | 3.4 | 渐进式 JavaScript 框架 |
-| Vite | 5 | 下一代前端构建工具 |
-| Pinia | 2.1 | Vue 状态管理 |
-| Monaco Editor | 0.47 | 代码编辑器 |
-| Milkdown | 7.18 | Markdown 编辑器 |
-
-## 快速开始
-
-### 环境要求
-
-- Node.js >= 18
-- npm >= 9
-
-### 安装
+### 🚀 快速开始
 
 ```bash
 # 克隆仓库
@@ -116,16 +212,12 @@ cd SlimNote
 
 # 安装依赖
 npm install
-```
 
-### 开发
-
-```bash
-# 启动开发模式
+# 启动开发服务器
 npm run dev
 ```
 
-### 构建
+### 🔨 构建
 
 ```bash
 # 构建 Windows 版本
@@ -143,31 +235,17 @@ npm run build
 
 构建产物位于 `release` 目录。
 
-## 项目结构
+### 📁 支持的文件格式
 
-```
-SlimNote/
-├── electron/              # Electron 主进程
-│   ├── main.js           # 主进程入口
-│   ├── preload.js        # 预加载脚本
-│   └── main-new.js       # 新版主进程（开发中）
-├── src/
-│   ├── main/             # 主进程源码
-│   ├── preload/          # 预加载脚本源码
-│   ├── renderer/         # 渲染进程（Vue 应用）
-│   │   ├── components/   # Vue 组件
-│   │   ├── views/        # 页面视图
-│   │   ├── stores/       # Pinia 状态管理
-│   │   ├── router/       # 路由配置
-│   │   └── utils/        # 工具函数
-│   └── ...
-├── public/               # 静态资源
-├── package.json          # 项目配置
-├── vite.config.js        # Vite 配置
-└── electron.vite.config.ts  # Electron Vite 配置
-```
+| 类型 | 扩展名 |
+|------|--------|
+| 文本 | txt, text, md, markdown, mdx, log |
+| 数据 | json, jsonc, yaml, yml, xml, toml, csv, tsv |
+| 配置 | ini, conf, config, properties |
+| Web | html, htm, css, scss, sass, less, js, ts, jsx, tsx, vue |
+| 编程 | py, java, c, cpp, cs, sh, bash, ps1, bat, sql |
 
-## 快捷键
+### ⌨️ 快捷键
 
 | 功能 | Windows/Linux | macOS |
 |------|---------------|-------|
@@ -179,12 +257,9 @@ SlimNote/
 | 查找 | Ctrl+F | Cmd+F |
 | 替换 | Ctrl+H | Cmd+H |
 | 切换主题 | Ctrl+T | Cmd+T |
-| 撤销 | Ctrl+Z | Cmd+Z |
-| 重做 | Ctrl+Y | Cmd+Y |
 | 开发者工具 | F12 | F12 |
-| 退出 | Ctrl+Q | Cmd+Q |
 
-## 开发计划
+### 🗺️ 开发路线
 
 - [ ] 全局搜索功能
 - [ ] 代码片段管理
@@ -195,7 +270,7 @@ SlimNote/
 - [ ] 远程文件编辑 (SSH/FTP)
 - [ ] 协作编辑
 
-## 贡献
+### 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
 
@@ -205,16 +280,29 @@ SlimNote/
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 提交 Pull Request
 
-## 许可证
+### 📄 许可证
 
-[MIT License](LICENSE)
-
-## 联系方式
-
-如有问题或建议，欢迎在 [Issues](https://github.com/chengrady/SlimNote/issues) 中提出。
+本项目基于 [MIT License](LICENSE) 开源。
 
 ---
 
-<p align="center">
-  Made with ❤️ by SlimNote Team
-</p>
+<div align="center">
+
+## 🛠️ Tech Stack
+
+| Technology | Version | Description |
+|------------|---------|-------------|
+| [Electron](https://www.electronjs.org/) | 28 | Cross-platform desktop framework |
+| [Vue](https://vuejs.org/) | 3.4 | Progressive JavaScript framework |
+| [Vite](https://vitejs.dev/) | 5 | Next generation frontend tooling |
+| [Pinia](https://pinia.vuejs.org/) | 2.1 | Vue state management |
+| [Monaco Editor](https://microsoft.github.io/monaco-editor/) | 0.47 | Code editor (VS Code engine) |
+| [Milkdown](https://milkdown.dev/) | 7.18 | WYSIWYG Markdown editor |
+
+---
+
+Made with ❤️ by [SlimNote Team](https://github.com/chengrady)
+
+[⬆ Back to Top](#slimnote)
+
+</div>

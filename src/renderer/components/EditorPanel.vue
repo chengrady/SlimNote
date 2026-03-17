@@ -111,10 +111,10 @@
             />
           </div>
           <div v-if="activeTab.language === 'log'" class="log-stats-bar">
-            <span class="log-stat-pill total">总计 {{ logStats.total }}</span>
-            <span class="log-stat-pill error">ERROR {{ logStats.error }}</span>
-            <span class="log-stat-pill warn">WARN {{ logStats.warn }}</span>
-            <span class="log-stat-pill info">INFO {{ logStats.info }}</span>
+            <span class="log-stat-pill total">{{ t('editorPanel.logTotal') }} {{ logStats.total }}</span>
+            <span class="log-stat-pill error">{{ t('editorPanel.logError') }} {{ logStats.error }}</span>
+            <span class="log-stat-pill warn">{{ t('editorPanel.logWarn') }} {{ logStats.warn }}</span>
+            <span class="log-stat-pill info">{{ t('editorPanel.logInfo') }} {{ logStats.info }}</span>
           </div>
           <!-- JSON 统计栏 -->
           <JsonStatsBar v-if="activeTab.language === 'json'" :content="activeTab.content" />
@@ -123,7 +123,7 @@
             v-if="isMarkdownSplitView && markdownSplitFocus === 'both'"
             class="split-resizer"
             role="separator"
-            aria-label="调整源码与预览宽度"
+            :aria-label="t('editorPanel.splitResize')"
             aria-orientation="vertical"
             @mousedown="startSplitResize"
           >
@@ -131,8 +131,8 @@
               <button
                 class="split-resizer-action split-resizer-action-editor"
                 type="button"
-                title="聚焦源码"
-                aria-label="聚焦源码"
+                :title="t('editorPanel.focusSource')"
+                :aria-label="t('editorPanel.focusSource')"
                 @mousedown.stop.prevent
                 @click.stop="setMarkdownSplitFocus('editor')"
               >
@@ -143,8 +143,8 @@
               <button
                 class="split-resizer-action split-resizer-action-preview"
                 type="button"
-                title="聚焦预览"
-                aria-label="聚焦预览"
+                :title="t('editorPanel.focusPreview')"
+                :aria-label="t('editorPanel.focusPreview')"
                 @mousedown.stop.prevent
                 @click.stop="setMarkdownSplitFocus('preview')"
               >
@@ -170,7 +170,7 @@
           v-if="showContextSidebar && !isContextSidebarCollapsed"
           class="context-resizer"
           role="separator"
-          aria-label="调整右侧上下文栏宽度"
+          :aria-label="t('editorPanel.resizeContextSidebar')"
           aria-orientation="vertical"
           @mousedown="startContextResize"
         ></div>
@@ -191,7 +191,7 @@
                 type="button"
                 @click="setMarkdownContextTab('preview')"
               >
-                预览
+                {{ t('editorPanel.preview') }}
               </button>
               <button
                 class="context-tab-button"
@@ -200,7 +200,7 @@
                 :disabled="markdownHeadings.length === 0"
                 @click="setMarkdownContextTab('outline')"
               >
-                目录
+                {{ t('editorPanel.outline') }}
               </button>
             </div>
             <button
@@ -209,7 +209,7 @@
               type="button"
               @click="toggleJsonTree"
             >
-              隐藏
+              {{ t('editorPanel.hide') }}
             </button>
             <button
               v-else-if="activeTab.language === 'log' && logFilterMode !== 'all'"
@@ -217,7 +217,7 @@
               type="button"
               @click="setLogFilterMode('all')"
             >
-              清除过滤
+              {{ t('editorPanel.clearFilter') }}
             </button>
           </template>
 
@@ -253,29 +253,29 @@
           <div v-else-if="showLogContextPanel" class="log-context-panel">
             <div class="log-context-stats-grid">
               <div class="log-context-stat-card total">
-                <span class="log-context-stat-label">总行数</span>
+                <span class="log-context-stat-label">{{ t('editorPanel.logTotalLines') }}</span>
                 <strong>{{ logStats.total }}</strong>
               </div>
               <div class="log-context-stat-card error">
-                <span class="log-context-stat-label">ERROR</span>
+                <span class="log-context-stat-label">{{ t('editorPanel.logError') }}</span>
                 <strong>{{ logStats.error }}</strong>
               </div>
               <div class="log-context-stat-card warn">
-                <span class="log-context-stat-label">WARN</span>
+                <span class="log-context-stat-label">{{ t('editorPanel.logWarn') }}</span>
                 <strong>{{ logStats.warn }}</strong>
               </div>
               <div class="log-context-stat-card info">
-                <span class="log-context-stat-label">INFO</span>
+                <span class="log-context-stat-label">{{ t('editorPanel.logInfo') }}</span>
                 <strong>{{ logStats.info }}</strong>
               </div>
             </div>
 
             <div v-if="logFilterMode === 'all'" class="log-context-empty-state">
-              <p>从顶部工具栏切换过滤条件，右侧将集中展示异常日志结果。</p>
+              <p>{{ t('editorPanel.logFilterHint') }}</p>
               <div class="log-context-shortcuts">
-                <button type="button" @click="setLogFilterMode('error')">查看 ERROR</button>
-                <button type="button" @click="setLogFilterMode('warn')">查看 WARN</button>
-                <button type="button" @click="setLogFilterMode('issues')">查看 ERROR / WARN</button>
+                <button type="button" @click="setLogFilterMode('error')">{{ t('editorPanel.viewError') }}</button>
+                <button type="button" @click="setLogFilterMode('warn')">{{ t('editorPanel.viewWarn') }}</button>
+                <button type="button" @click="setLogFilterMode('issues')">{{ t('editorPanel.viewIssues') }}</button>
               </div>
             </div>
 
@@ -295,7 +295,7 @@
     </div>
     <ModalDialog
       :show="showErrorDialog"
-      title="错误"
+      :title="t('editorPanel.errorTitle')"
       :message="errorMessage"
       @close="showErrorDialog = false"
       @confirm="showErrorDialog = false"
@@ -323,6 +323,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import { useSettingsStore } from '../stores/settings'
@@ -349,6 +350,8 @@ import { repairAndFormat } from '../utils/jsonRepair'
 import { exportCodeToImage, downloadImage } from '../utils/exportImage'
 import { buildMarkdownClipboardPayload, buildMarkdownPdfDocument } from '../utils/markdownPdf'
 import { formatSql, minifySql, transformSqlKeywords } from '../utils/sqlFormatter'
+
+const { t } = useI18n()
 
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
@@ -441,28 +444,32 @@ const showLogContextPanel = computed(() => activeTab.value?.language === 'log')
 const showContextSidebar = computed(() => showMarkdownContextPreview.value || showMarkdownOutlinePanel.value || showJsonContextTree.value || showLogContextPanel.value)
 const contextSidebarTitle = computed(() => {
   if (activeTab.value?.language === 'markdown') {
-    return markdownContextTab.value === 'preview' && !isMarkdownSplitView.value && editorMode.value === 'source' ? 'Markdown 预览' : 'Markdown 目录'
+    return markdownContextTab.value === 'preview' && !isMarkdownSplitView.value && editorMode.value === 'source'
+      ? t('editorPanel.contextMarkdownPreview')
+      : t('editorPanel.contextMarkdownOutline')
   }
   if (activeTab.value?.language === 'json') {
-    return 'JSON 结构'
+    return t('editorPanel.contextJson')
   }
   if (activeTab.value?.language === 'log') {
-    return '日志侧栏'
+    return t('editorPanel.contextLog')
   }
-  return '上下文'
+  return t('contextSidebar.title')
 })
 const contextSidebarSubtitle = computed(() => {
   if (activeTab.value?.language === 'markdown') {
     if (markdownContextTab.value === 'preview' && !isMarkdownSplitView.value && editorMode.value === 'source') {
-      return '源码与预览保持同步'
+      return t('editorPanel.contextMarkdownSync')
     }
-    return markdownHeadings.value.length > 0 ? `${markdownHeadings.value.length} 个标题节点` : '当前文档暂无标题'
+    return markdownHeadings.value.length > 0
+      ? t('editorPanel.contextHeadingCount', { count: markdownHeadings.value.length })
+      : t('editorPanel.contextNoHeadings')
   }
   if (activeTab.value?.language === 'json') {
-    return '结构树与源码联动定位'
+    return t('editorPanel.contextJsonSync')
   }
   if (activeTab.value?.language === 'log') {
-    return logFilterMode.value === 'all' ? '右侧集中展示过滤结果与统计' : logFilterSummary.value
+    return logFilterMode.value === 'all' ? t('editorPanel.contextLogSummary') : logFilterSummary.value
   }
   return ''
 })
@@ -488,13 +495,13 @@ const filteredLogEntries = computed(() => {
 })
 const logFilterSummary = computed(() => {
   if (logFilterMode.value === 'error') {
-    return `仅显示 ERROR，共 ${filteredLogEntries.value.length} 条`
+    return t('editorPanel.logFilterErrorSummary', { count: filteredLogEntries.value.length })
   }
   if (logFilterMode.value === 'warn') {
-    return `仅显示 WARN，共 ${filteredLogEntries.value.length} 条`
+    return t('editorPanel.logFilterWarnSummary', { count: filteredLogEntries.value.length })
   }
   if (logFilterMode.value === 'issues') {
-    return `仅显示 ERROR / WARN，共 ${filteredLogEntries.value.length} 条`
+    return t('editorPanel.logFilterIssuesSummary', { count: filteredLogEntries.value.length })
   }
   return ''
 })
@@ -1246,7 +1253,7 @@ async function exportMarkdownAsPdf() {
     const defaultExportPath = activeTab.value.filePath
       ? activeTab.value.filePath.replace(/\.[^.]+$/, '.pdf')
       : `${defaultFileName}.pdf`
-    const html = buildMarkdownPdfDocument({
+    const html = await buildMarkdownPdfDocument({
       content: activeTab.value.content,
       title: activeTab.value.title || defaultFileName,
       theme: settingsStore.settings.theme,

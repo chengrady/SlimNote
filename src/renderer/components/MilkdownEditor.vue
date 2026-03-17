@@ -12,6 +12,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { Crepe } from '@milkdown/crepe'
+import { editorViewCtx } from '@milkdown/kit/core'
+import { insert, replaceAll } from '@milkdown/kit/utils'
 import '@milkdown/crepe/theme/common/style.css'
 import '@milkdown/crepe/theme/frame.css'
 import { useSettingsStore } from '../stores/settings'
@@ -116,6 +118,24 @@ function handleCopy(event) {
   event.preventDefault()
 }
 
+function getCurrentMarkdown() {
+  if (!crepeEditor || !isEditorReady) return props.modelValue || ''
+
+  try {
+    return crepeEditor.getMarkdown() || ''
+  } catch (err) {
+    console.warn('Failed to get markdown:', err)
+    return props.modelValue || ''
+  }
+}
+
+function replaceMarkdownContent(markdown) {
+  if (!crepeEditor || !isEditorReady) return
+
+  crepeEditor.editor.action(replaceAll(typeof markdown === 'string' ? markdown : '', true))
+  applyEditableRootPreferences()
+}
+
 onMounted(async () => {
   if (!editorRef.value) return
 
@@ -159,8 +179,20 @@ onUnmounted(() => {
 })
 
 // Watch for external value changes
-watch(() => props.modelValue, () => {
-  if (!crepeEditor || !isEditorReady) return
+watch(() => props.modelValue, (value) => {
+  if (!crepeEditor || !isEditorReady || isApplyingExternalUpdate) return
+
+  const nextMarkdown = typeof value === 'string' ? value : ''
+  if (nextMarkdown === getCurrentMarkdown()) return
+
+  isApplyingExternalUpdate = true
+  try {
+    replaceMarkdownContent(nextMarkdown)
+  } finally {
+    queueMicrotask(() => {
+      isApplyingExternalUpdate = false
+    })
+  }
 })
 
 // Watch for theme changes
@@ -179,22 +211,26 @@ watch(() => settingsStore.settings.theme, () => {
 // Expose methods
 defineExpose({
   getMarkdown: () => {
-    if (!crepeEditor || !isEditorReady) return props.modelValue || ''
-    try {
-      return crepeEditor.getMarkdown() || ''
-    } catch (err) {
-      console.warn('Failed to get markdown:', err)
-      return props.modelValue || ''
-    }
+    return getCurrentMarkdown()
   },
   setMarkdown: (markdown) => {
     if (!crepeEditor || !isEditorReady) return
+    replaceMarkdownContent(markdown)
   },
   focus: () => {
     if (!crepeEditor || !isEditorReady) return
+    crepeEditor.editor.action((ctx) => {
+      ctx.get(editorViewCtx).focus()
+    })
   },
   insertText: (text) => {
     if (!crepeEditor || !isEditorReady || !text) return
+
+    crepeEditor.editor.action(insert(text, !/[\r\n]/.test(text)))
+    applyEditableRootPreferences()
+    crepeEditor.editor.action((ctx) => {
+      ctx.get(editorViewCtx).focus()
+    })
   }
 })
 </script>

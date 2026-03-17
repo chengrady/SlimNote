@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="converter-modal">
       <div class="modal-header">
-        <h3>格式转换</h3>
+        <h3>{{ t('jsonConverter.title') }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -14,30 +14,22 @@
       <div class="modal-body">
         <div class="format-selector">
           <div class="format-group">
-            <label>源格式</label>
+            <label>{{ t('jsonConverter.sourceFormat') }}</label>
             <select v-model="fromFormat">
-              <option value="json">JSON</option>
-              <option value="yaml">YAML</option>
-              <option value="xml">XML</option>
-              <option value="toml">TOML</option>
-              <option value="csv">CSV</option>
+              <option v-for="format in formatOptions" :key="`from-${format.value}`" :value="format.value">{{ format.label }}</option>
             </select>
           </div>
 
-          <button class="swap-btn" @click="swapFormats" title="交换">
+          <button class="swap-btn" @click="swapFormats" :title="t('jsonConverter.swap')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/>
             </svg>
           </button>
 
           <div class="format-group">
-            <label>目标格式</label>
+            <label>{{ t('jsonConverter.targetFormat') }}</label>
             <select v-model="toFormat">
-              <option value="json">JSON</option>
-              <option value="yaml">YAML</option>
-              <option value="xml">XML</option>
-              <option value="toml">TOML</option>
-              <option value="csv">CSV</option>
+              <option v-for="format in formatOptions" :key="`to-${format.value}`" :value="format.value">{{ format.label }}</option>
             </select>
           </div>
         </div>
@@ -46,19 +38,19 @@
           <div class="editor-pane">
             <div class="pane-header">
               <span>{{ formatNames[fromFormat] }}</span>
-              <button @click="formatInput" title="格式化">
+              <button @click="formatInput" :title="t('jsonConverter.format')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 10H3M21 6H3M21 14H3M21 18H3"/>
                 </svg>
               </button>
             </div>
-            <textarea v-model="inputContent" placeholder="输入内容..."></textarea>
+            <textarea v-model="inputContent" :placeholder="t('jsonConverter.inputPlaceholder')"></textarea>
           </div>
 
           <div class="editor-pane">
             <div class="pane-header">
               <span>{{ formatNames[toFormat] }}</span>
-              <button @click="copyOutput" title="复制">
+              <button @click="copyOutput" :title="t('jsonConverter.copy')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -80,8 +72,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">关闭</button>
-        <button class="btn btn-primary" @click="doConvert">转换</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ t('jsonConverter.close') }}</button>
+        <button class="btn btn-primary" @click="doConvert">{{ t('jsonConverter.convert') }}</button>
       </div>
     </div>
   </div>
@@ -89,7 +81,10 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { convert, formats } from '../utils/jsonConverter'
+
+const { t } = useI18n()
 
 const props = defineProps({
   content: {
@@ -106,13 +101,14 @@ const inputContent = ref('')
 const outputContent = ref('')
 const error = ref('')
 
-const formatNames = {
-  json: 'JSON',
-  yaml: 'YAML',
-  xml: 'XML',
-  toml: 'TOML',
-  csv: 'CSV'
-}
+const formatOptions = computed(() => Object.entries(formats).map(([value, format]) => ({
+  value,
+  label: format.name
+})))
+
+const formatNames = computed(() => Object.fromEntries(
+  Object.entries(formats).map(([value, format]) => [value, format.name])
+))
 
 // 初始化输入内容
 watch(() => props.content, (newContent) => {

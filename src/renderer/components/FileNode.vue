@@ -1,20 +1,20 @@
 <template>
-  <div class="file-node">
+  <div v-if="isVisible" class="file-node">
     <div 
       class="node-label"
-      :class="{ active: !node.isDirectory && node.path === activePath, selected: node.path === selectedPath }"
-      :style="{ paddingLeft: `calc(${depth} * 14px + 8px)` }"
+      :class="{ active: !node.isDirectory && node.path === activePath, selected: node.path === selectedPath, 'is-search-hit': isSearchHit }"
+      :style="{ paddingLeft: `calc(${depth} * 13px + 8px)` }"
       @click="handleClick"
       @keydown.enter="handleClick"
       @keydown.space.prevent="handleClick"
       @contextmenu.stop.prevent="showContextMenu"
       tabindex="0"
     >
-      <span class="twisty" :class="{ expanded: node.isDirectory && node.expanded }" aria-hidden="true">
+      <span class="twisty" :class="{ expanded: isExpandedInView }" aria-hidden="true">
         <svg v-if="node.isDirectory" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </span>
-      <span v-if="node.isDirectory" class="icon icon-folder" :class="{ expanded: node.expanded }" aria-hidden="true">
-        <svg v-if="node.expanded" width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <span v-if="node.isDirectory" class="icon icon-folder" :class="{ expanded: isExpandedInView }" aria-hidden="true">
+        <svg v-if="isExpandedInView" width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path d="M2 5.15c0-.83.67-1.5 1.5-1.5h2.9l1.08 1.22h6.98c.83 0 1.5.67 1.5 1.5v.48H2Z" fill="#d9a441" />
           <path d="M1.7 6.1h14.6l-1.12 5.62a1.5 1.5 0 0 1-1.47 1.2H3.64a1.5 1.5 0 0 1-1.47-1.2Z" fill="#e4b663" />
           <path d="M2.9 7.15h10.25" stroke="rgba(120,78,17,0.22)" stroke-width="0.8" stroke-linecap="round" />
@@ -30,7 +30,7 @@
       </span>
       <span class="name">{{ node.name }}</span>
     </div>
-    <div v-if="node.expanded && node.children">
+    <div v-if="isExpandedInView && node.children">
       <FileNode
         v-for="child in node.children"
         :key="child.path"
@@ -38,6 +38,7 @@
         :depth="depth + 1"
         :active-path="activePath"
         :selected-path="selectedPath"
+        :search-query="searchQuery"
         @open-file="$emit('open-file', $event)"
         @context-menu="$emit('context-menu', $event)"
         @select-node="$emit('select-node', $event)"
@@ -47,6 +48,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useFileStore } from '../stores/file'
 import FileIcon from './FileIcon.vue'
 
@@ -66,12 +68,24 @@ const props = defineProps({
   selectedPath: {
     type: String,
     default: ''
+  },
+  searchQuery: {
+    type: String,
+    default: ''
   }
 })
 
 const emit = defineEmits(['open-file', 'context-menu', 'select-node'])
 
 const fileStore = useFileStore()
+const normalizedSearchQuery = computed(() => String(props.searchQuery || '').trim().toLowerCase())
+const isSearchHit = computed(() => normalizedSearchQuery.value && String(props.node?.name || '').toLowerCase().includes(normalizedSearchQuery.value))
+const hasVisibleChildren = computed(() => {
+  if (!props.node?.isDirectory || !Array.isArray(props.node.children)) return false
+  return props.node.children.some(child => nodeMatchesSearch(child, normalizedSearchQuery.value))
+})
+const isVisible = computed(() => nodeMatchesSearch(props.node, normalizedSearchQuery.value))
+const isExpandedInView = computed(() => props.node?.isDirectory && (props.node.expanded || (normalizedSearchQuery.value && hasVisibleChildren.value)))
 
 async function handleClick() {
   emit('select-node', props.node)
@@ -86,6 +100,21 @@ function showContextMenu(event) {
   emit('select-node', props.node)
   emit('context-menu', { event, node: props.node })
 }
+
+function nodeMatchesSearch(node, searchQuery) {
+  if (!searchQuery) return true
+
+  const nodeName = String(node?.name || '').toLowerCase()
+  if (nodeName.includes(searchQuery)) {
+    return true
+  }
+
+  if (!node?.isDirectory || !Array.isArray(node.children)) {
+    return false
+  }
+
+  return node.children.some(child => nodeMatchesSearch(child, searchQuery))
+}
 </script>
 
 <style scoped>
@@ -96,12 +125,12 @@ function showContextMenu(event) {
 .node-label {
   display: flex;
   align-items: center;
-  min-height: 32px;
+  min-height: 34px;
   padding: 4px 8px;
   cursor: pointer;
-  margin: 1px 6px;
+  margin: 0 8px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   transition: var(--transition-fast);
   color: var(--text-main);
   line-height: 1.2;
@@ -109,21 +138,25 @@ function showContextMenu(event) {
 }
 
 .node-label.active {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.12) 72%, var(--glass-bg));
+  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.08) 80%, var(--glass-bg));
   color: var(--accent-primary);
-  border-color: rgba(var(--accent-primary-rgb), 0.14);
+  border-color: rgba(var(--accent-primary-rgb), 0.1);
   box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.72);
 }
 
 .node-label.selected {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.08) 74%, var(--glass-bg));
+  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.05) 84%, var(--glass-bg));
   color: var(--text-main);
-  border-color: rgba(var(--accent-primary-rgb), 0.12);
+  border-color: rgba(var(--accent-primary-rgb), 0.08);
   box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.55);
 }
 
 .node-label.active.selected {
   box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.75);
+}
+
+.node-label.is-search-hit {
+  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.06) 78%, var(--glass-bg));
 }
 
 .twisty {
@@ -144,8 +177,7 @@ function showContextMenu(event) {
 .node-label:hover {
   background: var(--interactive-hover-bg);
   color: var(--text-main);
-  border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
+  border-color: rgba(var(--accent-primary-rgb), 0.08);
 }
 
 .node-label:active {
@@ -174,7 +206,7 @@ function showContextMenu(event) {
 
 .name {
   font-size: 12.5px;
-  line-height: 1.35;
+  line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

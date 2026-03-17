@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './style.css'
+import { i18n, initLocaleFromSystem } from './locales'
 
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
@@ -33,4 +34,9 @@ const pinia = createPinia()
 
 app.use(pinia)
 app.use(router)
+app.use(i18n)
+
+// 初始化语言设置（根据系统语言）
+initLocaleFromSystem()
+
 app.mount('#app')

@@ -1,7 +1,7 @@
 <template>
   <div class="status-bar">
     <div class="status-left">
-      <span v-if="activeTab && activeTab.filePath" class="status-item clickable status-path" @click="showInFolder" :title="activeTab.filePath">
+      <span v-if="activeTab && activeTab.filePath" class="status-item clickable status-path" @click="showInFolder" :title="t('statusBar.showInFolder')">
         <span class="status-icon" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
@@ -11,21 +11,21 @@
         <span class="status-icon" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </span>
-        <span class="status-path-text">未打开文档，欢迎开始新建或打开文件</span>
+        <span class="status-path-text">{{ t('statusBar.noDocument') }}</span>
       </span>
     </div>
     <div class="status-right">
       <!-- Editor Properties -->
       <div class="status-group">
         <span class="status-item">
-          行 {{ cursorPosition.line }}, 列 {{ cursorPosition.column }}
+          {{ t('statusBar.line') }} {{ cursorPosition.line }}, {{ t('statusBar.column') }} {{ cursorPosition.column }}
         </span>
         <div class="status-item picker-container" ref="fontSizePickerContainer">
-          <span class="clickable" @click="toggleFontSizePicker" title="字体大小">
+          <span class="clickable" @click="toggleFontSizePicker" :title="t('statusBar.fontSize')">
             {{ activeTab ? activeTab.fontSize : settingsStore.settings.fontSize }}px
           </span>
           <div v-if="showFontSizePicker" class="popup-menu font-size-popup">
-            <div class="popup-header">字体大小</div>
+            <div class="popup-header">{{ t('statusBar.fontSize') }}</div>
             <div class="popup-list">
               <div 
                 v-for="size in fontSizes" 
@@ -49,11 +49,11 @@
           {{ getFileSize() }}
         </span>
         <div class="status-item picker-container status-compact-hide" ref="fontFamilyPickerContainer">
-          <span class="clickable" @click="toggleFontFamilyPicker" title="字体">
+          <span class="clickable" @click="toggleFontFamilyPicker" :title="t('statusBar.fontFamily')">
             {{ currentFontFamilyName }}
           </span>
           <div v-if="showFontFamilyPicker" class="popup-menu font-family-popup">
-            <div class="popup-header">选择字体</div>
+            <div class="popup-header">{{ t('statusBar.selectFont') }}</div>
             <div class="popup-list">
               <div 
                 v-for="font in fontFamilies" 
@@ -72,11 +72,11 @@
           {{ activeTab.encoding ? activeTab.encoding.toUpperCase() : 'UTF-8' }}
         </span>
         <div v-if="activeTab.language === 'sql'" class="status-item picker-container" ref="sqlDialectPickerContainer">
-          <span class="clickable" @click="toggleSqlDialectPicker" title="SQL 方言">
+          <span class="clickable" @click="toggleSqlDialectPicker" :title="t('statusBar.sqlDialect')">
             {{ currentSqlDialectLabel }}
           </span>
           <div v-if="showSqlDialectPicker" class="popup-menu sql-dialect-popup">
-            <div class="popup-header">SQL 方言</div>
+            <div class="popup-header">{{ t('statusBar.sqlDialect') }}</div>
             <div class="popup-list">
               <div
                 v-for="dialect in sqlDialects"
@@ -95,7 +95,7 @@
             {{ getLanguageLabel(activeTab.language) }}
           </span>
           <div v-if="showLanguagePicker" class="popup-menu">
-            <div class="popup-header">选择语言模式</div>
+            <div class="popup-header">{{ t('statusBar.selectLanguage') }}</div>
             <div class="popup-list">
               <div 
                 v-for="lang in languages" 
@@ -111,9 +111,9 @@
         </div>
       </div>
       <div v-else class="status-group status-idle-group">
-        <span class="status-item status-compact-hide">空白工作区</span>
-        <span class="status-item">默认字体 {{ settingsStore.settings.fontSize }}px</span>
-        <span class="status-item status-compact-hide">等待打开文件</span>
+        <span class="status-item status-compact-hide">{{ t('statusBar.emptyWorkspace') }}</span>
+        <span class="status-item">{{ t('statusBar.defaultFontSize', { size: settingsStore.settings.fontSize }) }}</span>
+        <span class="status-item status-compact-hide">{{ t('statusBar.waitingForFile') }}</span>
       </div>
     </div>
   </div>
@@ -121,8 +121,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useSettingsStore } from '../stores/settings'
+
+const { t, te } = useI18n()
 
 const editorStore = useEditorStore()
 const settingsStore = useSettingsStore()
@@ -172,9 +175,9 @@ const currentSqlDialectLabel = computed(() => {
   return sqlDialects.find(item => item.value === current)?.label || 'MySQL'
 })
 
-const languages = [
-  { label: '纯文本', value: 'plaintext' },
-  { label: 'Log', value: 'log' },
+const languages = computed(() => [
+  { label: t('languages.plaintext'), value: 'plaintext' },
+  { label: t('languages.log'), value: 'log' },
   { label: 'JavaScript', value: 'javascript' },
   { label: 'TypeScript', value: 'typescript' },
   { label: 'JSON', value: 'json' },
@@ -189,11 +192,13 @@ const languages = [
   { label: 'C++', value: 'cpp' },
   { label: 'C#', value: 'csharp' },
   { label: 'SQL', value: 'sql' }
-]
+])
 
 function getLanguageLabel(langValue) {
-  const lang = languages.find(l => l.value === langValue)
-  return lang ? lang.label : langValue
+  const lang = languages.value.find(l => l.value === langValue)
+  if (lang) return lang.label
+  const key = `languages.${langValue}`
+  return te(key) ? t(key) : langValue
 }
 
 function toggleLanguagePicker() {

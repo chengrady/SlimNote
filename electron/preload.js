@@ -64,4 +64,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuRedo: (callback) => onIpc('menu-redo', callback),
   onMenuToggleTheme: (callback) => onIpc('menu-toggle-theme', callback),
   onAppOpenFile: (callback) => onIpc('app-open-file', callback),
+
+  // System Locale
+  getSystemLocale: () => ipcRenderer.invoke('get-system-locale'),
+  updateLocale: (locale) => ipcRenderer.send('update-locale', locale),
 })

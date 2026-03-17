@@ -3,19 +3,26 @@
     ref="previewContainer"
     class="markdown-preview"
     tabindex="0"
-    v-html="htmlContent"
     @scroll="handleScroll"
     @click="handleClick"
     @keydown="handleKeydown"
     @copy="handleCopy"
-  ></div>
+  >
+    <div ref="previewContent" class="markdown-preview-content" v-html="htmlContent"></div>
+  </div>
 </template>
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
+import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css' // Or another style
+import { useSettingsStore } from '../stores/settings'
+
+const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
 const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll'])
 
@@ -27,7 +34,17 @@ const props = defineProps({
 })
 
 const previewContainer = ref(null)
+const previewContent = ref(null)
 let isSyncingScroll = false
+let mermaidRenderVersion = 0
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 function isPrimarySelectAll(event) {
   return (event.ctrlKey || event.metaKey) && !event.altKey && String(event.key || '').toLowerCase() === 'a'
@@ -183,6 +200,55 @@ function handleCopy(event) {
   event.preventDefault()
 }
 
+function getMermaidTheme() {
+  return settingsStore.settings.theme === 'dark' ? 'dark' : 'default'
+}
+
+async function renderMermaidDiagrams() {
+  const container = previewContainer.value
+  if (!container) return
+
+  const currentVersion = ++mermaidRenderVersion
+  const mermaidCodeBlocks = Array.from(container.querySelectorAll('pre code.language-mermaid, pre code.lang-mermaid'))
+  if (!mermaidCodeBlocks.length) return
+
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'strict',
+    theme: getMermaidTheme()
+  })
+
+  for (const [index, codeBlock] of mermaidCodeBlocks.entries()) {
+    if (!(codeBlock instanceof HTMLElement)) continue
+
+    const pre = codeBlock.closest('pre')
+    if (!pre || currentVersion !== mermaidRenderVersion) return
+
+    const source = codeBlock.textContent || ''
+    const host = document.createElement('div')
+    host.className = 'mermaid-block'
+
+    try {
+      const renderId = `slimnote-mermaid-${currentVersion}-${index}`
+      const { svg, bindFunctions } = await mermaid.render(renderId, source)
+      if (currentVersion !== mermaidRenderVersion) return
+
+      host.innerHTML = svg
+      bindFunctions?.(host)
+    } catch (error) {
+      console.error('Mermaid rendering error:', error)
+      host.innerHTML = `
+        <div class="mermaid-error">
+          <p class="mermaid-error-message">${escapeHtml(t('markdown.mermaidError'))}</p>
+          <pre><code>${escapeHtml(source)}</code></pre>
+        </div>
+      `
+    }
+
+    pre.replaceWith(host)
+  }
+}
+
 defineExpose({
   setScrollRatio,
   scrollToHeading
@@ -226,6 +292,8 @@ const htmlContent = computed(() => {
     // 兼容不同版本的 marked
     const parser = typeof marked === 'function' ? marked : marked.parse
     return parser(props.content, {
+      gfm: true,
+      breaks: true,
       renderer: createHeadingRenderer(),
       highlight: function(code, lang) {
         const language = hljs.getLanguage(lang) ? lang : 'plaintext'
@@ -235,43 +303,64 @@ const htmlContent = computed(() => {
     })
   } catch (e) {
     console.error('Markdown parsing error:', e)
-    return '<p>Error parsing markdown</p>'
+    return `<p>${t('markdown.parseError')}</p>`
   }
 })
 
 watch(htmlContent, async () => {
   await nextTick()
+  await renderMermaidDiagrams()
   syncActiveHeading()
 }, { immediate: true })
+
+watch(() => settingsStore.settings.theme, async () => {
+  if (previewContent.value) {
+    previewContent.value.innerHTML = htmlContent.value
+  }
+  await nextTick()
+  await renderMermaidDiagrams()
+  syncActiveHeading()
+})
 </script>
 
 <style scoped>
 .markdown-preview {
+  display: flex;
   padding: clamp(20px, 2.8vw, 36px);
   overflow-y: auto;
   height: 100%;
+  width: 100%;
+  min-width: 0;
   background-color: var(--bg-primary);
   color: var(--text-main);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
   line-height: 1.6;
   scrollbar-gutter: stable;
   user-select: text;
 }
 
-.markdown-preview :deep(> :first-child) {
+.markdown-preview-content {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.markdown-preview-content :deep(> :first-child) {
   margin-top: 0;
 }
 
-.markdown-preview :deep(> :last-child) {
+.markdown-preview-content :deep(> :last-child) {
   margin-bottom: 0;
 }
 
-.markdown-preview :deep(h1),
-.markdown-preview :deep(h2),
-.markdown-preview :deep(h3),
-.markdown-preview :deep(h4),
-.markdown-preview :deep(h5),
-.markdown-preview :deep(h6) {
+.markdown-preview-content :deep(h1),
+.markdown-preview-content :deep(h2),
+.markdown-preview-content :deep(h3),
+.markdown-preview-content :deep(h4),
+.markdown-preview-content :deep(h5),
+.markdown-preview-content :deep(h6) {
   margin-top: var(--space-6);
   margin-bottom: var(--space-4);
   font-weight: 600;
@@ -282,28 +371,28 @@ watch(htmlContent, async () => {
   transition: color var(--transition-fast);
 }
 
-.markdown-preview :deep(h1:hover),
-.markdown-preview :deep(h2:hover),
-.markdown-preview :deep(h3:hover),
-.markdown-preview :deep(h4:hover),
-.markdown-preview :deep(h5:hover),
-.markdown-preview :deep(h6:hover) {
+.markdown-preview-content :deep(h1:hover),
+.markdown-preview-content :deep(h2:hover),
+.markdown-preview-content :deep(h3:hover),
+.markdown-preview-content :deep(h4:hover),
+.markdown-preview-content :deep(h5:hover),
+.markdown-preview-content :deep(h6:hover) {
   color: var(--accent-primary);
 }
 
-.markdown-preview :deep(h1) { font-size: 2em; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.3em; }
-.markdown-preview :deep(h2) { font-size: 1.5em; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.3em; }
-.markdown-preview :deep(h3) { font-size: 1.25em; }
-.markdown-preview :deep(h4) { font-size: 1em; }
-.markdown-preview :deep(h5) { font-size: 0.875em; }
-.markdown-preview :deep(h6) { font-size: 0.85em; color: var(--text-muted); }
+.markdown-preview-content :deep(h1) { font-size: 2em; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.3em; }
+.markdown-preview-content :deep(h2) { font-size: 1.5em; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.3em; }
+.markdown-preview-content :deep(h3) { font-size: 1.25em; }
+.markdown-preview-content :deep(h4) { font-size: 1em; }
+.markdown-preview-content :deep(h5) { font-size: 0.875em; }
+.markdown-preview-content :deep(h6) { font-size: 0.85em; color: var(--text-muted); }
 
-.markdown-preview :deep(p) {
+.markdown-preview-content :deep(p) {
   margin-top: 0;
   margin-bottom: var(--space-4);
 }
 
-.markdown-preview :deep(code) {
+.markdown-preview-content :deep(code) {
   padding: 0.2em 0.4em;
   margin: 0;
   font-size: 85%;
@@ -312,7 +401,7 @@ watch(htmlContent, async () => {
   font-family: var(--font-family-mono);
 }
 
-.markdown-preview :deep(pre) {
+.markdown-preview-content :deep(pre) {
   padding: 16px;
   overflow: auto;
   font-size: 14px;
@@ -322,7 +411,7 @@ watch(htmlContent, async () => {
   margin-bottom: 16px;
 }
 
-.markdown-preview :deep(pre code) {
+.markdown-preview-content :deep(pre code) {
   padding: 0;
   margin: 0;
   font-size: 100%;
@@ -332,7 +421,33 @@ watch(htmlContent, async () => {
   border: 0;
 }
 
-.markdown-preview :deep(blockquote) {
+.markdown-preview-content :deep(.mermaid-block) {
+  margin-bottom: 16px;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 78%, transparent);
+}
+
+.markdown-preview-content :deep(.mermaid-block svg) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.markdown-preview-content :deep(.mermaid-error) {
+  color: var(--text-main);
+}
+
+.markdown-preview-content :deep(.mermaid-error-message) {
+  margin: 0 0 10px;
+  color: #d14343;
+  font-weight: 600;
+}
+
+.markdown-preview-content :deep(blockquote) {
   padding: 0 1em;
   color: var(--text-muted);
   border-left: 0.25em solid rgba(var(--accent-primary-rgb), 0.28);
@@ -341,59 +456,59 @@ watch(htmlContent, async () => {
   border-radius: 0 8px 8px 0;
 }
 
-.markdown-preview :deep(ul),
-.markdown-preview :deep(ol) {
+.markdown-preview-content :deep(ul),
+.markdown-preview-content :deep(ol) {
   padding-left: 2em;
   margin-top: 0;
   margin-bottom: 16px;
 }
 
-.markdown-preview :deep(ol) {
+.markdown-preview-content :deep(ol) {
   list-style-position: inside;
   padding-left: 0;
 }
 
-.markdown-preview :deep(ol li) {
+.markdown-preview-content :deep(ol li) {
   padding-left: 0.25em;
 }
 
-.markdown-preview :deep(ol li::marker) {
+.markdown-preview-content :deep(ol li::marker) {
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
 }
 
-.markdown-preview :deep(img) {
+.markdown-preview-content :deep(img) {
   max-width: 100%;
   box-sizing: border-box;
 }
 
-.markdown-preview :deep(a) {
+.markdown-preview-content :deep(a) {
   color: var(--accent-primary);
   text-decoration: none;
 }
 
-.markdown-preview :deep(a:hover) {
+.markdown-preview-content :deep(a:hover) {
   text-decoration: underline;
 }
 
-.markdown-preview :deep(table) {
+.markdown-preview-content :deep(table) {
   border-spacing: 0;
   border-collapse: collapse;
   margin-bottom: 16px;
   width: 100%;
 }
 
-.markdown-preview :deep(table th),
-.markdown-preview :deep(table td) {
+.markdown-preview-content :deep(table th),
+.markdown-preview-content :deep(table td) {
   padding: 6px 13px;
   border: 1px solid var(--glass-border);
 }
 
-.markdown-preview :deep(table tr:nth-child(2n)) {
+.markdown-preview-content :deep(table tr:nth-child(2n)) {
   background-color: color-mix(in srgb, var(--bg-secondary) 88%, rgba(var(--accent-primary-rgb), 0.03));
 }
 
-.markdown-preview :deep(hr) {
+.markdown-preview-content :deep(hr) {
   border: 0;
   height: 1px;
   margin: 24px 0;

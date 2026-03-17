@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="diff-modal">
       <div class="modal-header">
-        <h3>JSON Diff 对比</h3>
+        <h3>{{ t('jsonDiff.title') }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -15,61 +15,61 @@
         <div class="editor-row">
           <div class="editor-pane">
             <div class="pane-header">
-              <span>原始 JSON</span>
-              <button @click="formatLeft" title="格式化">
+              <span>{{ t('jsonDiff.source') }}</span>
+              <button @click="formatLeft" :title="t('jsonDiff.format')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 10H3M21 6H3M21 14H3M21 18H3"/>
                 </svg>
               </button>
             </div>
-            <textarea v-model="leftContent" placeholder="输入原始 JSON..."></textarea>
+            <textarea v-model="leftContent" :placeholder="t('jsonDiff.inputSourcePlaceholder')"></textarea>
           </div>
 
           <div class="editor-pane">
             <div class="pane-header">
-              <span>对比 JSON</span>
-              <button @click="formatRight" title="格式化">
+              <span>{{ t('jsonDiff.target') }}</span>
+              <button @click="formatRight" :title="t('jsonDiff.format')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 10H3M21 6H3M21 14H3M21 18H3"/>
                 </svg>
               </button>
             </div>
-            <textarea v-model="rightContent" placeholder="输入对比 JSON..."></textarea>
+            <textarea v-model="rightContent" :placeholder="t('jsonDiff.inputTargetPlaceholder')"></textarea>
           </div>
         </div>
 
         <div class="stats-bar" v-if="diffStats">
-          <span class="stat added" title="新增行">
+          <span class="stat added" :title="t('jsonDiff.addedLines')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            {{ diffStats.added }} 新增
+            {{ diffStats.added }} {{ t('jsonDiff.added') }}
           </span>
-          <span class="stat removed" title="删除行">
+          <span class="stat removed" :title="t('jsonDiff.removedLines')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            {{ diffStats.removed }} 删除
+            {{ diffStats.removed }} {{ t('jsonDiff.removed') }}
           </span>
-          <span class="stat modified" title="修改行">
+          <span class="stat modified" :title="t('jsonDiff.modifiedLines')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
-            {{ diffStats.modified }} 修改
+            {{ diffStats.modified }} {{ t('jsonDiff.modified') }}
           </span>
         </div>
 
         <div class="diff-output" v-if="diffResult">
           <div class="output-header">
-            <span>差异结果</span>
+            <span>{{ t('jsonDiff.result') }}</span>
             <div class="output-actions">
-              <button @click="swapContents" title="交换内容">
+              <button @click="swapContents" :title="t('jsonDiff.swap')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/>
                 </svg>
-                交换
+                {{ t('jsonDiff.swapShort') }}
               </button>
             </div>
           </div>
@@ -89,15 +89,18 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">关闭</button>
-        <button class="btn btn-primary" @click="doDiff">对比</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ t('jsonDiff.close') }}</button>
+        <button class="btn btn-primary" @click="doDiff">{{ t('jsonDiff.compare') }}</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   content: {

@@ -1,90 +1,90 @@
 <template>
   <div class="empty-editor">
-    <div class="empty-badge">轻量 · 专注 · 即开即用</div>
-    <h2>SlimNote</h2>
-    <p>打开文件、选择工作流直接开始，历史记录统一放在左侧工作台查看</p>
+    <div class="empty-badge">{{ t('app.slogan') }}</div>
+    <h2>{{ t('app.name') }}</h2>
+    <p>{{ t('welcome.description') }}</p>
     <div class="quick-actions">
       <div class="quick-actions-primary">
-        <button @click="$emit('new-file')" class="btn btn-primary">新建文件</button>
-        <button @click="$emit('open-file')" class="btn">打开文件</button>
-        <button @click="$emit('open-folder')" class="btn">打开目录</button>
+        <button @click="$emit('new-file')" class="btn btn-primary">{{ t('welcome.newFile') }}</button>
+        <button @click="$emit('open-file')" class="btn">{{ t('welcome.openFile') }}</button>
+        <button @click="$emit('open-folder')" class="btn">{{ t('welcome.openFolder') }}</button>
       </div>
       <div v-if="lastOpenedFolder" class="quick-actions-secondary">
-        <button @click="$emit('restore-last-folder')" class="btn">恢复最近目录</button>
+        <button @click="$emit('restore-last-folder')" class="btn">{{ t('welcome.restoreFolder') }}</button>
       </div>
     </div>
     <div class="workflow-highlights">
       <button class="workflow-card markdown" type="button" @click="emitTemplate(markdownTemplate)">
-        <span class="workflow-label">文档工作流</span>
-        <strong>Markdown / Notes</strong>
-        <p>适合方案、说明、会议记录与日常笔记。</p>
+        <span class="workflow-label">{{ t('welcome.workflow.document') }}</span>
+        <strong>{{ t('welcome.workflowMeta.document') }}</strong>
+        <p>{{ t('welcome.workflow.documentDesc') }}</p>
       </button>
       <button class="workflow-card json" type="button" @click="emitTemplate(jsonTemplate)">
-        <span class="workflow-label">数据工作流</span>
-        <strong>JSON / SQL</strong>
-        <p>结构化数据查看、修复、格式化与查询脚本整理。</p>
+        <span class="workflow-label">{{ t('welcome.workflow.data') }}</span>
+        <strong>{{ t('welcome.workflowMeta.data') }}</strong>
+        <p>{{ t('welcome.workflow.dataDesc') }}</p>
       </button>
       <button class="workflow-card log" type="button" @click="emitTemplate(logTemplate)">
-        <span class="workflow-label">排查工作流</span>
-        <strong>Log / Text</strong>
-        <p>快速打开日志、过滤异常并继续上下文排查。</p>
+        <span class="workflow-label">{{ t('welcome.workflow.debug') }}</span>
+        <strong>{{ t('welcome.workflowMeta.debug') }}</strong>
+        <p>{{ t('welcome.workflow.debugDesc') }}</p>
       </button>
     </div>
     <div class="welcome-overview-strip">
       <div class="overview-pill">
-        <span class="overview-label">左侧记录</span>
+        <span class="overview-label">{{ t('welcome.overview.recentFiles') }}</span>
         <strong>{{ recentQuickFiles.length }}</strong>
       </div>
       <div class="overview-pill">
-        <span class="overview-label">支持类型</span>
-        <strong>MD / JSON / SQL / LOG</strong>
+        <span class="overview-label">{{ t('welcome.overview.supportedTypes') }}</span>
+        <strong>{{ t('welcome.overviewValues.supportedTypes') }}</strong>
       </div>
     </div>
     <div class="welcome-grid">
       <div class="welcome-card start-card">
         <div class="welcome-card-header">
-          <h3>开始任务</h3>
-          <span>欢迎页专用</span>
+          <h3>{{ t('welcome.start.title') }}</h3>
+          <span>{{ t('welcome.start.subtitle') }}</span>
         </div>
-        <p class="welcome-empty-text">这里保留启动动作和工作流入口；最近文件、已固定项目与目录历史都集中在左侧工作台。</p>
+        <p class="welcome-empty-text">{{ t('welcome.start.description') }}</p>
         <div class="start-insight-strip">
           <div class="start-insight">
-            <span>最近文件</span>
+            <span>{{ t('welcome.start.recentFiles') }}</span>
             <strong>{{ recentQuickFiles.length }}</strong>
           </div>
           <div class="start-insight">
-            <span>上次目录</span>
-            <strong>{{ lastOpenedFolder ? getFileName(lastOpenedFolder) : '暂无' }}</strong>
+            <span>{{ t('welcome.start.lastFolder') }}</span>
+            <strong>{{ lastOpenedFolder ? getFileName(lastOpenedFolder) : t('welcome.start.noFolder') }}</strong>
           </div>
         </div>
         <div class="start-actions">
           <button class="start-action" @click="$emit('open-file')">
-            <strong>打开单个文件</strong>
-            <span>适合快速查看 Markdown、JSON、SQL、Log</span>
+            <strong>{{ t('welcome.start.openSingleFile') }}</strong>
+            <span>{{ t('welcome.start.openSingleFileDesc') }}</span>
           </button>
           <button v-if="lastOpenedFolder" class="start-action" @click="$emit('restore-last-folder')">
-            <strong>恢复最近目录</strong>
+            <strong>{{ t('welcome.start.restoreFolder') }}</strong>
             <span>{{ getFileName(lastOpenedFolder) }}</span>
           </button>
           <button class="start-action" @click="$emit('create-from-clipboard', 'json')">
-            <strong>从剪贴板开始 JSON</strong>
-            <span>直接进入结构化数据整理流程</span>
+            <strong>{{ t('welcome.start.startFromClipboardJson') }}</strong>
+            <span>{{ t('welcome.start.startFromClipboardJsonDesc') }}</span>
           </button>
           <button class="start-action" @click="$emit('create-from-clipboard', 'markdown')">
-            <strong>从剪贴板开始 Markdown</strong>
-            <span>适合会议记录、方案整理与快速成稿</span>
+            <strong>{{ t('welcome.start.startFromClipboardMarkdown') }}</strong>
+            <span>{{ t('welcome.start.startFromClipboardMarkdownDesc') }}</span>
           </button>
         </div>
       </div>
       <template v-if="!isCompactWelcomeMode">
         <div class="welcome-card template-card">
           <div class="welcome-card-header">
-            <h3>快速模板</h3>
-            <span>一键创建</span>
+            <h3>{{ t('welcome.templates.title') }}</h3>
+            <span>{{ t('welcome.templates.subtitle') }}</span>
           </div>
           <div class="clipboard-actions">
-            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'json')">从剪贴板新建 JSON</button>
-            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'markdown')">从剪贴板新建 Markdown</button>
+            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'json')">{{ t('welcome.templates.fromClipboardJson') }}</button>
+            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'markdown')">{{ t('welcome.templates.fromClipboardMarkdown') }}</button>
           </div>
           <div class="template-grid">
             <button class="template-item" @click="$emit('create-template', template)" v-for="template in templates" :key="template.title">
@@ -95,21 +95,21 @@
         </div>
         <div class="welcome-card shortcut-card">
           <div class="welcome-card-header">
-            <h3>常用场景</h3>
-            <span>按任务进入</span>
+            <h3>{{ t('welcome.scenarios.title') }}</h3>
+            <span>{{ t('welcome.scenarios.subtitle') }}</span>
           </div>
           <div class="scenario-list">
             <button class="scenario-item" type="button" @click="emitTemplate(markdownTemplate)">
-              <strong>开始写文档</strong>
-              <span>进入 Markdown 工作流，适合方案、说明和会议记录。</span>
+              <strong>{{ t('welcome.scenarios.writeDocs') }}</strong>
+              <span>{{ t('welcome.scenarios.writeDocsDesc') }}</span>
             </button>
             <button class="scenario-item" type="button" @click="emitTemplate(jsonTemplate)">
-              <strong>整理数据</strong>
-              <span>从 JSON / SQL 模板起步，继续格式化、修复或查询整理。</span>
+              <strong>{{ t('welcome.scenarios.organizeData') }}</strong>
+              <span>{{ t('welcome.scenarios.organizeDataDesc') }}</span>
             </button>
             <button class="scenario-item" type="button" @click="emitTemplate(logTemplate)">
-              <strong>排查日志</strong>
-              <span>快速进入 Log / Text 场景，继续过滤异常和定位问题。</span>
+              <strong>{{ t('welcome.scenarios.analyzeLogs') }}</strong>
+              <span>{{ t('welcome.scenarios.analyzeLogsDesc') }}</span>
             </button>
           </div>
         </div>
@@ -117,21 +117,21 @@
     </div>
     <div v-if="isCompactWelcomeMode" class="welcome-compact-section">
       <button class="btn welcome-more-toggle" @click="showCompactExtras = !showCompactExtras" :aria-expanded="showCompactExtras">
-        <span>{{ showCompactExtras ? '收起更多功能' : '展开更多功能' }}</span>
+        <span>{{ showCompactExtras ? t('welcome.compact.hideMore') : t('welcome.compact.showMore') }}</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="{ expanded: showCompactExtras }">
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
-      <p class="welcome-compact-tip">小窗口下默认保留最近文件与常用入口，扩展功能可按需展开。</p>
+      <p class="welcome-compact-tip">{{ t('welcome.compact.tip') }}</p>
       <div v-if="showCompactExtras" class="welcome-extra-stack">
         <div class="welcome-card template-card compact-card">
           <div class="welcome-card-header">
-            <h3>快速模板</h3>
-            <span>一键创建</span>
+            <h3>{{ t('welcome.templates.title') }}</h3>
+            <span>{{ t('welcome.templates.subtitle') }}</span>
           </div>
           <div class="clipboard-actions">
-            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'json')">从剪贴板新建 JSON</button>
-            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'markdown')">从剪贴板新建 Markdown</button>
+            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'json')">{{ t('welcome.templates.fromClipboardJson') }}</button>
+            <button class="clipboard-btn" @click="$emit('create-from-clipboard', 'markdown')">{{ t('welcome.templates.fromClipboardMarkdown') }}</button>
           </div>
           <div class="template-grid compact-template-grid">
             <button class="template-item" @click="$emit('create-template', template)" v-for="template in templates" :key="`compact-${template.title}`">
@@ -142,21 +142,21 @@
         </div>
         <div class="welcome-card shortcut-card compact-card">
           <div class="welcome-card-header">
-            <h3>常用场景</h3>
-            <span>按任务进入</span>
+            <h3>{{ t('welcome.scenarios.title') }}</h3>
+            <span>{{ t('welcome.scenarios.subtitle') }}</span>
           </div>
           <div class="scenario-list compact-scenario-list">
             <button class="scenario-item" type="button" @click="emitTemplate(markdownTemplate)">
-              <strong>开始写文档</strong>
-              <span>Markdown 记录与成稿</span>
+              <strong>{{ t('welcome.scenarios.writeDocs') }}</strong>
+              <span>{{ t('welcome.scenarios.compactWriteDocsDesc') }}</span>
             </button>
             <button class="scenario-item" type="button" @click="emitTemplate(jsonTemplate)">
-              <strong>整理数据</strong>
-              <span>JSON / SQL 清洗与处理</span>
+              <strong>{{ t('welcome.scenarios.organizeData') }}</strong>
+              <span>{{ t('welcome.scenarios.compactOrganizeDataDesc') }}</span>
             </button>
             <button class="scenario-item" type="button" @click="emitTemplate(logTemplate)">
-              <strong>排查日志</strong>
-              <span>Log / Text 异常分析</span>
+              <strong>{{ t('welcome.scenarios.analyzeLogs') }}</strong>
+              <span>{{ t('welcome.scenarios.compactAnalyzeLogsDesc') }}</span>
             </button>
           </div>
         </div>
@@ -167,6 +167,9 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   lastOpenedFolder: {

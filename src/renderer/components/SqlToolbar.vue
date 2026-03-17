@@ -1,38 +1,42 @@
 <template>
   <div class="sql-toolbar">
-    <span class="sql-toolbar-meta">SQL</span>
-    <span class="sql-toolbar-note">方言：{{ dialectLabel }}</span>
-    <button class="sql-toolbar-button" type="button" @click="$emit('snippet', 'select')" title="插入 SELECT 片段">
-      <span class="sql-toolbar-text">SELECT 片段</span>
+    <span class="sql-toolbar-meta">{{ t('sqlToolbar.meta') }}</span>
+    <span class="sql-toolbar-note">{{ t('sqlToolbar.dialect', { dialect: dialectLabel }) }}</span>
+    <button class="sql-toolbar-button" type="button" @click="$emit('snippet', 'select')" :title="t('sqlToolbar.selectSnippet')">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.selectSnippet') }}</span>
     </button>
-    <button class="sql-toolbar-button" type="button" @click="$emit('snippet', 'insert')" title="插入 INSERT 片段">
-      <span class="sql-toolbar-text">INSERT 片段</span>
+    <button class="sql-toolbar-button" type="button" @click="$emit('snippet', 'insert')" :title="t('sqlToolbar.insertSnippet')">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.insertSnippet') }}</span>
     </button>
-    <button class="sql-toolbar-button" type="button" @click="$emit('snippet', 'update')" title="插入 UPDATE 片段">
-      <span class="sql-toolbar-text">UPDATE 片段</span>
-    </button>
-    <div class="sql-toolbar-separator"></div>
-    <button class="sql-toolbar-button" type="button" @click="$emit('format')" title="格式化 SQL (Ctrl+Shift+F)">
-      <span class="sql-toolbar-text">格式化</span>
-    </button>
-    <button class="sql-toolbar-button" type="button" @click="$emit('minify')" title="压缩 SQL (Ctrl+Shift+M)">
-      <span class="sql-toolbar-text">压缩</span>
+    <button class="sql-toolbar-button" type="button" @click="$emit('snippet', 'update')" :title="t('sqlToolbar.updateSnippet')">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.updateSnippet') }}</span>
     </button>
     <div class="sql-toolbar-separator"></div>
-    <button class="sql-toolbar-button" type="button" @click="$emit('upper-keywords')" title="关键字转大写 (Ctrl+Shift+U)">
-      <span class="sql-toolbar-text">关键字大写</span>
+    <button class="sql-toolbar-button" type="button" @click="$emit('format')" :title="`${t('sqlToolbar.format')} SQL (Ctrl+Shift+F)`">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.format') }}</span>
     </button>
-    <button class="sql-toolbar-button" type="button" @click="$emit('lower-keywords')" title="关键字转小写 (Ctrl+Shift+L)">
-      <span class="sql-toolbar-text">关键字小写</span>
+    <button class="sql-toolbar-button" type="button" @click="$emit('minify')" :title="`${t('sqlToolbar.minify')} SQL (Ctrl+Shift+M)`">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.minify') }}</span>
     </button>
     <div class="sql-toolbar-separator"></div>
-    <button class="sql-toolbar-button" type="button" @click="$emit('copy')" title="复制 SQL 内容">
-      <span class="sql-toolbar-text">复制内容</span>
+    <button class="sql-toolbar-button" type="button" @click="$emit('upper-keywords')" :title="`${t('sqlToolbar.upperKeywords')} (Ctrl+Shift+U)`">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.upperKeywords') }}</span>
+    </button>
+    <button class="sql-toolbar-button" type="button" @click="$emit('lower-keywords')" :title="`${t('sqlToolbar.lowerKeywords')} (Ctrl+Shift+L)`">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.lowerKeywords') }}</span>
+    </button>
+    <div class="sql-toolbar-separator"></div>
+    <button class="sql-toolbar-button" type="button" @click="$emit('copy')" :title="t('sqlToolbar.copy')">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.copy') }}</span>
     </button>
   </div>
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 defineProps({
   dialectLabel: {
     type: String,

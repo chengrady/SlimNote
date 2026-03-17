@@ -10,6 +10,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onWindowUnmaximized: (callback) => ipcRenderer.on('window-unmaximized', callback),
   setTheme: (theme) => ipcRenderer.send('set-theme', theme),
 
+  // System Info
+  getSystemLocale: () => ipcRenderer.invoke('get-system-locale'),
+  onLocaleChanged: (callback) => ipcRenderer.on('locale-changed', (event, locale) => callback(locale)),
+  updateLocale: (locale) => ipcRenderer.send('update-locale', locale),
+
   // File System
   readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
   writeFile: (filePath, content, encoding) => ipcRenderer.invoke('write-file', { filePath, content, encoding }),

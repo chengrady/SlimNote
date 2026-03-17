@@ -1,42 +1,46 @@
 <template>
   <div class="log-toolbar">
-    <span class="log-toolbar-meta">Log</span>
-    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'all' }" @click="$emit('set-filter', 'all')" title="显示全部日志">
-      <span class="log-toolbar-text">全部</span>
+    <span class="log-toolbar-meta">{{ t('logToolbar.meta') }}</span>
+    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'all' }" @click="$emit('set-filter', 'all')" :title="t('logToolbar.showAll')">
+      <span class="log-toolbar-text">{{ t('logToolbar.all') }}</span>
     </button>
-    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'error' }" @click="$emit('set-filter', 'error')" title="仅看 ERROR">
-      <span class="log-toolbar-text">仅 ERROR</span>
+    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'error' }" @click="$emit('set-filter', 'error')" :title="t('logToolbar.errorsOnly')">
+      <span class="log-toolbar-text">{{ t('logToolbar.errorsOnly') }}</span>
     </button>
-    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'warn' }" @click="$emit('set-filter', 'warn')" title="仅看 WARN">
-      <span class="log-toolbar-text">仅 WARN</span>
+    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'warn' }" @click="$emit('set-filter', 'warn')" :title="t('logToolbar.warningsOnly')">
+      <span class="log-toolbar-text">{{ t('logToolbar.warningsOnly') }}</span>
     </button>
-    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'issues' }" @click="$emit('set-filter', 'issues')" title="仅看 ERROR/WARN">
-      <span class="log-toolbar-text">ERROR/WARN</span>
-    </button>
-    <div class="log-toolbar-separator"></div>
-    <button class="log-toolbar-button" type="button" :class="{ active: wrapEnabled }" @click="$emit('toggle-wrap')" title="切换自动换行 (Ctrl+Shift+W)">
-      <span class="log-toolbar-text">自动换行</span>
-    </button>
-    <button class="log-toolbar-button" type="button" @click="$emit('jump-level', 'ERROR')" title="定位下一条 ERROR">
-      <span class="log-toolbar-text">下一个 ERROR</span>
-    </button>
-    <button class="log-toolbar-button" type="button" @click="$emit('jump-level', 'WARN')" title="定位下一条 WARN">
-      <span class="log-toolbar-text">下一个 WARN</span>
-    </button>
-    <button class="log-toolbar-button" type="button" @click="$emit('jump-level', 'INFO')" title="定位下一条 INFO">
-      <span class="log-toolbar-text">下一个 INFO</span>
+    <button class="log-toolbar-button" type="button" :class="{ active: filterMode === 'issues' }" @click="$emit('set-filter', 'issues')" :title="t('logToolbar.issuesOnly')">
+      <span class="log-toolbar-text">{{ t('logToolbar.issues') }}</span>
     </button>
     <div class="log-toolbar-separator"></div>
-    <button class="log-toolbar-button" type="button" @click="$emit('scroll-bottom')" title="滚动到底部">
-      <span class="log-toolbar-text">滚动到底部</span>
+    <button class="log-toolbar-button" type="button" :class="{ active: wrapEnabled }" @click="$emit('toggle-wrap')" :title="`${t('logToolbar.toggleWrap')} (Ctrl+Shift+W)`">
+      <span class="log-toolbar-text">{{ t('logToolbar.wrap') }}</span>
     </button>
-    <button class="log-toolbar-button" type="button" @click="$emit('copy')" title="复制日志内容">
-      <span class="log-toolbar-text">复制内容</span>
+    <button class="log-toolbar-button" type="button" @click="$emit('jump-level', 'ERROR')" :title="t('logToolbar.nextError')">
+      <span class="log-toolbar-text">{{ t('logToolbar.nextError') }}</span>
+    </button>
+    <button class="log-toolbar-button" type="button" @click="$emit('jump-level', 'WARN')" :title="t('logToolbar.nextWarn')">
+      <span class="log-toolbar-text">{{ t('logToolbar.nextWarn') }}</span>
+    </button>
+    <button class="log-toolbar-button" type="button" @click="$emit('jump-level', 'INFO')" :title="t('logToolbar.nextInfo')">
+      <span class="log-toolbar-text">{{ t('logToolbar.nextInfo') }}</span>
+    </button>
+    <div class="log-toolbar-separator"></div>
+    <button class="log-toolbar-button" type="button" @click="$emit('scroll-bottom')" :title="t('logToolbar.scrollBottom')">
+      <span class="log-toolbar-text">{{ t('logToolbar.scrollBottom') }}</span>
+    </button>
+    <button class="log-toolbar-button" type="button" @click="$emit('copy')" :title="t('logToolbar.copy')">
+      <span class="log-toolbar-text">{{ t('logToolbar.copy') }}</span>
     </button>
   </div>
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 defineProps({
   filterMode: {
     type: String,

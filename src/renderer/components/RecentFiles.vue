@@ -2,20 +2,20 @@
   <div class="recent-files-panel" :class="{ collapsed }">
     <div class="panel-header">
       <div class="panel-title-group">
-        <span class="panel-title">最近打开</span>
-        <span v-if="!collapsed" class="panel-subtitle">{{ totalRecentCount > 0 ? `${totalRecentCount} 个文件` : '快速访问文件' }}</span>
+        <span class="panel-title">{{ t('recentFilesPanel.title') }}</span>
+        <span v-if="!collapsed" class="panel-subtitle">{{ totalRecentCount > 0 ? t('recentFilesPanel.countSubtitle', { count: totalRecentCount }) : t('recentFilesPanel.quickAccess') }}</span>
       </div>
       <div class="header-actions">
-        <button @click="$emit('toggle-collapse')" :title="collapsed ? '展开侧栏' : '收起侧栏'" :aria-label="collapsed ? '展开侧栏' : '收起侧栏'">
+        <button @click="$emit('toggle-collapse')" :title="collapsed ? t('recentFilesPanel.expandSidebar') : t('recentFilesPanel.collapseSidebar')" :aria-label="collapsed ? t('recentFilesPanel.expandSidebar') : t('recentFilesPanel.collapseSidebar')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline v-if="collapsed" points="9 18 15 12 9 6"/>
             <polyline v-else points="15 18 9 12 15 6"/>
           </svg>
         </button>
-        <button @click="openFileDialog" title="打开文件" aria-label="打开文件">
+        <button @click="openFileDialog" :title="t('recentFilesPanel.openFile')" :aria-label="t('recentFilesPanel.openFile')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
         </button>
-        <button @click="clearRecent" title="清空最近记录" aria-label="清空最近记录" v-if="unpinnedRecentFiles.length > 0 && !collapsed">
+        <button @click="clearRecent" :title="t('recentFilesPanel.clearRecent')" :aria-label="t('recentFilesPanel.clearRecent')" v-if="unpinnedRecentFiles.length > 0 && !collapsed">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
         </button>
       </div>
@@ -23,10 +23,10 @@
     <div class="panel-content">
       <div v-if="!collapsed" class="search-box">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input v-model="searchTerm" type="search" placeholder="搜索最近文件" aria-label="搜索最近文件">
+        <input v-model="searchTerm" type="search" :placeholder="t('recentFilesPanel.searchPlaceholder')" :aria-label="t('recentFilesPanel.searchPlaceholder')">
       </div>
       <div v-if="collapsed" class="collapsed-list">
-        <button class="collapsed-open-btn" @click="openFileDialog" aria-label="打开文件">
+        <button class="collapsed-open-btn" @click="openFileDialog" :aria-label="t('recentFilesPanel.openFile')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
         </button>
         <div
@@ -43,18 +43,18 @@
         <div class="empty-icon" aria-hidden="true">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
         </div>
-        <p>暂无最近打开的文件</p>
-        <button class="btn empty-action" @click="openFileDialog">打开文件</button>
+        <p>{{ t('recentFilesPanel.empty') }}</p>
+        <button class="btn empty-action" @click="openFileDialog">{{ t('recentFilesPanel.emptyAction') }}</button>
       </div>
       <div v-else-if="filteredEntries.length === 0" class="empty-state search-empty">
         <div class="empty-icon" aria-hidden="true">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </div>
-        <p>没有匹配的最近文件</p>
+        <p>{{ t('recentFilesPanel.noMatch') }}</p>
       </div>
       <div v-else class="grouped-files">
         <div v-if="showPinnedGroup" class="file-group">
-          <div class="group-title">已固定</div>
+          <div class="group-title">{{ t('recentFilesPanel.pinned') }}</div>
           <div
             class="file-list"
             :class="{ 'group-drop-active': recentDrag.dragPath && recentDrag.targetPinned === true && !recentDrag.targetPath }"
@@ -82,18 +82,18 @@
                 <span class="file-name" :title="file.path">{{ getFileName(file.path) }}</span>
                 <span class="file-path" :title="file.path">{{ file.path }}</span>
               </div>
-              <button class="pin-btn active" @click.stop="togglePin(file.path)" :title="'取消固定'" aria-label="取消固定">
+              <button class="pin-btn active" @click.stop="togglePin(file.path)" :title="t('recentFilesPanel.unpin')" :aria-label="t('recentFilesPanel.unpin')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
               </button>
-              <button class="remove-btn" @click.stop="removeRecent(file.path)" title="从列表中移除">×</button>
+              <button class="remove-btn" @click.stop="removeRecent(file.path)" :title="t('recentFilesPanel.remove')">×</button>
             </div>
             <div v-if="filteredPinnedFiles.length === 0" class="drop-placeholder">
-              拖到这里即可固定到顶部
+              {{ t('recentFilesPanel.dropToPin') }}
             </div>
           </div>
         </div>
         <div v-if="showUnpinnedGroup" class="file-group">
-          <div class="group-title">最近</div>
+          <div class="group-title">{{ t('recentFilesPanel.recent') }}</div>
           <div
             class="file-list"
             :class="{ 'group-drop-active': recentDrag.dragPath && recentDrag.targetPinned === false && !recentDrag.targetPath }"
@@ -121,13 +121,13 @@
                 <span class="file-name" :title="file.path">{{ getFileName(file.path) }}</span>
                 <span class="file-path" :title="file.path">{{ file.path }}</span>
               </div>
-              <button class="pin-btn" @click.stop="togglePin(file.path)" title="固定到顶部" aria-label="固定到顶部">
+              <button class="pin-btn" @click.stop="togglePin(file.path)" :title="t('recentFilesPanel.pinTop')" :aria-label="t('recentFilesPanel.pinTop')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
               </button>
-              <button class="remove-btn" @click.stop="removeRecent(file.path)" title="从列表中移除">×</button>
+              <button class="remove-btn" @click.stop="removeRecent(file.path)" :title="t('recentFilesPanel.remove')">×</button>
             </div>
             <div v-if="filteredUnpinnedFiles.length === 0" class="drop-placeholder">
-              拖到这里即可移回最近列表
+              {{ t('recentFilesPanel.dropToRecent') }}
             </div>
           </div>
         </div>
@@ -141,13 +141,13 @@
         class="context-menu"
         :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
       >
-        <div class="menu-item" @click="handleContextAction('open')">打开</div>
+        <div class="menu-item" @click="handleContextAction('open')">{{ t('recentFilesPanel.menuOpen') }}</div>
         <div class="menu-item" @click="handleContextAction('togglePin')">
-          {{ contextMenu.file?.pinned ? '取消固定' : '固定到顶部' }}
+          {{ contextMenu.file?.pinned ? t('recentFilesPanel.unpin') : t('recentFilesPanel.pinTop') }}
         </div>
-        <div class="menu-item" @click="handleContextAction('remove')">从列表中移除</div>
+        <div class="menu-item" @click="handleContextAction('remove')">{{ t('recentFilesPanel.remove') }}</div>
         <div class="menu-separator"></div>
-        <div class="menu-item" @click="handleContextAction('clearUnpinned')">清理未固定记录</div>
+        <div class="menu-item" @click="handleContextAction('clearUnpinned')">{{ t('recentFilesPanel.menuClearUnpinned') }}</div>
       </div>
     </Teleport>
   </div>
@@ -155,8 +155,11 @@
 
 <script setup>
 import { computed, nextTick, ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useFileStore } from '../stores/file'
 import FileIcon from './FileIcon.vue'
+
+const { t } = useI18n()
 
 defineProps({
   collapsed: {

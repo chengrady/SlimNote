@@ -1,14 +1,14 @@
 <template>
   <div class="toolbar editor-actions-bar editor-view-toolbar">
-    <div class="editor-view-toolbar-label">视图</div>
+    <div class="editor-view-toolbar-label">{{ t('editorView.view') }}</div>
     <div class="editor-view-toolbar-actions">
-      <span class="editor-view-toolbar-pill">{{ fileType }}</span>
+      <span class="editor-view-toolbar-pill">{{ localizedFileType }}</span>
       <button
         class="editor-view-toolbar-button"
         type="button"
         @click="$emit('pin')"
-        title="打开悬浮窗口"
-        aria-label="打开悬浮窗口"
+        :title="t('editorView.pinWindow')"
+        :aria-label="t('editorView.pinWindow')"
       >
         <span class="editor-view-toolbar-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -16,18 +16,29 @@
             <path d="M12 15v6"/>
           </svg>
         </span>
-        <span class="editor-view-toolbar-text">悬浮窗口</span>
+        <span class="editor-view-toolbar-text">{{ t('editorView.pinWindow') }}</span>
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const props = defineProps({
   fileType: {
     type: String,
     default: 'TEXT'
   }
+})
+
+const { t, te } = useI18n()
+
+const localizedFileType = computed(() => {
+  const normalized = String(props.fileType || 'TEXT').trim().toLowerCase()
+  const key = `editorView.fileTypes.${normalized}`
+  return te(key) ? t(key) : props.fileType
 })
 
 defineEmits(['pin'])

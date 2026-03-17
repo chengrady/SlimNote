@@ -1,5 +1,6 @@
 import { marked } from 'marked'
 import hljs from 'highlight.js'
+import mermaid from 'mermaid'
 
 function escapeHtml(value = '') {
 	return String(value)
@@ -42,6 +43,78 @@ function configureMarked() {
 function buildMarkdownHtml(content = '') {
 	configureMarked()
 	return marked.parse(content || '')
+}
+
+function getMermaidTheme(theme = 'light') {
+	return theme === 'dark' ? 'dark' : 'default'
+}
+
+function normalizeTextForCompare(value = '') {
+	return String(value)
+		.replace(/[`*_~#[\]()>-]/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.toLowerCase()
+}
+
+function getLeadingMarkdownHeading(content = '') {
+	const match = String(content).match(/^\s*#\s+(.+?)\s*(?:\r?\n|$)/)
+	return match ? match[1].trim() : ''
+}
+
+function shouldRenderDocumentHeader(content = '', title = '') {
+	const normalizedTitle = normalizeTextForCompare(title)
+	if (!normalizedTitle) return false
+
+	const leadingHeading = getLeadingMarkdownHeading(content)
+	if (!leadingHeading) return true
+
+	return normalizeTextForCompare(leadingHeading) !== normalizedTitle
+}
+
+async function renderMermaidBlocksInHtml(html = '', theme = 'light') {
+	if (!html || typeof DOMParser === 'undefined' || typeof document === 'undefined') {
+		return html
+	}
+
+	const parser = new DOMParser()
+	const doc = parser.parseFromString(`<div class="markdown-body-root">${html}</div>`, 'text/html')
+	const root = doc.body.firstElementChild
+	if (!root) return html
+
+	const mermaidBlocks = Array.from(root.querySelectorAll('pre code.language-mermaid, pre code.lang-mermaid'))
+	if (!mermaidBlocks.length) {
+		return root.innerHTML
+	}
+
+	mermaid.initialize({
+		startOnLoad: false,
+		securityLevel: 'strict',
+		theme: getMermaidTheme(theme)
+	})
+
+	for (const [index, block] of mermaidBlocks.entries()) {
+		const pre = block.closest('pre')
+		if (!pre) continue
+
+		const source = block.textContent || ''
+		try {
+			const renderId = `slimnote-pdf-mermaid-${Date.now()}-${index}`
+			const { svg } = await mermaid.render(renderId, source)
+			const wrapper = doc.createElement('div')
+			wrapper.className = 'mermaid-block'
+			wrapper.innerHTML = svg
+			pre.replaceWith(wrapper)
+		} catch (error) {
+			console.error('Failed to render Mermaid for PDF export:', error)
+			const fallback = doc.createElement('div')
+			fallback.className = 'mermaid-error-block'
+			fallback.innerHTML = `<div class="mermaid-error-title">Mermaid render failed</div><pre><code>${escapeHtml(source)}</code></pre>`
+			pre.replaceWith(fallback)
+		}
+	}
+
+	return root.innerHTML
 }
 
 function createClipboardHtmlFragment(html = '') {
@@ -411,11 +484,18 @@ export function buildMarkdownClipboardPayload({ content = '', sourcePath = '' } 
 	}
 }
 
-export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Document', theme = 'light', sourcePath = '' } = {}) {
-	const isDark = theme === 'dark'
-	const html = buildMarkdownHtml(content || '')
+export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown Document', theme = 'light', sourcePath = '' } = {}) {
+	const pdfTheme = 'light'
+	const html = await renderMermaidBlocksInHtml(buildMarkdownHtml(content || ''), pdfTheme)
 	const safeTitle = escapeHtml(title)
 	const baseHref = getDirectoryFileUrl(sourcePath)
+	const renderDocumentHeader = shouldRenderDocumentHeader(content, title)
+	const documentHeaderHtml = renderDocumentHeader
+		? `<header class="document-header">
+				<h1 class="document-title">${safeTitle}</h1>
+				<div class="document-subtitle">由 SlimNote 导出为 PDF</div>
+			</header>`
+		: ''
 
 	return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -426,21 +506,21 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 		${baseHref ? `<base href="${baseHref}">` : ''}
 		<style>
 			:root {
-				color-scheme: ${isDark ? 'dark' : 'light'};
-				--page-bg: ${isDark ? '#0f1117' : '#ffffff'};
-				--surface-bg: ${isDark ? '#161a22' : '#ffffff'};
-				--text-main: ${isDark ? '#e8ecf3' : '#1f2937'};
-				--text-muted: ${isDark ? '#9aa4b2' : '#6b7280'};
-				--border-color: ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)'};
-				--accent: ${isDark ? '#7cc4ff' : '#2563eb'};
-				--code-bg: ${isDark ? '#11151d' : '#f6f8fb'};
-				--quote-bg: ${isDark ? 'rgba(124,196,255,0.08)' : 'rgba(37,99,235,0.06)'};
-				--table-stripe: ${isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)'};
+				color-scheme: light;
+				--page-bg: #ffffff;
+				--surface-bg: #ffffff;
+				--text-main: #1f2937;
+				--text-muted: #6b7280;
+				--border-color: rgba(15, 23, 42, 0.1);
+				--accent: #2563eb;
+				--code-bg: #f6f8fb;
+				--quote-bg: rgba(37, 99, 235, 0.06);
+				--table-stripe: rgba(15, 23, 42, 0.02);
 			}
 
 			@page {
 				size: A4;
-				margin: 18mm 16mm;
+				margin: 16mm 14mm 18mm;
 			}
 
 			* {
@@ -456,6 +536,8 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 				font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 				line-height: 1.7;
 				font-size: 14px;
+				-webkit-print-color-adjust: exact;
+				print-color-adjust: exact;
 			}
 
 			body {
@@ -472,6 +554,8 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 				margin-bottom: 24px;
 				padding-bottom: 14px;
 				border-bottom: 1px solid var(--border-color);
+				page-break-after: avoid;
+				break-after: avoid-page;
 			}
 
 			.document-title {
@@ -489,10 +573,16 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 
 			.markdown-body {
 				color: var(--text-main);
+				font-size: 14px;
+				line-height: 1.7;
 			}
 
 			.markdown-body > :first-child {
 				margin-top: 0;
+			}
+
+			.markdown-body > :last-child {
+				margin-bottom: 0;
 			}
 
 			.markdown-body h1,
@@ -503,8 +593,19 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 			.markdown-body h6 {
 				color: var(--text-main);
 				page-break-after: avoid;
+				break-after: avoid-page;
 				margin: 1.4em 0 0.6em;
 				line-height: 1.3;
+			}
+
+			.markdown-body h1 { font-size: 2em; }
+			.markdown-body h2 { font-size: 1.5em; }
+			.markdown-body h3 { font-size: 1.25em; }
+			.markdown-body h4 { font-size: 1em; }
+			.markdown-body h5 { font-size: 0.875em; }
+			.markdown-body h6 {
+				font-size: 0.85em;
+				color: var(--text-muted);
 			}
 
 			.markdown-body h1,
@@ -520,6 +621,26 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 			.markdown-body table,
 			.markdown-body pre {
 				margin: 0 0 1em;
+			}
+
+			.markdown-body p,
+			.markdown-body li {
+				orphans: 3;
+				widows: 3;
+			}
+
+			.markdown-body ul,
+			.markdown-body ol {
+				padding-left: 2em;
+			}
+
+			.markdown-body ol {
+				list-style-position: inside;
+				padding-left: 0;
+			}
+
+			.markdown-body li + li {
+				margin-top: 0.35em;
 			}
 
 			.markdown-body a {
@@ -551,6 +672,8 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 				overflow: hidden;
 				white-space: pre-wrap;
 				word-break: break-word;
+				overflow-wrap: anywhere;
+				tab-size: 2;
 			}
 
 			.markdown-body pre code {
@@ -558,6 +681,47 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 				border: 0;
 				padding: 0;
 				font-size: 0.9em;
+				white-space: pre-wrap;
+				word-break: break-word;
+				overflow-wrap: anywhere;
+			}
+
+			.markdown-body .mermaid-block,
+			.markdown-body .mermaid-error-block {
+				margin: 0 0 1em;
+				padding: 10px 8px;
+				background: #ffffff;
+				border: 1px solid var(--border-color);
+				border-radius: 12px;
+				overflow: visible;
+				text-align: center;
+			}
+
+			.markdown-body .mermaid-block svg {
+				display: block;
+				width: auto !important;
+				max-width: 100% !important;
+				height: auto !important;
+				margin: 0 auto;
+				overflow: visible;
+			}
+
+			.markdown-body .mermaid-block svg foreignObject {
+				overflow: visible;
+			}
+
+			.markdown-body .mermaid-block .label,
+			.markdown-body .mermaid-block .nodeLabel,
+			.markdown-body .mermaid-block .edgeLabel {
+				max-width: 100%;
+				word-break: break-word;
+				white-space: normal;
+			}
+
+			.markdown-body .mermaid-error-title {
+				margin-bottom: 10px;
+				font-weight: 600;
+				color: #d14343;
 			}
 
 			.markdown-body blockquote {
@@ -575,14 +739,31 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 				border: 1px solid var(--border-color);
 				overflow: hidden;
 				border-radius: 10px;
+				table-layout: auto;
+				font-size: 12.5px;
+			}
+
+			.markdown-body thead {
+				display: table-header-group;
+			}
+
+			.markdown-body tfoot {
+				display: table-footer-group;
+			}
+
+			.markdown-body tr {
+				page-break-inside: avoid;
+				break-inside: avoid;
 			}
 
 			.markdown-body th,
 			.markdown-body td {
 				border: 1px solid var(--border-color);
-				padding: 10px 12px;
+				padding: 8px 10px;
 				text-align: left;
 				vertical-align: top;
+				word-break: break-word;
+				overflow-wrap: anywhere;
 			}
 
 			.markdown-body tbody tr:nth-child(even) {
@@ -603,10 +784,7 @@ export function buildMarkdownPdfDocument({ content = '', title = 'Markdown Docum
 	</head>
 	<body>
 		<main class="document">
-			<header class="document-header">
-				<h1 class="document-title">${safeTitle}</h1>
-				<div class="document-subtitle">由 SlimNote 导出为 PDF</div>
-			</header>
+			${documentHeaderHtml}
 			<article class="markdown-body">${html}</article>
 		</main>
 	</body>

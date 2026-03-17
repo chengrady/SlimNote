@@ -5,41 +5,49 @@
         <div class="modal-container">
           <div class="modal-header">
             <div class="modal-title-group">
-              <h3>设置</h3>
-              <p class="modal-subtitle">外观与编辑器选项会实时生效</p>
+              <h3>{{ t('settings.title') }}</h3>
+              <p class="modal-subtitle">{{ t('settings.subtitle') }}</p>
             </div>
             <button class="close-btn" @click="$emit('close')">×</button>
           </div>
 
           <div class="modal-body">
             <div class="settings-sidebar">
-              <div 
-                class="sidebar-item" 
+              <div
+                class="sidebar-item"
                 :class="{ active: activeSection === 'appearance' }"
                 @click="activeSection = 'appearance'"
               >
-                <span class="sidebar-item-title">外观</span>
-                <span class="sidebar-item-desc">主题、字体与基础显示</span>
+                <span class="sidebar-item-title">{{ t('settings.appearance') }}</span>
+                <span class="sidebar-item-desc">{{ t('settings.appearanceDesc') }}</span>
               </div>
-              <div 
-                class="sidebar-item" 
+              <div
+                class="sidebar-item"
                 :class="{ active: activeSection === 'editor' }"
                 @click="activeSection = 'editor'"
               >
-                <span class="sidebar-item-title">编辑器</span>
-                <span class="sidebar-item-desc">行号、缩略图与缩进</span>
+                <span class="sidebar-item-title">{{ t('settings.editor') }}</span>
+                <span class="sidebar-item-desc">{{ t('settings.editorDesc') }}</span>
               </div>
             </div>
-            
+
             <div class="settings-content">
               <!-- Appearance Settings -->
               <div v-if="activeSection === 'appearance'" class="settings-section">
                 <div class="section-header">
-                  <h4>外观</h4>
-                  <p>调整主题、字体与阅读密度。</p>
+                  <h4>{{ t('settings.appearance') }}</h4>
+                  <p>{{ t('settings.appearanceSection') }}</p>
                 </div>
                 <div class="setting-item card-like">
-                  <label>主题</label>
+                  <label>{{ t('settings.language') }}</label>
+                  <select v-model="localSettings.locale" @change="handleLocaleChange">
+                    <option v-for="loc in supportedLocales" :key="loc.value" :value="loc.value">
+                      {{ loc.label }}
+                    </option>
+                  </select>
+                </div>
+                <div class="setting-item card-like">
+                  <label>{{ t('settings.theme') }}</label>
                   <div class="theme-preview-grid">
                     <button
                       class="theme-preview"
@@ -48,7 +56,7 @@
                       type="button"
                     >
                       <span class="theme-preview-canvas light"></span>
-                      <span class="theme-preview-label">浅色</span>
+                      <span class="theme-preview-label">{{ t('settings.light') }}</span>
                     </button>
                     <button
                       class="theme-preview"
@@ -57,16 +65,16 @@
                       type="button"
                     >
                       <span class="theme-preview-canvas dark"></span>
-                      <span class="theme-preview-label">深色</span>
+                      <span class="theme-preview-label">{{ t('settings.dark') }}</span>
                     </button>
                   </div>
                 </div>
                 <div class="setting-item card-like">
-                  <label>字体大小 ({{ localSettings.fontSize }}px)</label>
+                  <label>{{ t('settings.fontSize', { size: localSettings.fontSize }) }}</label>
                   <input type="range" v-model.number="localSettings.fontSize" min="8" max="32" step="1">
                 </div>
                 <div class="setting-item card-like">
-                  <label>字体</label>
+                  <label>{{ t('settings.fontFamily') }}</label>
                   <select v-model="localSettings.fontFamily">
                     <option v-for="font in fontFamilies" :key="font.value" :value="font.value">
                       {{ font.label }}
@@ -74,14 +82,14 @@
                   </select>
                 </div>
                 <div class="setting-item card-like">
-                  <label>即时预览</label>
+                  <label>{{ t('settings.livePreview') }}</label>
                   <div class="live-preview" :class="localSettings.theme" :style="previewStyle">
                     <div class="live-preview-toolbar"></div>
                     <div class="live-preview-content">
-                      <div class="live-preview-title"># SlimNote Preview</div>
-                      <div class="live-preview-text">const note = '界面调优进行中';</div>
-                      <div class="live-preview-line">- 字体：{{ currentPreviewFont }}</div>
-                      <div class="live-preview-line">- 大小：{{ localSettings.fontSize }}px</div>
+                      <div class="live-preview-title">{{ t('settings.previewTitle') }}</div>
+                      <div class="live-preview-text">{{ t('settings.previewSample') }}</div>
+                      <div class="live-preview-line">- {{ t('settings.previewFont', { font: currentPreviewFont }) }}</div>
+                      <div class="live-preview-line">- {{ t('settings.previewSize', { size: localSettings.fontSize }) }}</div>
                     </div>
                   </div>
                 </div>
@@ -90,40 +98,40 @@
               <!-- Editor Settings -->
               <div v-if="activeSection === 'editor'" class="settings-section">
                 <div class="section-header">
-                  <h4>编辑器</h4>
-                  <p>控制编码体验和代码视图辅助信息。</p>
+                  <h4>{{ t('settings.editor') }}</h4>
+                  <p>{{ t('settings.editorDesc') }}</p>
                 </div>
                 <div class="setting-item card-like">
-                  <label>标签栏密度</label>
+                  <label>{{ t('settings.tabDensity') }}</label>
                   <select v-model="localSettings.tabDensity">
-                    <option value="comfortable">舒适</option>
-                    <option value="compact">紧凑</option>
+                    <option value="comfortable">{{ t('settings.comfortable') }}</option>
+                    <option value="compact">{{ t('settings.compact') }}</option>
                   </select>
                 </div>
                 <div class="setting-item checkbox card-like">
                   <label>
                     <input type="checkbox" v-model="localSettings.wordWrap">
-                    自动换行
+                    {{ t('settings.wordWrap') }}
                   </label>
                 </div>
                 <div class="setting-item checkbox card-like">
                   <label>
                     <input type="checkbox" v-model="localSettings.lineNumbers">
-                    显示行号
+                    {{ t('settings.lineNumbers') }}
                   </label>
                 </div>
                 <div class="setting-item checkbox card-like">
                   <label>
                     <input type="checkbox" v-model="localSettings.minimap">
-                    显示缩略图 (Minimap)
+                    {{ t('settings.minimap') }}
                   </label>
                 </div>
                 <div class="setting-item card-like">
-                  <label>Tab 缩进大小</label>
+                  <label>{{ t('settings.tabSize') }}</label>
                   <select v-model.number="localSettings.tabSize">
-                    <option value="2">2 个空格</option>
-                    <option value="4">4 个空格</option>
-                    <option value="8">8 个空格</option>
+                    <option value="2">{{ t('settings.spaces', { count: 2 }) }}</option>
+                    <option value="4">{{ t('settings.spaces', { count: 4 }) }}</option>
+                    <option value="8">{{ t('settings.spaces', { count: 8 }) }}</option>
                   </select>
                 </div>
               </div>
@@ -131,8 +139,8 @@
           </div>
 
           <div class="modal-footer">
-            <button class="modal-btn" @click="handleReset">恢复默认</button>
-            <button class="modal-btn primary" @click="$emit('close')">关闭设置</button>
+            <button class="modal-btn" @click="handleReset">{{ t('settings.restoreDefaults') }}</button>
+            <button class="modal-btn primary" @click="$emit('close')">{{ t('settings.closeSettings') }}</button>
           </div>
         </div>
       </div>
@@ -142,8 +150,11 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settings'
+import { setLocale, getSupportedLocales } from '../locales'
 
+const { t } = useI18n()
 const props = defineProps({
   show: Boolean
 })
@@ -151,6 +162,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 const settingsStore = useSettingsStore()
 const activeSection = ref('appearance')
+const supportedLocales = getSupportedLocales()
 
 const localSettings = ref({})
 const previewStyle = computed(() => ({
@@ -219,6 +231,13 @@ function handleReset() {
   localSettings.value = {
     ...settingsStore.settings,
     theme: settingsStore.settings.theme || 'light'
+  }
+}
+
+function handleLocaleChange() {
+  const newLocale = localSettings.value.locale
+  if (newLocale) {
+    settingsStore.updateLocale(newLocale)
   }
 }
 </script>

@@ -1,7 +1,7 @@
 <template>
   <div class="pin-window" :style="windowStyle">
     <div class="pin-header">
-      <span>SlimNote Pin</span>
+      <span>{{ t('pinWindow.title') }}</span>
       <button @click="closeWindow" class="close-btn">✕</button>
     </div>
     <div class="pin-content">
@@ -14,11 +14,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
 
 const route = useRoute()
+const { t } = useI18n()
 const content = ref('')
 const language = ref('plaintext')
 const windowId = ref(0)
@@ -48,7 +50,7 @@ const htmlContent = computed(() => {
     return parser(content.value)
   } catch (e) {
     console.error('Markdown parsing error:', e)
-    return '<p>Error parsing markdown</p>'
+    return `<p>${t('pinWindow.markdownError')}</p>`
   }
 })
 

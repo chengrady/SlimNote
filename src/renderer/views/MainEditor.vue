@@ -57,9 +57,10 @@ const settingsStore = useSettingsStore()
 const SIDEBAR_MIN_WIDTH = 220
 const SIDEBAR_MAX_WIDTH = 420
 const SIDEBAR_AUTO_COLLAPSE_THRESHOLD = 176
+const DEFAULT_SIDEBAR_WIDTH = 280
 
-const sidebarWidth = ref(settingsStore.settings.sidebarWidth || 250)
-const lastExpandedSidebarWidth = ref(settingsStore.settings.sidebarWidth || 250)
+const sidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
+const lastExpandedSidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
 const isResizing = ref(false)
 const resizePointerX = ref(0)
 const showErrorDialog = ref(false)

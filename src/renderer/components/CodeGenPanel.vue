@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="codegen-modal">
       <div class="modal-header">
-        <h3>代码生成</h3>
+        <h3>{{ t('codegen.title') }}</h3>
         <button class="close-btn" @click="$emit('close')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -14,7 +14,7 @@
       <div class="modal-body">
         <div class="options-row">
           <div class="option-group">
-            <label>目标语言</label>
+            <label>{{ t('codegen.targetLanguage') }}</label>
             <select v-model="selectedLanguage">
               <option v-for="lang in languages" :key="lang.id" :value="lang.id">
                 {{ lang.name }}
@@ -22,8 +22,8 @@
             </select>
           </div>
           <div class="option-group">
-            <label>类型名称</label>
-            <input v-model="typeName" type="text" placeholder="Root" />
+            <label>{{ t('codegen.typeName') }}</label>
+            <input v-model="typeName" type="text" :placeholder="t('codegen.typeNamePlaceholder')" />
           </div>
         </div>
 
@@ -31,12 +31,12 @@
           <div class="output-header">
             <span>{{ currentLanguage?.name }} {{ currentLanguage?.extension }}</span>
             <div class="output-actions">
-              <button @click="copyCode" title="复制代码">
+              <button @click="copyCode" :title="t('codegen.copyCode')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
-                复制
+                {{ t('codegen.copy') }}
               </button>
             </div>
           </div>
@@ -45,7 +45,7 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">关闭</button>
+        <button class="btn btn-secondary" @click="$emit('close')">{{ t('codegen.close') }}</button>
       </div>
     </div>
   </div>
@@ -53,7 +53,10 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { languages, generateCode } from '../utils/codeGenerator'
+
+const { t } = useI18n()
 
 const props = defineProps({
   content: {

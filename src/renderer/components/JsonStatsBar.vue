@@ -12,47 +12,47 @@
           <line x1="9" y1="9" x2="15" y2="15"/>
         </svg>
       </span>
-      <span class="stat-label">JSON</span>
+      <span class="stat-label">{{ t('jsonStats.label') }}</span>
     </div>
     <template v-if="stats.isValid">
       <div class="stat-item">
-        <span class="stat-label">键:</span>
+        <span class="stat-label">{{ t('jsonStats.keys') }}</span>
         <span class="stat-value">{{ stats.keys }}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">深度:</span>
+        <span class="stat-label">{{ t('jsonStats.depth') }}</span>
         <span class="stat-value">{{ stats.depth }}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">大小:</span>
+        <span class="stat-label">{{ t('jsonStats.size') }}</span>
         <span class="stat-value">{{ formatSize(stats.size) }}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">行数:</span>
+        <span class="stat-label">{{ t('jsonStats.lines') }}</span>
         <span class="stat-value">{{ stats.lines }}</span>
       </div>
       <div class="stat-divider"></div>
-      <div class="stat-item stat-detail" title="对象数量">
+      <div class="stat-item stat-detail" :title="t('jsonStats.objects')">
         <span class="stat-icon object-icon">{}</span>
         <span class="stat-value">{{ stats.objects }}</span>
       </div>
-      <div class="stat-item stat-detail" title="数组数量">
+      <div class="stat-item stat-detail" :title="t('jsonStats.arrays')">
         <span class="stat-icon array-icon">[]</span>
         <span class="stat-value">{{ stats.arrays }}</span>
       </div>
-      <div class="stat-item stat-detail" title="字符串数量">
+      <div class="stat-item stat-detail" :title="t('jsonStats.strings')">
         <span class="stat-icon string-icon">""</span>
         <span class="stat-value">{{ stats.strings }}</span>
       </div>
-      <div class="stat-item stat-detail" title="数字数量">
+      <div class="stat-item stat-detail" :title="t('jsonStats.numbers')">
         <span class="stat-icon number-icon">#</span>
         <span class="stat-value">{{ stats.numbers }}</span>
       </div>
-      <div class="stat-item stat-detail" title="布尔值数量">
+      <div class="stat-item stat-detail" :title="t('jsonStats.booleans')">
         <span class="stat-icon bool-icon">?</span>
         <span class="stat-value">{{ stats.booleans }}</span>
       </div>
-      <div class="stat-item stat-detail" title="null 数量">
+      <div class="stat-item stat-detail" :title="t('jsonStats.nulls')">
         <span class="stat-icon null-icon">∅</span>
         <span class="stat-value">{{ stats.nulls }}</span>
       </div>
@@ -62,7 +62,10 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getJsonStats } from '../utils/jsonStats'
+
+const { t } = useI18n()
 
 const props = defineProps({
   content: {

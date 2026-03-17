@@ -1,141 +1,83 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } = require('electron')
-const { join, resolve } = require('path')
+const { join } = require('path')
 const fs = require('fs')
 const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
 
-const gotSingleInstanceLock = app.requestSingleInstanceLock()
-
-async function exportMarkdownPdf({ html, defaultPath }) {
-  const result = await dialog.showSaveDialog(mainWindow, {
-    title: '导出 PDF',
-    defaultPath,
-    filters: [
-      { name: 'PDF 文档', extensions: ['pdf'] }
-    ]
-  })
-
-  if (result.canceled || !result.filePath) {
-    return { canceled: true }
-  }
-
-  let pdfWindow = null
-
-  try {
-    pdfWindow = new BrowserWindow({
-      show: false,
-      width: 960,
-      height: 1280,
-      backgroundColor: '#ffffff',
-      webPreferences: {
-        sandbox: false,
-        contextIsolation: true,
-        javascript: true
-      }
-    })
-
-    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-    await new Promise((resolve) => setTimeout(resolve, 180))
-
-    const pdfBuffer = await pdfWindow.webContents.printToPDF({
-      printBackground: true,
-      preferCSSPageSize: true,
-      margins: {
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0
-      }
-    })
-
-    await fs.promises.writeFile(result.filePath, pdfBuffer)
-    return {
-      canceled: false,
-      filePath: result.filePath
-    }
-  } finally {
-    if (pdfWindow && !pdfWindow.isDestroyed()) {
-      pdfWindow.close()
-    }
-  }
-}
-
 let mainWindow = null
 let pinWindows = new Map()
 let fileWatchers = new Map()
-let pendingOpenFilePath = null
 
-const MAIN_WINDOW_MIN_WIDTH = 980
-const MAIN_WINDOW_MIN_HEIGHT = 680
-const PIN_WINDOW_MIN_WIDTH = 320
-const PIN_WINDOW_MIN_HEIGHT = 220
-
-function normalizePotentialFilePath(value = '') {
-  const nextValue = String(value || '').trim().replace(/^"|"$/g, '')
-  if (!nextValue || nextValue.startsWith('-')) {
-    return ''
-  }
-
-  return resolve(nextValue)
-}
-
-function extractOpenFilePath(argv = []) {
-  const candidates = Array.isArray(argv) ? argv.slice(1) : []
-
-  for (const arg of candidates) {
-    const filePath = normalizePotentialFilePath(arg)
-    if (!filePath) continue
-
-    try {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        return filePath
-      }
-    } catch (error) {
-      console.warn('Failed to inspect startup file path:', error)
+// i18n support
+let currentLocale = 'zh-CN'
+const locales = {
+  'zh-CN': {
+    menu: {
+      file: '文件',
+      newFile: '新建文件',
+      openFile: '打开文件',
+      save: '保存',
+      saveAs: '另存为',
+      settings: '设置',
+      exit: '退出',
+      edit: '编辑',
+      undo: '撤销',
+      redo: '重做',
+      cut: '剪切',
+      copy: '复制',
+      paste: '粘贴',
+      view: '视图',
+      reload: '重新加载',
+      forceReload: '强制重新加载',
+      toggleDevTools: '切换开发者工具',
+      resetZoom: '重置缩放',
+      zoomIn: '放大',
+      zoomOut: '缩小',
+      toggleTheme: '切换主题',
+      toggleFullscreen: '切换全屏',
+      selectAll: '全选'
+    }
+  },
+  'en-US': {
+    menu: {
+      file: 'File',
+      newFile: 'New File',
+      openFile: 'Open File',
+      save: 'Save',
+      saveAs: 'Save As',
+      settings: 'Settings',
+      exit: 'Exit',
+      edit: 'Edit',
+      undo: 'Undo',
+      redo: 'Redo',
+      cut: 'Cut',
+      copy: 'Copy',
+      paste: 'Paste',
+      view: 'View',
+      reload: 'Reload',
+      forceReload: 'Force Reload',
+      toggleDevTools: 'Toggle Developer Tools',
+      resetZoom: 'Reset Zoom',
+      zoomIn: 'Zoom In',
+      zoomOut: 'Zoom Out',
+      toggleTheme: 'Toggle Theme',
+      toggleFullscreen: 'Toggle Fullscreen',
+      selectAll: 'Select All'
     }
   }
-
-  return ''
 }
 
-function focusMainWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) return
-
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore()
+function t(key) {
+  const keys = key.split('.')
+  let value = locales[currentLocale]
+  for (const k of keys) {
+    if (value && typeof value === 'object') {
+      value = value[k]
+    } else {
+      return key
+    }
   }
-
-  if (!mainWindow.isVisible()) {
-    mainWindow.show()
-  }
-
-  mainWindow.focus()
-}
-
-function dispatchPendingOpenFile() {
-  if (!pendingOpenFilePath || !mainWindow || mainWindow.isDestroyed()) return
-
-  const sendFilePath = () => {
-    if (!pendingOpenFilePath || !mainWindow || mainWindow.isDestroyed()) return
-    const nextFilePath = pendingOpenFilePath
-    pendingOpenFilePath = null
-    mainWindow.webContents.send('app-open-file', nextFilePath)
-  }
-
-  focusMainWindow()
-
-  if (mainWindow.webContents.isLoadingMainFrame()) {
-    mainWindow.webContents.once('did-finish-load', sendFilePath)
-    return
-  }
-
-  sendFilePath()
-}
-
-function queueOpenFile(filePath) {
-  if (!filePath) return
-  pendingOpenFilePath = filePath
-  dispatchPendingOpenFile()
+  return value || key
 }
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -143,11 +85,15 @@ const iconPath = isDev
   ? join(__dirname, '../public/logo.ico')
   : join(__dirname, '../dist/logo.ico')
 
-if (!isDev && process.platform === 'win32') {
-  app.disableHardwareAcceleration()
-  app.commandLine.appendSwitch('disable-gpu')
-  app.commandLine.appendSwitch('disable-gpu-compositing')
-}
+const appDataRoot = app.getPath('appData')
+const userDataDir = join(appDataRoot, isDev ? 'SlimNote-dev' : 'SlimNote')
+const sessionDataDir = join(userDataDir, 'session')
+
+fs.mkdirSync(userDataDir, { recursive: true })
+fs.mkdirSync(sessionDataDir, { recursive: true })
+
+app.setPath('userData', userDataDir)
+app.setPath('sessionData', sessionDataDir)
 
 // Window State Management
 function getStorePath() {
@@ -181,12 +127,65 @@ function savePinWindowBounds(bounds) {
   }
 }
 
+async function exportMarkdownPdf({ html, defaultPath } = {}) {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出 PDF',
+    defaultPath,
+    filters: [
+      { name: 'PDF 文档', extensions: ['pdf'] }
+    ]
+  })
+
+  if (result.canceled || !result.filePath) {
+    return { canceled: true }
+  }
+
+  let pdfWindow = null
+
+  try {
+    pdfWindow = new BrowserWindow({
+      show: false,
+      width: 960,
+      height: 1280,
+      backgroundColor: '#ffffff',
+      webPreferences: {
+        sandbox: false,
+        contextIsolation: true,
+        javascript: true
+      }
+    })
+
+    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html || '')}`)
+    await new Promise((resolve) => setTimeout(resolve, 180))
+
+    const pdfBuffer = await pdfWindow.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+      margins: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0
+      }
+    })
+
+    await fs.promises.writeFile(result.filePath, pdfBuffer)
+
+    return {
+      canceled: false,
+      filePath: result.filePath
+    }
+  } finally {
+    if (pdfWindow && !pdfWindow.isDestroyed()) {
+      pdfWindow.close()
+    }
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: MAIN_WINDOW_MIN_WIDTH,
-    minHeight: MAIN_WINDOW_MIN_HEIGHT,
     frame: false, // Custom TitleBar
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
@@ -200,24 +199,12 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
-    dispatchPendingOpenFile()
   })
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    if (process.env.SLIMNOTE_OPEN_DEVTOOLS === '1') {
-      mainWindow.webContents.openDevTools()
-    }
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-      console.error('[renderer] did-fail-load:', { errorCode, errorDescription, validatedURL })
-    })
-    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-      if (level >= 2) {
-        console.error(`[renderer] console(${level}): ${message} (${sourceId}:${line})`)
-      }
-    })
   } else {
-    mainWindow.loadFile(join(__dirname, '../dist/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
   mainWindow.on('closed', () => {
@@ -232,18 +219,14 @@ function createWindow() {
     mainWindow?.webContents.send('window-unmaximized')
   })
 
-  mainWindow.webContents.on('did-finish-load', () => {
-    dispatchPendingOpenFile()
-  })
-
   // Context Menu
   ipcMain.on('show-editor-context-menu', (event) => {
     const menu = Menu.buildFromTemplate([
-      { label: '剪切', role: 'cut' },
-      { label: '复制', role: 'copy' },
-      { label: '粘贴', role: 'paste' },
+      { label: t('menu.cut'), role: 'cut' },
+      { label: t('menu.copy'), role: 'copy' },
+      { label: t('menu.paste'), role: 'paste' },
       { type: 'separator' },
-      { label: '全选', role: 'selectAll' }
+      { label: t('menu.selectAll'), role: 'selectAll' }
     ])
     menu.popup({ window: BrowserWindow.fromWebContents(event.sender) })
   })
@@ -254,80 +237,75 @@ function createWindow() {
 function createMenu() {
   const template = [
     {
-      label: '文件',
+      label: t('menu.file'),
       submenu: [
         {
-          label: '新建文件',
+          label: t('menu.newFile'),
           accelerator: 'CmdOrCtrl+N',
           click: () => mainWindow?.webContents.send('menu-new-file')
         },
         {
-          label: '打开文件',
+          label: t('menu.openFile'),
           accelerator: 'CmdOrCtrl+O',
           click: () => mainWindow?.webContents.send('menu-open-file')
         },
-        {
-          label: '打开目录',
-          accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => mainWindow?.webContents.send('menu-open-folder')
-        },
         { type: 'separator' },
         {
-          label: '保存',
+          label: t('menu.save'),
           accelerator: 'CmdOrCtrl+S',
           click: () => mainWindow?.webContents.send('menu-save')
         },
         {
-          label: '另存为',
+          label: t('menu.saveAs'),
           accelerator: 'CmdOrCtrl+Shift+S',
           click: () => mainWindow?.webContents.send('menu-save-as')
         },
         { type: 'separator' },
         {
-          label: '设置',
+          label: t('menu.settings'),
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu-open-settings')
         },
         { type: 'separator' },
-        { label: '退出', role: 'quit' }
+        { label: t('menu.exit'), role: 'quit' }
       ]
     },
     {
-      label: '编辑',
+      label: t('menu.edit'),
       submenu: [
         {
-          label: '撤销',
+          label: t('menu.undo'),
           accelerator: 'CmdOrCtrl+Z',
           click: () => mainWindow?.webContents.send('menu-undo')
         },
         {
-          label: '重做',
+          label: t('menu.redo'),
           accelerator: process.platform === 'darwin' ? 'Cmd+Shift+Z' : 'Ctrl+Y',
           click: () => mainWindow?.webContents.send('menu-redo')
         },
         { type: 'separator' },
-        { label: '剪切', role: 'cut' },
-        { label: '复制', role: 'copy' },
-        { label: '粘贴', role: 'paste' }
+        { label: t('menu.cut'), role: 'cut' },
+        { label: t('menu.copy'), role: 'copy' },
+        { label: t('menu.paste'), role: 'paste' }
       ]
     },
     {
-      label: '视图',
+      label: t('menu.view'),
       submenu: [
-        { label: '重新加载', role: 'reload' },
-        { label: '强制重新加载', role: 'forceReload' },
-        { label: '切换开发者工具', role: 'toggleDevTools' },
+        { label: t('menu.reload'), role: 'reload' },
+        { label: t('menu.forceReload'), role: 'forceReload' },
+        { label: t('menu.toggleDevTools'), role: 'toggleDevTools' },
         { type: 'separator' },
-        { label: '重置缩放', role: 'resetZoom' },
-        { label: '放大', role: 'zoomIn' },
-        { label: '缩小', role: 'zoomOut' },
+        { label: t('menu.resetZoom'), role: 'resetZoom' },
+        { label: t('menu.zoomIn'), role: 'zoomIn' },
+        { label: t('menu.zoomOut'), role: 'zoomOut' },
         { type: 'separator' },
         {
-          label: '切换主题',
+          label: t('menu.toggleTheme'),
           click: () => mainWindow?.webContents.send('menu-toggle-theme')
         },
         { type: 'separator' },
-        { label: '切换全屏', role: 'togglefullscreen' }
+        { label: t('menu.toggleFullscreen'), role: 'togglefullscreen' }
       ]
     }
   ]
@@ -338,6 +316,21 @@ function createMenu() {
 
 // Register all IPC handlers
 function registerIpcHandlers() {
+  // i18n
+  ipcMain.handle('get-system-locale', () => {
+    const locale = app.getLocale()
+    // 将类似 zh-CN, zh_CN, en-US, en_US 等格式统一
+    if (locale.startsWith('zh')) return 'zh-CN'
+    return 'en-US'
+  })
+
+  ipcMain.on('update-locale', (event, locale) => {
+    if (locales[locale]) {
+      currentLocale = locale
+      createMenu()
+    }
+  })
+
   // Window Controls
   ipcMain.handle('is-maximized', () => mainWindow?.isMaximized())
   ipcMain.on('window-min', () => mainWindow?.minimize())
@@ -489,14 +482,12 @@ function registerIpcHandlers() {
     const win = new BrowserWindow({
       width: bounds.width,
       height: bounds.height,
-      minWidth: PIN_WINDOW_MIN_WIDTH,
-      minHeight: PIN_WINDOW_MIN_HEIGHT,
       title: 'SlimNote Pin',
       icon: iconPath,
       alwaysOnTop: true,
       frame: false,
       webPreferences: {
-        preload: join(__dirname, 'preload.js'),
+        preload: join(__dirname, '../preload/index.js'),
         contextIsolation: true,
         nodeIntegration: false,
       }
@@ -508,7 +499,7 @@ function registerIpcHandlers() {
     if (isDev) {
       win.loadURL(`http://localhost:5173/#/pin?id=${winId}`)
     } else {
-      win.loadFile(join(__dirname, '../dist/index.html'), { hash: `/pin?id=${winId}` })
+      win.loadFile(join(__dirname, '../renderer/index.html'), { hash: `/pin?id=${winId}` })
     }
 
     win.webContents.once('did-finish-load', () => {
@@ -552,32 +543,14 @@ function registerIpcHandlers() {
   })
 }
 
-if (!gotSingleInstanceLock) {
-  app.quit()
-} else {
-  app.on('second-instance', (event, argv) => {
-    if (app.isPackaged) {
-      queueOpenFile(extractOpenFilePath(argv))
-    }
+app.whenReady().then(() => {
+  createWindow()
+  registerIpcHandlers()
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
-
-  app.whenReady().then(() => {
-    if (app.isPackaged) {
-      queueOpenFile(extractOpenFilePath(process.argv))
-    }
-    createWindow()
-    registerIpcHandlers()
-
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow()
-        return
-      }
-
-      focusMainWindow()
-    })
-  })
-}
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

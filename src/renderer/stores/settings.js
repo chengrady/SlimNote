@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { setLocale } from '../locales'
 
 const DEFAULT_SETTINGS = {
   theme: 'light',
@@ -13,7 +14,8 @@ const DEFAULT_SETTINGS = {
   minimap: true,
   sidebarCollapsed: false,
   sidebarWidth: 250,
-  tabDensity: 'comfortable'
+  tabDensity: 'comfortable',
+  locale: 'zh-CN'
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -80,6 +82,18 @@ export const useSettingsStore = defineStore('settings', () => {
     updateSettings({ theme: newTheme })
   }
 
+  // 更新语言
+  function updateLocale(locale) {
+    if (setLocale(locale)) {
+      settings.value.locale = locale
+      saveSettings()
+      // 通知主进程更新菜单
+      if (window.electronAPI?.updateLocale) {
+        window.electronAPI.updateLocale(locale)
+      }
+    }
+  }
+
   // 监听设置变化
   watch(settings, () => {
     saveSettings()
@@ -92,6 +106,7 @@ export const useSettingsStore = defineStore('settings', () => {
     updateSettings,
     resetSettings,
     toggleTheme,
+    updateLocale,
     applyTheme,
     DEFAULT_SETTINGS
   }
