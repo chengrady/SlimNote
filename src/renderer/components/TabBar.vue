@@ -1,0 +1,759 @@
+<template>
+  <div class="tab-bar-container" :class="tabDensityClass">
+    <!-- Pinned Tabs Row -->
+    <div v-if="pinnedTabs.length > 0" class="pinned-tabs-row">
+      <span class="pinned-tabs-label">已固定</span>
+      <div class="pinned-tabs-list">
+        <div
+          v-for="tab in pinnedTabs"
+          :key="tab.id"
+          class="tab pinned"
+          :class="{ active: tab.id === editorStore.activeTabId, dirty: tab.isDirty, selected: selectedTabIds.includes(tab.id), dragging: dragState.dragId === tab.id, 'drag-target': dragState.targetId === tab.id && dragState.dragId !== tab.id }"
+          @click="handleTabClick($event, tab.id)"
+          @contextmenu.prevent="showContextMenu($event, tab.id)"
+          draggable="true"
+          @dragstart="onTabDragStart(tab.id)"
+          @dragover.prevent="onTabDragOver(tab.id)"
+          @drop.prevent="onTabDrop(tab.id)"
+          @dragend="onTabDragEnd"
+        >
+          <span class="tab-icon pin-icon" @click.stop="editorStore.togglePin(tab.id)" title="取消固定">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+              <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+            </svg>
+          </span>
+          <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
+          <span v-if="tab.isDirty" class="dirty-indicator">●</span>
+          <button class="tab-close" @click.stop="closeTab(tab.id)" aria-label="关闭标签页">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M2 10l8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Normal Tabs Row -->
+    <div class="tab-bar">
+      <div ref="tabsRef" class="tabs" :class="{ scrollable: hasTabOverflow }">
+        <div
+          v-for="tab in unpinnedTabs"
+          :key="tab.id"
+          class="tab"
+          :class="{ active: tab.id === editorStore.activeTabId, dirty: tab.isDirty, selected: selectedTabIds.includes(tab.id), dragging: dragState.dragId === tab.id, 'drag-target': dragState.targetId === tab.id && dragState.dragId !== tab.id }"
+          @click="handleTabClick($event, tab.id)"
+          @contextmenu.prevent="showContextMenu($event, tab.id)"
+          draggable="true"
+          @dragstart="onTabDragStart(tab.id)"
+          @dragover.prevent="onTabDragOver(tab.id)"
+          @drop.prevent="onTabDrop(tab.id)"
+          @dragend="onTabDragEnd"
+        >
+          <FileIcon :filename="tab.title" :size="19" class="tab-icon-component" />
+          <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
+          <span v-if="tab.isDirty" class="dirty-indicator">●</span>
+          <button class="tab-close" @click.stop="closeTab(tab.id)" aria-label="关闭标签页">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M2 10l8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="tab-actions">
+        <div v-if="selectedTabIds.length > 1" class="batch-actions">
+          <span class="batch-count">已选 {{ selectedTabIds.length }} 项</span>
+          <button v-if="dirtySelectedCount > 0" @click="saveSelectedTabs" :title="`保存选中的 ${dirtySelectedCount} 个标签页`" aria-label="保存选中标签页">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3h11l3 3v15H5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 3v6h8" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 21v-6h6v6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </button>
+          <button v-if="hasUnpinnedSelection" @click="pinSelectedTabs" title="固定选中标签页" aria-label="固定选中标签页">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
+          </button>
+          <button v-if="hasPinnedSelection" @click="unpinSelectedTabs" title="取消固定选中标签页" aria-label="取消固定选中标签页">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 2h10v2h-1v8l2 2v2h-5.2v6h-1.6v-6H6v-2l2-2V4H7V2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+          <button @click="closeSelectedTabs" title="关闭选中标签页" aria-label="关闭选中标签页">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M8 10v7M12 10v7M16 10v7M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button @click="clearSelectedTabs" title="取消选择" aria-label="取消选择">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <button @click="newTab" title="新建标签页" aria-label="新建标签页">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <Teleport to="body">
+      <div
+        v-if="contextMenu.visible"
+        ref="contextMenuRef"
+        class="context-menu"
+        :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
+      >
+        <div class="menu-item" @click="handleAction('closeCurrent')">关闭当前标签</div>
+        <div class="menu-item" @click="handleAction('closeOthers')">关闭其他</div>
+        <div class="menu-item" @click="handleAction('closeAll')">关闭所有</div>
+        <div class="menu-item" @click="handleAction('closeRight')">关闭右侧</div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" @click="handleAction('togglePin')">
+          {{ pinMenuLabel }}
+        </div>
+        <div v-if="selectedTabIds.length > 1" class="menu-item" @click="handleAction('togglePinSelected')">
+          {{ selectedPinMenuLabel }}
+        </div>
+        <div v-if="dirtySelectedCount > 0" class="menu-item" @click="handleAction('saveSelected')">
+          保存选中项
+        </div>
+      </div>
+    </Teleport>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useEditorStore } from '../stores/editor'
+import { useSettingsStore } from '../stores/settings'
+import FileIcon from './FileIcon.vue'
+
+const editorStore = useEditorStore()
+const settingsStore = useSettingsStore()
+
+const contextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  targetId: null
+})
+const contextMenuRef = ref(null)
+const tabsRef = ref(null)
+const hasTabOverflow = ref(false)
+let tabsResizeObserver = null
+const CONTEXT_MENU_MARGIN = 8
+const tabDensityClass = computed(() => `density-${settingsStore.settings.tabDensity || 'comfortable'}`)
+const dragState = ref({ dragId: null, targetId: null })
+const selectedTabIds = ref([])
+const lastSelectedTabId = ref(null)
+
+const pinnedTabs = computed(() => editorStore.tabs.filter(t => t.pinned))
+const unpinnedTabs = computed(() => editorStore.tabs.filter(t => !t.pinned))
+const visibleTabIds = computed(() => [...pinnedTabs.value, ...unpinnedTabs.value].map(tab => tab.id))
+const selectedTabs = computed(() => editorStore.tabs.filter(tab => selectedTabIds.value.includes(tab.id)))
+const hasPinnedSelection = computed(() => selectedTabs.value.some(tab => tab.pinned))
+const hasUnpinnedSelection = computed(() => selectedTabs.value.some(tab => !tab.pinned))
+const dirtySelectedCount = computed(() => selectedTabs.value.filter(tab => tab.isDirty).length)
+
+const isTargetPinned = computed(() => {
+  const tab = editorStore.tabs.find(t => t.id === contextMenu.value.targetId)
+  return tab ? tab.pinned : false
+})
+const pinMenuLabel = computed(() => {
+  if (selectedTabIds.value.length > 1 && selectedTabIds.value.includes(contextMenu.value.targetId)) {
+    if (hasPinnedSelection.value && hasUnpinnedSelection.value) {
+      return '切换当前标签固定状态'
+    }
+  }
+
+  return isTargetPinned.value ? '取消固定' : '固定'
+})
+const selectedPinMenuLabel = computed(() => {
+  if (hasPinnedSelection.value && hasUnpinnedSelection.value) {
+    return '固定未固定项'
+  }
+
+  return hasPinnedSelection.value ? '取消固定选中项' : '固定选中项'
+})
+
+function showContextMenu(event, tabId) {
+  if (!selectedTabIds.value.includes(tabId)) {
+    selectedTabIds.value = [tabId]
+    lastSelectedTabId.value = tabId
+  }
+
+  contextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    targetId: tabId
+  }
+
+  nextTick(() => adjustContextMenuPosition(event.clientX, event.clientY))
+}
+
+function adjustContextMenuPosition(pointerX, pointerY) {
+  const menuEl = contextMenuRef.value
+  if (!menuEl) return
+
+  const rect = menuEl.getBoundingClientRect()
+  const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - rect.width - CONTEXT_MENU_MARGIN)
+  const maxY = Math.max(CONTEXT_MENU_MARGIN, window.innerHeight - rect.height - CONTEXT_MENU_MARGIN)
+
+  contextMenu.value = {
+    ...contextMenu.value,
+    x: Math.min(pointerX, maxX),
+    y: Math.min(pointerY, maxY)
+  }
+}
+
+function closeContextMenu() {
+  contextMenu.value.visible = false
+}
+
+function handleAction(action) {
+  const tabId = contextMenu.value.targetId
+  if (!tabId) return
+
+  switch (action) {
+    case 'closeCurrent':
+      closeTab(tabId)
+      break
+    case 'closeOthers':
+      editorStore.closeOtherTabs(tabId)
+      break
+    case 'closeAll':
+      editorStore.closeAllTabs()
+      break
+    case 'closeRight':
+      editorStore.closeTabsToRight(tabId)
+      break
+    case 'togglePin':
+      editorStore.togglePin(tabId)
+      break
+    case 'togglePinSelected':
+      if (hasUnpinnedSelection.value) {
+        editorStore.setTabsPinned(selectedTabIds.value, true)
+      } else if (hasPinnedSelection.value) {
+        editorStore.setTabsPinned(selectedTabIds.value, false)
+      }
+      break
+    case 'saveSelected':
+      saveSelectedTabs()
+      break
+  }
+  closeContextMenu()
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeContextMenu)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu)
+})
+
+function newTab() {
+  editorStore.createTab()
+}
+
+function closeTab(tabId) {
+  const tab = editorStore.tabs.find(t => t.id === tabId)
+  if (tab && tab.isDirty) {
+    if (confirm(`${tab.title} 有未保存的更改。确定要关闭吗？`)) {
+      editorStore.closeTab(tabId)
+    }
+  } else {
+    editorStore.closeTab(tabId)
+  }
+
+  selectedTabIds.value = selectedTabIds.value.filter(id => id !== tabId)
+}
+
+function handleTabClick(event, tabId) {
+  const isToggleSelection = event.ctrlKey || event.metaKey
+  const isRangeSelection = event.shiftKey && lastSelectedTabId.value
+
+  if (isRangeSelection) {
+    const ids = visibleTabIds.value
+    const start = ids.indexOf(lastSelectedTabId.value)
+    const end = ids.indexOf(tabId)
+    if (start !== -1 && end !== -1) {
+      const [from, to] = start < end ? [start, end] : [end, start]
+      const rangeIds = ids.slice(from, to + 1)
+      selectedTabIds.value = Array.from(new Set([...selectedTabIds.value, ...rangeIds]))
+    }
+  } else if (isToggleSelection) {
+    selectedTabIds.value = selectedTabIds.value.includes(tabId)
+      ? selectedTabIds.value.filter(id => id !== tabId)
+      : [...selectedTabIds.value, tabId]
+  } else {
+    selectedTabIds.value = [tabId]
+  }
+
+  lastSelectedTabId.value = tabId
+  editorStore.setActiveTab(tabId)
+}
+
+function clearSelectedTabs() {
+  selectedTabIds.value = []
+  lastSelectedTabId.value = null
+}
+
+function closeSelectedTabs() {
+  const ids = selectedTabIds.value.length > 0 ? selectedTabIds.value : []
+  if (ids.length === 0) return
+
+  const dirtyTabs = editorStore.tabs.filter(tab => ids.includes(tab.id) && tab.isDirty)
+  if (dirtyTabs.length > 0 && !confirm(`选中的 ${dirtyTabs.length} 个标签页包含未保存内容，确定关闭吗？`)) {
+    return
+  }
+
+  editorStore.closeTabs(ids)
+  clearSelectedTabs()
+}
+
+function pinSelectedTabs() {
+  if (!hasUnpinnedSelection.value) return
+  editorStore.setTabsPinned(selectedTabIds.value, true)
+}
+
+function unpinSelectedTabs() {
+  if (!hasPinnedSelection.value) return
+  editorStore.setTabsPinned(selectedTabIds.value, false)
+}
+
+function saveSelectedTabs() {
+  const dirtyIds = selectedTabs.value.filter(tab => tab.isDirty).map(tab => tab.id)
+  if (dirtyIds.length === 0) return
+  window.dispatchEvent(new CustomEvent('save-tabs', { detail: { tabIds: dirtyIds } }))
+}
+
+function onTabDragStart(tabId) {
+  dragState.value = { dragId: tabId, targetId: null }
+}
+
+function onTabDragOver(tabId) {
+  if (!dragState.value.dragId || dragState.value.dragId === tabId) return
+  dragState.value = { ...dragState.value, targetId: tabId }
+}
+
+function onTabDrop(tabId) {
+  if (!dragState.value.dragId || dragState.value.dragId === tabId) {
+    onTabDragEnd()
+    return
+  }
+
+  editorStore.moveTab(dragState.value.dragId, tabId)
+  onTabDragEnd()
+}
+
+function onTabDragEnd() {
+  dragState.value = { dragId: null, targetId: null }
+}
+
+function updateTabOverflow() {
+  if (!tabsRef.value) {
+    hasTabOverflow.value = false
+    return
+  }
+  hasTabOverflow.value = tabsRef.value.scrollHeight > tabsRef.value.clientHeight + 1
+}
+
+watch(
+  [() => unpinnedTabs.value.length, () => pinnedTabs.value.length],
+  () => {
+    nextTick(updateTabOverflow)
+  }
+)
+
+watch(() => editorStore.tabs.map(tab => tab.id), (ids) => {
+  selectedTabIds.value = selectedTabIds.value.filter(id => ids.includes(id))
+  if (lastSelectedTabId.value && !ids.includes(lastSelectedTabId.value)) {
+    lastSelectedTabId.value = selectedTabIds.value.at(-1) || null
+  }
+})
+
+onMounted(() => {
+  tabsResizeObserver = new ResizeObserver(() => {
+    updateTabOverflow()
+  })
+  if (tabsRef.value) {
+    tabsResizeObserver.observe(tabsRef.value)
+  }
+  window.addEventListener('resize', updateTabOverflow)
+  nextTick(updateTabOverflow)
+})
+
+onUnmounted(() => {
+  if (tabsResizeObserver) {
+    tabsResizeObserver.disconnect()
+    tabsResizeObserver = null
+  }
+  window.removeEventListener('resize', updateTabOverflow)
+})
+</script>
+
+<style scoped>
+.tab-bar-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--backdrop-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--panel-card-shadow);
+  flex-shrink: 0;
+}
+
+.tab-bar-container.density-compact .pinned-tabs-row {
+  gap: 4px;
+}
+
+.tab-bar-container.density-compact .tab-bar {
+  min-height: 32px;
+}
+
+.pinned-tabs-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-1) var(--space-3);
+  background: color-mix(in srgb, var(--glass-bg) 88%, rgba(var(--accent-primary-rgb), 0.05));
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.pinned-tabs-label {
+  font-size: var(--ui-font-size-xs);
+  font-weight: var(--ui-font-weight-bold);
+  line-height: var(--panel-title-line-height);
+  color: var(--accent-primary);
+  letter-spacing: 0.04em;
+}
+
+.pinned-tabs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tab-bar {
+  display: flex;
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--glass-bg) 94%, transparent);
+  min-height: 36px;
+  overflow: hidden;
+  padding: var(--space-1) var(--space-3);
+  margin-top: 0;
+  gap: var(--space-2);
+  position: relative;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  gap: var(--space-1);
+  max-height: calc(28px * 2 + var(--space-1));
+  padding-right: var(--space-1);
+}
+
+.tabs::-webkit-scrollbar {
+  width: 0;
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.tabs.scrollable:hover::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 8px;
+  height: 28px;
+  background: var(--btn-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+  color: var(--text-muted);
+  font-size: var(--ui-font-size-sm);
+  font-weight: var(--ui-font-weight-medium);
+  width: fit-content;
+  max-width: 220px;
+  min-width: 0;
+  flex: 0 1 auto;
+  position: relative;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.tab-bar-container.density-compact .tab {
+  height: 24px;
+  font-size: var(--ui-font-size-xs);
+  max-width: 180px;
+}
+
+.tab-bar-container.density-compact .tabs {
+  max-height: calc(24px * 2 + var(--space-1));
+}
+
+.tab.pinned {
+  min-width: 0;
+  background: rgba(var(--accent-primary-rgb), 0.08);
+  border-color: var(--accent-primary);
+}
+
+.tab:hover {
+  background: color-mix(in srgb, var(--interactive-hover-bg) 88%, var(--btn-bg));
+  border-color: var(--interactive-hover-border);
+  color: var(--text-main);
+  box-shadow: var(--interactive-hover-ring), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.tab.active {
+  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.16) 78%, var(--bg-primary));
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: var(--interactive-active-shadow), inset 0 1px 0 rgba(var(--accent-primary-rgb), 0.16);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.tab.selected:not(.active) {
+  background: color-mix(in srgb, var(--interactive-selected-bg) 88%, var(--btn-bg));
+  border-color: var(--interactive-selected-border);
+  color: var(--text-main);
+  box-shadow: var(--interactive-hover-ring), inset 0 1px 0 rgba(var(--accent-primary-rgb), 0.08);
+}
+
+.tab:focus-visible {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: var(--field-focus-ring), inset 0 1px 0 rgba(var(--accent-primary-rgb), 0.12);
+}
+
+.tab.dragging {
+  opacity: 0.55;
+}
+
+.tab.drag-target {
+  border-color: var(--accent-primary);
+  box-shadow: var(--interactive-drag-shadow);
+}
+
+.tab-icon {
+  margin-right: 2px;
+  font-size: 12px; /* Smaller icon */
+  display: flex;
+  align-items: center;
+}
+
+.tab-icon-component {
+  margin-right: 1px;
+  opacity: 0.96;
+  transform: translateY(0.2px);
+  flex-shrink: 0;
+}
+
+.pin-icon {
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.76;
+  width: var(--icon-button-size-sm);
+  height: var(--icon-button-size-sm);
+  border-radius: var(--icon-button-radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.pin-icon:hover {
+  color: var(--icon-button-hover-color);
+  background: var(--icon-button-hover-bg);
+  opacity: 1;
+  box-shadow: var(--interactive-hover-ring);
+}
+
+.tab:hover .pin-icon,
+.tab.selected .pin-icon,
+.tab:focus-visible .pin-icon {
+  opacity: 1;
+  color: var(--text-main);
+}
+
+.tab.active .pin-icon {
+  color: var(--accent-primary);
+  opacity: 1;
+  background: rgba(var(--accent-primary-rgb), 0.1);
+}
+
+.tab-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dirty-indicator {
+  color: var(--color-text-secondary);
+  font-size: 16px; /* Smaller dot */
+  line-height: 1;
+  width: 8px;
+  height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab.active .dirty-indicator {
+  color: var(--color-text);
+}
+
+.tab.selected .dirty-indicator {
+  color: var(--text-main);
+}
+
+.tab-close {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  border-radius: var(--icon-button-radius);
+  width: 0;
+  height: var(--icon-button-size-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: var(--transition-fast);
+}
+
+.tab:hover .tab-close {
+  width: var(--icon-button-size-sm);
+  margin-left: 2px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tab.active .tab-close {
+  color: var(--accent-primary);
+}
+
+.tab-close:hover {
+  background-color: var(--danger-soft-bg);
+  color: var(--danger-soft-color);
+  box-shadow: var(--interactive-hover-ring);
+}
+
+.tab-close:focus-visible,
+.pin-icon:focus-visible,
+.menu-item:focus-visible {
+  outline: none;
+  border-radius: var(--icon-button-radius);
+  box-shadow: var(--field-focus-ring);
+}
+
+.tab-actions {
+  padding: 0;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  min-height: var(--toolbar-button-height);
+  padding-left: 4px;
+  background: transparent;
+  border-radius: var(--toolbar-button-radius);
+  border: none;
+  gap: 6px;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--toolbar-button-height);
+  padding: 0 6px 0 4px;
+  border-radius: var(--toolbar-button-radius);
+  background: color-mix(in srgb, var(--icon-button-bg) 82%, var(--glass-bg));
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.08);
+}
+
+.batch-count {
+  font-size: var(--ui-font-size-xs);
+  color: var(--accent-primary);
+  font-weight: var(--ui-font-weight-semibold);
+  white-space: nowrap;
+}
+
+.tab-actions button {
+  background: var(--icon-button-bg);
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  width: var(--icon-button-size-md);
+  height: var(--icon-button-size-md);
+  border-radius: var(--toolbar-button-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.tab-actions button:focus-visible {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: var(--field-focus-ring);
+}
+
+.tab-actions button:hover {
+  background: var(--interactive-hover-bg);
+  color: var(--text-main);
+  border-color: var(--interactive-hover-border);
+  box-shadow: var(--interactive-hover-ring);
+}
+
+/* Context Menu */
+.context-menu {
+  position: fixed;
+  background: color-mix(in srgb, var(--glass-bg) 92%, var(--bg-deep));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--menu-card-shadow);
+  padding: 4px 0;
+  min-width: 120px;
+  z-index: 5000;
+  backdrop-filter: blur(10px);
+}
+
+.menu-item {
+  min-height: var(--menu-item-min-height);
+  padding: var(--menu-item-padding-y) var(--menu-item-padding-x);
+  display: flex;
+  align-items: center;
+  font-size: var(--ui-font-size-sm);
+  font-weight: var(--ui-font-weight-medium);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.menu-item:hover {
+  background: var(--interactive-hover-bg);
+  color: var(--accent-primary);
+}
+
+.menu-separator {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 4px 0;
+}
+</style>

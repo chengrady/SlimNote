@@ -1,0 +1,154 @@
+{
+  "name": "slimnote",
+  "version": "1.1.1",
+  "description": "A cross-platform text editor built with Electron and Vue 3",
+  "main": "dist-electron/main.js",
+  "author": "SlimNote Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "dev:web": "vite --config vite-frontend.config.js",
+    "build": "vite build && electron-builder",
+    "build:win": "vite build && electron-builder --win",
+    "build:mac": "vite build && electron-builder --mac",
+    "build:linux": "vite build && electron-builder --linux"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5",
+    "@milkdown/core": "^7.18.0",
+    "@milkdown/crepe": "^7.18.0",
+    "@milkdown/ctx": "^7.18.0",
+    "@milkdown/kit": "^7.18.0",
+    "@milkdown/plugin-block": "^7.18.0",
+    "@milkdown/plugin-clipboard": "^7.18.0",
+    "@milkdown/plugin-history": "^7.18.0",
+    "@milkdown/plugin-listener": "^7.18.0",
+    "@milkdown/plugin-math": "^7.5.9",
+    "@milkdown/plugin-prism": "^7.18.0",
+    "@milkdown/plugin-upload": "^7.18.0",
+    "@milkdown/preset-commonmark": "^7.18.0",
+    "@milkdown/preset-gfm": "^7.18.0",
+    "ajv": "^6.14.0",
+    "chokidar": "^3.6.0",
+    "fast-xml-parser": "^5.4.2",
+    "highlight.js": "^11.9.0",
+    "html2canvas": "^1.4.1",
+    "iconv-lite": "^0.6.3",
+    "jmespath": "^0.16.0",
+    "jsonrepair": "^3.13.2",
+    "katex": "^0.16.27",
+    "marked": "^12.0.1",
+    "monaco-editor": "^0.47.0",
+    "papaparse": "^5.5.3",
+    "pinia": "^2.1.7",
+    "prismjs": "^1.30.0",
+    "seti-icons": "^0.0.4",
+    "smol-toml": "^1.6.0",
+    "to-json-schema": "^0.2.5",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "vite": "^5.1.6",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "build": {
+    "appId": "com.slimnote.app",
+    "productName": "SlimNote",
+    "fileAssociations": [
+      {
+        "ext": [
+          "txt",
+          "text",
+          "md",
+          "markdown",
+          "mdx",
+          "json",
+          "jsonc",
+          "yaml",
+          "yml",
+          "xml",
+          "toml",
+          "ini",
+          "conf",
+          "config",
+          "properties",
+          "log",
+          "sql",
+          "csv",
+          "tsv",
+          "js",
+          "mjs",
+          "cjs",
+          "ts",
+          "mts",
+          "cts",
+          "jsx",
+          "tsx",
+          "vue",
+          "html",
+          "htm",
+          "css",
+          "scss",
+          "sass",
+          "less",
+          "py",
+          "java",
+          "c",
+          "cpp",
+          "cc",
+          "cxx",
+          "h",
+          "hpp",
+          "cs",
+          "sh",
+          "bash",
+          "zsh",
+          "ps1",
+          "bat",
+          "cmd"
+        ],
+        "name": "SlimNote 文本与代码文件",
+        "description": "使用 SlimNote 打开支持的文本与代码文件",
+        "role": "Editor",
+        "icon": "public/logo.ico"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/logo.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "public/logo.svg"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "public/logo.svg"
+    }
+  }
+}

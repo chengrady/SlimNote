@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm search:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run preview)",
+      "Bash(npm run build:*)",
+      "Bash(npm run)",
+      "mcp__web-reader__webReader",
+      "Bash(npm ls:*)",
+      "Bash(npx electron:*)",
+      "Bash(npm show:*)",
+      "Bash(node:*)",
+      "Bash(npm run electron:dev:*)",
+      "Bash(npx electron-vite:*)",
+      "Bash(timeout:*)",
+      "Bash(npm view:*)",
+      "Bash(npx create-electron-vite@latest:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(\"node_modules/electron/dist/electron.exe\" test-electron-debug.js)",
+      "Bash(ls:*)",
+      "Bash(set:*)",
+      "Bash(ELECTRON_RUN_AS_NODE=\"\" npm run dev:*)",
+      "Bash(\"node_modules/.bin/electron\" \".\" --version)",
+      "Bash(\"d:\\\\00 Code\\\\SlimNote\\\\test-electron.js\":*)",
+      "Bash(\"d:\\\\00 Code\\\\SlimNote\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\" --version)",
+      "Bash('d:\\\\00 Code\\\\SlimNote\\\\node_modules\\\\electron\\\\dist\\\\electron.exe' 'd:\\\\00 Code\\\\SlimNote\\\\test-electron.js')",
+      "Bash('node_modules\\\\.bin\\\\electron' -v)",
+      "Bash(taskkill /F /IM electron.exe)",
+      "mcp__zread__get_repo_structure",
+      "Bash(npx vue-tsc --noEmit)",
+      "Bash(npx vite build)",
+      "Bash(npm cache clean --force)",
+      "Bash(rm -rf node_modules/electron)",
+      "Bash(grep -r \"spawn\\\\|exec\\\\|electron\" node_modules/vite-plugin-electron/simple/dist/*.js)",
+      "Bash(rm -rf \"$LOCALAPPDATA/electron/Cache\" \"$LOCALAPPDATA/electron/Cache.old\")",
+      "Bash(rm -rf \"$HOME/.cache/electron\")",
+      "Bash(node_modules/.bin/electron --version)"
+    ]
+  }
+}
