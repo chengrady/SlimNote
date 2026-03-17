@@ -68,9 +68,11 @@ Download the latest release for your platform:
 
 | Platform | Download |
 |----------|----------|
-| Windows | `.exe` (Installer) / `.exe` (Portable) |
-| macOS | `.dmg` |
-| Linux | `.AppImage` / `.deb` |
+| Windows | [Installer v1.2.0](https://github.com/chengrady/SlimNote/releases/download/v1.2.0/SlimNote.Setup.1.2.0.exe) / [Portable v1.2.0](https://github.com/chengrady/SlimNote/releases/download/v1.2.0/SlimNote.1.2.0.exe) |
+| macOS | [View v1.2.0 release](https://github.com/chengrady/SlimNote/releases/tag/v1.2.0) |
+| Linux | [View v1.2.0 release](https://github.com/chengrady/SlimNote/releases/tag/v1.2.0) |
+
+Current v1.2.0 assets include Windows installer and portable builds. See the release page for the latest platform availability.
 
 ### 🚀 Quick Start
 
@@ -197,9 +199,11 @@ SlimNote 是一个基于 **Electron**、**Vue 3**、**Monaco Editor** 和 **Milk
 
 | 平台 | 下载 |
 |------|------|
-| Windows | `.exe` (安装包) / `.exe` (便携版) |
-| macOS | `.dmg` |
-| Linux | `.AppImage` / `.deb` |
+| Windows | [安装包 v1.2.0](https://github.com/chengrady/SlimNote/releases/download/v1.2.0/SlimNote.Setup.1.2.0.exe) / [便携版 v1.2.0](https://github.com/chengrady/SlimNote/releases/download/v1.2.0/SlimNote.1.2.0.exe) |
+| macOS | [查看 v1.2.0 发布页](https://github.com/chengrady/SlimNote/releases/tag/v1.2.0) |
+| Linux | [查看 v1.2.0 发布页](https://github.com/chengrady/SlimNote/releases/tag/v1.2.0) |
+
+当前 v1.2.0 已提供 Windows 安装包与便携版，其他平台请以发布页中的最新产物为准。
 
 ### 🚀 快速开始
 
