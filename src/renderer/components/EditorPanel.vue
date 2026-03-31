@@ -96,6 +96,7 @@
               :theme="settingsStore.settings.theme"
               :fontSize="activeTab.fontSize"
               @update:modelValue="handleContentChange"
+              @paste-content="handleEditorPasteContent"
             />
             <!-- Source Editor for all languages -->
             <MonacoEditor
@@ -108,6 +109,7 @@
               @scroll="handleEditorScroll"
               @cursor-change="handleCursorChange"
               @change-font-size="handleFontSizeChange"
+              @paste-content="handleEditorPasteContent"
             />
           </div>
           <div v-if="activeTab.language === 'log'" class="log-stats-bar">
@@ -300,6 +302,21 @@
       @close="showErrorDialog = false"
       @confirm="showErrorDialog = false"
     />
+    <ModalDialog
+      :show="showContentTypeSuggestionDialog"
+      :title="t('editorPanel.contentTypeSuggestionTitle')"
+      @close="dismissContentTypeSuggestion"
+      @confirm="applyContentTypeSuggestion"
+    >
+      <template #body>
+        <p>{{ t('editorPanel.contentTypeSuggestionMessage', { current: contentTypeSuggestion.currentLanguageLabel, target: contentTypeSuggestion.targetLanguageLabel }) }}</p>
+        <p v-if="contentTypeSuggestion.reason" class="content-type-suggestion-reason">{{ contentTypeSuggestion.reason }}</p>
+      </template>
+      <template #footer>
+        <button class="modal-btn" @click="dismissContentTypeSuggestion">{{ t('common.cancel') }}</button>
+        <button class="modal-btn primary" @click="applyContentTypeSuggestion">{{ t('editorPanel.switchFileType') }}</button>
+      </template>
+    </ModalDialog>
     <!-- JSON 格式转换弹窗 -->
     <JsonConverter
       v-if="showConverter"
@@ -349,9 +366,10 @@ import WelcomeWorkbench from './WelcomeWorkbench.vue'
 import { repairAndFormat } from '../utils/jsonRepair'
 import { exportCodeToImage, downloadImage } from '../utils/exportImage'
 import { buildMarkdownClipboardPayload, buildMarkdownPdfDocument } from '../utils/markdownPdf'
+import { detectLanguageFromContent, getLanguageDisplayName } from '../utils/contentTypeDetection'
 import { formatSql, minifySql, transformSqlKeywords } from '../utils/sqlFormatter'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
@@ -397,6 +415,71 @@ const showConverter = ref(false)
 const showCodeGen = ref(false)
 const showDiff = ref(false)
 const selectedJsonPath = ref([])
+const showContentTypeSuggestionDialog = ref(false)
+const contentTypeSuggestion = ref({
+  tabId: '',
+  targetLanguage: '',
+  targetLanguageLabel: '',
+  currentLanguageLabel: '',
+  reason: ''
+})
+const handledContentTypeSuggestionTabs = new Set()
+
+function triggerEditorEvent(name, detail) {
+  window.dispatchEvent(new CustomEvent(name, { detail }))
+}
+
+function getEditorLanguageLabel(language) {
+  const normalized = String(language || '').trim().toLowerCase()
+  const editorViewKey = `editorView.fileTypes.${normalized}`
+  const languageKey = `languages.${normalized}`
+
+  if (te(editorViewKey)) return t(editorViewKey)
+  if (te(languageKey)) return t(languageKey)
+  return getLanguageDisplayName(normalized, language)
+}
+
+function isEligibleForContentTypeSuggestion(tab) {
+  if (!tab || !tab.id || tab.filePath) return false
+  if (handledContentTypeSuggestionTabs.has(tab.id)) return false
+  return !String(tab.originalContent || '').trim()
+}
+
+function handleEditorPasteContent(payload) {
+  const tab = activeTab.value
+  if (!isEligibleForContentTypeSuggestion(tab)) return
+
+  const pastedText = typeof payload === 'string' ? payload : payload?.text
+  const hadContentBeforePaste = typeof payload === 'object' ? Boolean(payload?.hadContentBeforePaste) : false
+  if (hadContentBeforePaste) return
+
+  const text = String(pastedText || '')
+  if (text.trim().length < 12) return
+
+  const detection = detectLanguageFromContent(text, tab.language)
+  if (!detection.language || detection.language === tab.language) return
+
+  handledContentTypeSuggestionTabs.add(tab.id)
+  contentTypeSuggestion.value = {
+    tabId: tab.id,
+    targetLanguage: detection.language,
+    targetLanguageLabel: getEditorLanguageLabel(detection.language),
+    currentLanguageLabel: getEditorLanguageLabel(tab.language),
+    reason: detection.reason
+  }
+  showContentTypeSuggestionDialog.value = true
+}
+
+function dismissContentTypeSuggestion() {
+  showContentTypeSuggestionDialog.value = false
+}
+
+function applyContentTypeSuggestion() {
+  if (contentTypeSuggestion.value.tabId && contentTypeSuggestion.value.targetLanguage) {
+    editorStore.updateTabLanguage(contentTypeSuggestion.value.tabId, contentTypeSuggestion.value.targetLanguage)
+  }
+  showContentTypeSuggestionDialog.value = false
+}
 const templates = [
   {
     title: 'README.md',
@@ -1272,9 +1355,31 @@ async function exportMarkdownAsPdf() {
 
 // 键盘快捷键
 function handleKeydown(e) {
-  if (!activeTab.value) return
-
   if (e.ctrlKey || e.metaKey) {
+    if (e.shiftKey && e.key.toLowerCase() === 'f') {
+      e.preventDefault()
+      triggerEditorEvent('open-global-search')
+      return
+    }
+
+    if (activeTab.value && e.key.toLowerCase() === 'f') {
+      e.preventDefault()
+      triggerEditorEvent('editor-find')
+      return
+    }
+
+    if (activeTab.value && e.key.toLowerCase() === 'h') {
+      e.preventDefault()
+      triggerEditorEvent('editor-replace')
+      return
+    }
+
+    if (activeTab.value && e.key.toLowerCase() === 'a') {
+      triggerEditorEvent('editor-select-all')
+    }
+
+    if (!activeTab.value) return
+
     if (e.shiftKey) {
       switch (activeTab.value.language) {
         case 'json':
@@ -1328,6 +1433,16 @@ function handleKeydown(e) {
   }
 }
 
+function handleJumpToLocation(event) {
+  const lineNumber = Number(event?.detail?.lineNumber)
+  const column = Number(event?.detail?.column) || 1
+  if (!Number.isFinite(lineNumber) || lineNumber <= 0) return
+
+  requestAnimationFrame(() => {
+    monacoEditorRef.value?.jumpToLine(lineNumber, column)
+  })
+}
+
 onMounted(() => {
   const savedSplitRatio = Number(localStorage.getItem(MARKDOWN_SPLIT_RATIO_STORAGE_KEY))
   if (Number.isFinite(savedSplitRatio) && savedSplitRatio > 0) {
@@ -1337,6 +1452,7 @@ onMounted(() => {
   contextSidebarWidth.value = loadContextSidebarWidth(currentContextType.value)
 
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('editor-jump-to-location', handleJumpToLocation)
   document.addEventListener('mousemove', handleSplitMouseMove)
   document.addEventListener('mouseup', stopSplitResize)
   document.addEventListener('mousemove', handleContextSidebarMouseMove)
@@ -1345,6 +1461,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('editor-jump-to-location', handleJumpToLocation)
   document.removeEventListener('mousemove', handleSplitMouseMove)
   document.removeEventListener('mouseup', stopSplitResize)
   document.removeEventListener('mousemove', handleContextSidebarMouseMove)
@@ -1875,6 +1992,12 @@ async function openFolder() {
   height: 100%;
   min-width: 0;
   min-height: 0;
+}
+
+.content-type-suggestion-reason {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .context-resizer {

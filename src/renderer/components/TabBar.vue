@@ -1,5 +1,5 @@
 <template>
-  <div class="tab-bar-container" :class="tabDensityClass">
+  <div class="tab-bar-container ui-pane" :class="tabDensityClass">
     <!-- Pinned Tabs Row -->
     <div v-if="pinnedTabs.length > 0" class="pinned-tabs-row">
       <span class="pinned-tabs-label">已固定</span>
@@ -24,7 +24,7 @@
           </span>
           <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
           <span v-if="tab.isDirty" class="dirty-indicator">●</span>
-          <button class="tab-close" @click.stop="closeTab(tab.id)" aria-label="关闭标签页">
+          <button type="button" class="tab-close" @click.stop="closeTab(tab.id)" aria-label="关闭标签页">
             <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M2 10l8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         </div>
@@ -50,7 +50,7 @@
           <FileIcon :filename="tab.title" :size="19" class="tab-icon-component" />
           <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
           <span v-if="tab.isDirty" class="dirty-indicator">●</span>
-          <button class="tab-close" @click.stop="closeTab(tab.id)" aria-label="关闭标签页">
+          <button type="button" class="tab-close" @click.stop="closeTab(tab.id)" aria-label="关闭标签页">
             <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M2 10l8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         </div>
@@ -58,23 +58,23 @@
       <div class="tab-actions">
         <div v-if="selectedTabIds.length > 1" class="batch-actions">
           <span class="batch-count">已选 {{ selectedTabIds.length }} 项</span>
-          <button v-if="dirtySelectedCount > 0" @click="saveSelectedTabs" :title="`保存选中的 ${dirtySelectedCount} 个标签页`" aria-label="保存选中标签页">
+          <button v-if="dirtySelectedCount > 0" type="button" class="ui-icon-btn" @click="saveSelectedTabs" :title="`保存选中的 ${dirtySelectedCount} 个标签页`" aria-label="保存选中标签页">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3h11l3 3v15H5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 3v6h8" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 21v-6h6v6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
           </button>
-          <button v-if="hasUnpinnedSelection" @click="pinSelectedTabs" title="固定选中标签页" aria-label="固定选中标签页">
+          <button v-if="hasUnpinnedSelection" type="button" class="ui-icon-btn" @click="pinSelectedTabs" title="固定选中标签页" aria-label="固定选中标签页">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
           </button>
-          <button v-if="hasPinnedSelection" @click="unpinSelectedTabs" title="取消固定选中标签页" aria-label="取消固定选中标签页">
+          <button v-if="hasPinnedSelection" type="button" class="ui-icon-btn" @click="unpinSelectedTabs" title="取消固定选中标签页" aria-label="取消固定选中标签页">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 2h10v2h-1v8l2 2v2h-5.2v6h-1.6v-6H6v-2l2-2V4H7V2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </button>
-          <button @click="closeSelectedTabs" title="关闭选中标签页" aria-label="关闭选中标签页">
+          <button type="button" class="ui-icon-btn" @click="closeSelectedTabs" title="关闭选中标签页" aria-label="关闭选中标签页">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M8 10v7M12 10v7M16 10v7M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <button @click="clearSelectedTabs" title="取消选择" aria-label="取消选择">
+          <button type="button" class="ui-icon-btn" @click="clearSelectedTabs" title="取消选择" aria-label="取消选择">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </button>
         </div>
-        <button @click="newTab" title="新建标签页" aria-label="新建标签页">
+        <button type="button" class="ui-icon-btn" @click="newTab" title="新建标签页" aria-label="新建标签页">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
       </div>
@@ -84,34 +84,50 @@
       <div
         v-if="contextMenu.visible"
         ref="contextMenuRef"
-        class="context-menu"
+        class="context-menu ui-context-menu"
         :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
       >
-        <div class="menu-item" @click="handleAction('closeCurrent')">关闭当前标签</div>
-        <div class="menu-item" @click="handleAction('closeOthers')">关闭其他</div>
-        <div class="menu-item" @click="handleAction('closeAll')">关闭所有</div>
-        <div class="menu-item" @click="handleAction('closeRight')">关闭右侧</div>
-        <div class="menu-separator"></div>
-        <div class="menu-item" @click="handleAction('togglePin')">
+        <div class="menu-item ui-menu-item" @click="handleAction('closeCurrent')">关闭当前标签</div>
+        <div class="menu-item ui-menu-item" @click="handleAction('closeOthers')">关闭其他</div>
+        <div class="menu-item ui-menu-item" @click="handleAction('closeAll')">关闭所有</div>
+        <div class="menu-item ui-menu-item" @click="handleAction('closeRight')">关闭右侧</div>
+        <div class="menu-separator ui-menu-separator"></div>
+        <div class="menu-item ui-menu-item" @click="handleAction('togglePin')">
           {{ pinMenuLabel }}
         </div>
-        <div v-if="selectedTabIds.length > 1" class="menu-item" @click="handleAction('togglePinSelected')">
+        <div v-if="selectedTabIds.length > 1" class="menu-item ui-menu-item" @click="handleAction('togglePinSelected')">
           {{ selectedPinMenuLabel }}
         </div>
-        <div v-if="dirtySelectedCount > 0" class="menu-item" @click="handleAction('saveSelected')">
+        <div v-if="dirtySelectedCount > 0" class="menu-item ui-menu-item" @click="handleAction('saveSelected')">
           保存选中项
         </div>
       </div>
     </Teleport>
+
+    <ModalDialog
+      :show="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      @close="handleConfirmClose"
+      @confirm="handleConfirmAccept"
+    >
+      <template #footer>
+        <button type="button" class="modal-btn" @click="handleConfirmClose">{{ t('common.cancel') }}</button>
+        <button type="button" class="modal-btn primary" @click="handleConfirmAccept">{{ t('common.confirm') }}</button>
+      </template>
+    </ModalDialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useSettingsStore } from '../stores/settings'
 import FileIcon from './FileIcon.vue'
+import ModalDialog from './ModalDialog.vue'
 
+const { t } = useI18n()
 const editorStore = useEditorStore()
 const settingsStore = useSettingsStore()
 
@@ -130,6 +146,8 @@ const tabDensityClass = computed(() => `density-${settingsStore.settings.tabDens
 const dragState = ref({ dragId: null, targetId: null })
 const selectedTabIds = ref([])
 const lastSelectedTabId = ref(null)
+const confirmDialog = ref({ visible: false, title: '', message: '' })
+let confirmAction = null
 
 const pinnedTabs = computed(() => editorStore.tabs.filter(t => t.pinned))
 const unpinnedTabs = computed(() => editorStore.tabs.filter(t => !t.pinned))
@@ -143,6 +161,7 @@ const isTargetPinned = computed(() => {
   const tab = editorStore.tabs.find(t => t.id === contextMenu.value.targetId)
   return tab ? tab.pinned : false
 })
+
 const pinMenuLabel = computed(() => {
   if (selectedTabIds.value.length > 1 && selectedTabIds.value.includes(contextMenu.value.targetId)) {
     if (hasPinnedSelection.value && hasUnpinnedSelection.value) {
@@ -152,6 +171,7 @@ const pinMenuLabel = computed(() => {
 
   return isTargetPinned.value ? '取消固定' : '固定'
 })
+
 const selectedPinMenuLabel = computed(() => {
   if (hasPinnedSelection.value && hasUnpinnedSelection.value) {
     return '固定未固定项'
@@ -159,6 +179,22 @@ const selectedPinMenuLabel = computed(() => {
 
   return hasPinnedSelection.value ? '取消固定选中项' : '固定选中项'
 })
+
+function openConfirmDialog({ title, message, onConfirm }) {
+  confirmDialog.value = { visible: true, title, message }
+  confirmAction = onConfirm
+}
+
+function handleConfirmClose() {
+  confirmDialog.value = { visible: false, title: '', message: '' }
+  confirmAction = null
+}
+
+function handleConfirmAccept() {
+  const action = confirmAction
+  handleConfirmClose()
+  action?.()
+}
 
 function showContextMenu(event, tabId) {
   if (!selectedTabIds.value.includes(tabId)) {
@@ -226,16 +262,9 @@ function handleAction(action) {
       saveSelectedTabs()
       break
   }
+
   closeContextMenu()
 }
-
-onMounted(() => {
-  document.addEventListener('click', closeContextMenu)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', closeContextMenu)
-})
 
 function newTab() {
   editorStore.createTab()
@@ -243,14 +272,19 @@ function newTab() {
 
 function closeTab(tabId) {
   const tab = editorStore.tabs.find(t => t.id === tabId)
-  if (tab && tab.isDirty) {
-    if (confirm(`${tab.title} 有未保存的更改。确定要关闭吗？`)) {
-      editorStore.closeTab(tabId)
-    }
-  } else {
-    editorStore.closeTab(tabId)
+  if (tab?.isDirty) {
+    openConfirmDialog({
+      title: t('tabBar.unsavedCloseTitle'),
+      message: t('tabBar.unsavedCloseMessage', { title: tab.title }),
+      onConfirm: () => {
+        editorStore.closeTab(tabId)
+        selectedTabIds.value = selectedTabIds.value.filter(id => id !== tabId)
+      }
+    })
+    return
   }
 
+  editorStore.closeTab(tabId)
   selectedTabIds.value = selectedTabIds.value.filter(id => id !== tabId)
 }
 
@@ -289,7 +323,15 @@ function closeSelectedTabs() {
   if (ids.length === 0) return
 
   const dirtyTabs = editorStore.tabs.filter(tab => ids.includes(tab.id) && tab.isDirty)
-  if (dirtyTabs.length > 0 && !confirm(`选中的 ${dirtyTabs.length} 个标签页包含未保存内容，确定关闭吗？`)) {
+  if (dirtyTabs.length > 0) {
+    openConfirmDialog({
+      title: t('tabBar.unsavedBatchCloseTitle'),
+      message: t('tabBar.unsavedBatchCloseMessage', { count: dirtyTabs.length }),
+      onConfirm: () => {
+        editorStore.closeTabs(ids)
+        clearSelectedTabs()
+      }
+    })
     return
   }
 
@@ -341,15 +383,13 @@ function updateTabOverflow() {
     hasTabOverflow.value = false
     return
   }
+
   hasTabOverflow.value = tabsRef.value.scrollHeight > tabsRef.value.clientHeight + 1
 }
 
-watch(
-  [() => unpinnedTabs.value.length, () => pinnedTabs.value.length],
-  () => {
-    nextTick(updateTabOverflow)
-  }
-)
+watch([() => unpinnedTabs.value.length, () => pinnedTabs.value.length], () => {
+  nextTick(updateTabOverflow)
+})
 
 watch(() => editorStore.tabs.map(tab => tab.id), (ids) => {
   selectedTabIds.value = selectedTabIds.value.filter(id => ids.includes(id))
@@ -359,6 +399,7 @@ watch(() => editorStore.tabs.map(tab => tab.id), (ids) => {
 })
 
 onMounted(() => {
+  document.addEventListener('click', closeContextMenu)
   tabsResizeObserver = new ResizeObserver(() => {
     updateTabOverflow()
   })
@@ -370,6 +411,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu)
   if (tabsResizeObserver) {
     tabsResizeObserver.disconnect()
     tabsResizeObserver = null
@@ -377,63 +419,46 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateTabOverflow)
 })
 </script>
-
 <style scoped>
 .tab-bar-container {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--backdrop-blur));
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--panel-card-shadow);
-  flex-shrink: 0;
-}
-
-.tab-bar-container.density-compact .pinned-tabs-row {
-  gap: 4px;
-}
-
-.tab-bar-container.density-compact .tab-bar {
-  min-height: 32px;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
 .pinned-tabs-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: var(--space-1) var(--space-3);
-  background: color-mix(in srgb, var(--glass-bg) 88%, rgba(var(--accent-primary-rgb), 0.05));
-  border-bottom: 1px solid var(--glass-border);
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) 0;
+  min-width: 0;
+  background: color-mix(in srgb, var(--bg-secondary) 82%, rgba(var(--accent-primary-rgb), 0.03));
 }
 
 .pinned-tabs-label {
+  flex-shrink: 0;
   font-size: var(--ui-font-size-xs);
-  font-weight: var(--ui-font-weight-bold);
-  line-height: var(--panel-title-line-height);
-  color: var(--accent-primary);
-  letter-spacing: 0.04em;
+  font-weight: var(--ui-font-weight-semibold);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
 }
 
 .pinned-tabs-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .tab-bar {
   display: flex;
   align-items: flex-start;
-  background: color-mix(in srgb, var(--glass-bg) 94%, transparent);
-  min-height: 36px;
-  overflow: hidden;
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-3);
   margin-top: 0;
   gap: var(--space-2);
   position: relative;
+  background: color-mix(in srgb, var(--glass-bg) 96%, transparent);
 }
 
 .tabs {
@@ -672,18 +697,19 @@ onUnmounted(() => {
   background: transparent;
   border-radius: var(--toolbar-button-radius);
   border: none;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .batch-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1);
   min-height: var(--toolbar-button-height);
-  padding: 0 6px 0 4px;
+  padding: 0 8px 0 6px;
   border-radius: var(--toolbar-button-radius);
-  background: color-mix(in srgb, var(--icon-button-bg) 82%, var(--glass-bg));
-  border: 1px solid rgba(var(--accent-primary-rgb), 0.08);
+  background: color-mix(in srgb, var(--bg-secondary) 82%, rgba(var(--accent-primary-rgb), 0.05));
+  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(var(--accent-primary-rgb), 0.12));
+  box-shadow: var(--panel-inner-shadow);
 }
 
 .batch-count {
@@ -694,66 +720,16 @@ onUnmounted(() => {
 }
 
 .tab-actions button {
-  background: var(--icon-button-bg);
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  cursor: pointer;
   font-size: 14px;
-  width: var(--icon-button-size-md);
-  height: var(--icon-button-size-md);
   border-radius: var(--toolbar-button-radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-fast);
-}
-
-.tab-actions button:focus-visible {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
-}
-
-.tab-actions button:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--text-main);
-  border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
 }
 
 /* Context Menu */
 .context-menu {
-  position: fixed;
-  background: color-mix(in srgb, var(--glass-bg) 92%, var(--bg-deep));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--menu-card-shadow);
-  padding: 4px 0;
   min-width: 120px;
-  z-index: 5000;
-  backdrop-filter: blur(10px);
 }
 
 .menu-item {
-  min-height: var(--menu-item-min-height);
-  padding: var(--menu-item-padding-y) var(--menu-item-padding-x);
-  display: flex;
-  align-items: center;
-  font-size: var(--ui-font-size-sm);
-  font-weight: var(--ui-font-weight-medium);
-  color: var(--text-main);
-  cursor: pointer;
   transition: background 0.1s;
-}
-
-.menu-item:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--accent-primary);
-}
-
-.menu-separator {
-  height: 1px;
-  background: var(--glass-border);
-  margin: 4px 0;
 }
 </style>

@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } = require('electron')
-const { join } = require('path')
+const { join, resolve } = require('path')
 const fs = require('fs')
 const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
@@ -7,6 +7,19 @@ const { watch } = require('chokidar')
 let mainWindow = null
 let pinWindows = new Map()
 let fileWatchers = new Map()
+let pendingOpenFiles = []
+let rendererReady = false
+
+const SEARCH_EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'dist', 'dist-electron', 'release', 'release-debug'])
+const SEARCHABLE_FILE_EXTENSIONS = new Set([
+  'txt', 'text', 'md', 'markdown', 'mdx',
+  'json', 'jsonc', 'yaml', 'yml', 'xml', 'toml', 'ini', 'conf', 'config', 'properties',
+  'log', 'sql', 'csv', 'tsv',
+  'js', 'mjs', 'cjs', 'ts', 'mts', 'cts', 'jsx', 'tsx', 'vue',
+  'html', 'htm', 'css', 'scss', 'sass', 'less',
+  'py', 'java', 'c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'cs',
+  'sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd'
+])
 
 // i18n support
 let currentLocale = 'zh-CN'
@@ -16,6 +29,7 @@ const locales = {
       file: '文件',
       newFile: '新建文件',
       openFile: '打开文件',
+      openFolder: '打开目录',
       save: '保存',
       saveAs: '另存为',
       settings: '设置',
@@ -35,7 +49,10 @@ const locales = {
       zoomOut: '缩小',
       toggleTheme: '切换主题',
       toggleFullscreen: '切换全屏',
-      selectAll: '全选'
+      selectAll: '全选',
+      find: '查找',
+      replace: '替换',
+      globalSearch: '全局搜索'
     }
   },
   'en-US': {
@@ -43,6 +60,7 @@ const locales = {
       file: 'File',
       newFile: 'New File',
       openFile: 'Open File',
+      openFolder: 'Open Folder',
       save: 'Save',
       saveAs: 'Save As',
       settings: 'Settings',
@@ -62,7 +80,10 @@ const locales = {
       zoomOut: 'Zoom Out',
       toggleTheme: 'Toggle Theme',
       toggleFullscreen: 'Toggle Fullscreen',
-      selectAll: 'Select All'
+      selectAll: 'Select All',
+      find: 'Find',
+      replace: 'Replace',
+      globalSearch: 'Global Search'
     }
   }
 }
@@ -84,6 +105,8 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 const iconPath = isDev
   ? join(__dirname, '../public/logo.ico')
   : join(__dirname, '../dist/logo.ico')
+const rendererIndexPath = join(__dirname, '../dist/index.html')
+const preloadPath = join(__dirname, 'preload.js')
 
 const appDataRoot = app.getPath('appData')
 const userDataDir = join(appDataRoot, isDev ? 'SlimNote-dev' : 'SlimNote')
@@ -94,6 +117,243 @@ fs.mkdirSync(sessionDataDir, { recursive: true })
 
 app.setPath('userData', userDataDir)
 app.setPath('sessionData', sessionDataDir)
+
+function normalizeCandidatePath(candidate) {
+  if (!candidate || typeof candidate !== 'string') return null
+
+  const trimmed = candidate.trim().replace(/^"+|"+$/g, '')
+  if (!trimmed || trimmed.startsWith('--')) return null
+
+  const resolvedPath = resolve(trimmed)
+  if (!fs.existsSync(resolvedPath)) return null
+
+  try {
+    const stat = fs.statSync(resolvedPath)
+    return stat.isFile() ? resolvedPath : null
+  } catch (error) {
+    return null
+  }
+}
+
+function extractOpenableFilesFromArgv(argv = []) {
+  const startIndex = app.isPackaged ? 1 : 2
+  const candidates = argv.slice(startIndex)
+  return Array.from(new Set(candidates.map(normalizeCandidatePath).filter(Boolean)))
+}
+
+function getFileExtension(filePath = '') {
+  const normalized = String(filePath).split(/[\\/]/).pop() || ''
+  const lastDotIndex = normalized.lastIndexOf('.')
+  if (lastDotIndex <= 0 || lastDotIndex === normalized.length - 1) {
+    return ''
+  }
+
+  return normalized.slice(lastDotIndex + 1).toLowerCase()
+}
+
+function isSearchableFile(filePath = '') {
+  const fileName = String(filePath).split(/[\\/]/).pop()?.toLowerCase() || ''
+  if (!fileName) return false
+
+  if (['.gitignore', '.gitattributes', '.editorconfig', 'dockerfile', 'makefile', 'readme', 'license', 'changelog'].includes(fileName)) {
+    return true
+  }
+
+  if (fileName === '.env' || fileName.startsWith('.env.')) {
+    return true
+  }
+
+  const extension = getFileExtension(filePath)
+  return extension ? SEARCHABLE_FILE_EXTENSIONS.has(extension) : true
+}
+
+async function searchInWorkspace({ rootPath, query, matchCase = false, maxResults = 200 } = {}) {
+  const normalizedRoot = rootPath && fs.existsSync(rootPath) ? rootPath : null
+  const searchQuery = String(query || '').trim()
+  const collected = []
+  let totalMatches = 0
+
+  if (!normalizedRoot || !searchQuery) {
+    return { results: [], totalMatches: 0 }
+  }
+
+  const expected = matchCase ? searchQuery : searchQuery.toLowerCase()
+  const safeMaxResults = Math.max(1, Number(maxResults) || 200)
+
+  async function walkDirectory(dirPath) {
+    if (totalMatches >= safeMaxResults) return
+
+    let entries = []
+    try {
+      entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
+    } catch (error) {
+      return
+    }
+
+    for (const entry of entries) {
+      if (totalMatches >= safeMaxResults) break
+
+      const entryPath = join(dirPath, entry.name)
+
+      if (entry.isDirectory()) {
+        if (!SEARCH_EXCLUDED_DIRS.has(entry.name.toLowerCase())) {
+          await walkDirectory(entryPath)
+        }
+        continue
+      }
+
+      if (!entry.isFile() || !isSearchableFile(entryPath)) {
+        continue
+      }
+
+      let stat = null
+      try {
+        stat = await fs.promises.stat(entryPath)
+      } catch (error) {
+        continue
+      }
+
+      if (!stat || stat.size > 1024 * 1024 * 2) {
+        continue
+      }
+
+      let content = ''
+      try {
+        const buffer = await fs.promises.readFile(entryPath)
+        content = iconv.decode(buffer, 'utf8')
+      } catch (error) {
+        continue
+      }
+
+      const lines = content.split(/\r?\n/)
+      const matches = []
+
+      for (let index = 0; index < lines.length; index += 1) {
+        if (totalMatches >= safeMaxResults) break
+
+        const line = lines[index]
+        const haystack = matchCase ? line : line.toLowerCase()
+        let cursor = 0
+
+        while (cursor <= haystack.length) {
+          const foundIndex = haystack.indexOf(expected, cursor)
+          if (foundIndex === -1) break
+
+          matches.push({
+            lineNumber: index + 1,
+            column: foundIndex + 1,
+            text: line.trim() || line
+          })
+          totalMatches += 1
+
+          if (totalMatches >= safeMaxResults) break
+          cursor = foundIndex + Math.max(expected.length, 1)
+        }
+      }
+
+      if (matches.length) {
+        collected.push({
+          filePath: entryPath,
+          matches
+        })
+      }
+    }
+  }
+
+  const rootStat = await fs.promises.stat(normalizedRoot).catch(() => null)
+  if (!rootStat) {
+    return { results: [], totalMatches: 0 }
+  }
+
+  if (rootStat.isDirectory()) {
+    await walkDirectory(normalizedRoot)
+  } else if (rootStat.isFile()) {
+    const parentDir = normalizedRoot.replace(/[\\/][^\\/]+$/, '') || normalizedRoot
+    await walkDirectory(parentDir)
+  }
+
+  return {
+    results: collected,
+    totalMatches
+  }
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function queueOpenFiles(filePaths = []) {
+  if (!Array.isArray(filePaths) || !filePaths.length) return
+
+  pendingOpenFiles = Array.from(new Set([...pendingOpenFiles, ...filePaths]))
+  flushPendingOpenFiles()
+}
+
+function flushPendingOpenFiles() {
+  if (!rendererReady || !mainWindow || mainWindow.isDestroyed() || !pendingOpenFiles.length) {
+    return
+  }
+
+  const nextFiles = pendingOpenFiles
+  pendingOpenFiles = []
+
+  nextFiles.forEach((filePath) => {
+    mainWindow.webContents.send('app-open-file', filePath)
+  })
+}
+
+async function openFileAssociationSettings() {
+  try {
+    if (process.platform === 'win32') {
+      await shell.openExternal('ms-settings:defaultapps')
+      return { ok: true }
+    }
+
+    if (process.platform === 'darwin') {
+      await shell.openExternal('x-apple.systempreferences:com.apple.preference.general')
+      return { ok: true }
+    }
+
+    return {
+      ok: false,
+      message: '当前平台暂未提供系统文件关联设置入口。'
+    }
+  } catch (error) {
+    console.error('Failed to open file association settings:', error)
+    return {
+      ok: false,
+      message: error.message || '无法打开系统文件关联设置。'
+    }
+  }
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+
+if (!gotSingleInstanceLock) {
+  app.quit()
+}
+
+app.on('second-instance', (event, argv) => {
+  const filePaths = extractOpenableFilesFromArgv(argv)
+  focusMainWindow()
+  queueOpenFiles(filePaths)
+})
+
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  focusMainWindow()
+  const normalizedPath = normalizeCandidatePath(filePath)
+  if (normalizedPath) {
+    queueOpenFiles([normalizedPath])
+  }
+})
 
 // Window State Management
 function getStorePath() {
@@ -156,7 +416,9 @@ async function exportMarkdownPdf({ html, defaultPath } = {}) {
     })
 
     await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html || '')}`)
-    await new Promise((resolve) => setTimeout(resolve, 180))
+    await pdfWindow.webContents.executeJavaScript('document.fonts && document.fonts.ready ? document.fonts.ready.then(() => true) : Promise.resolve(true)', true)
+    await pdfWindow.webContents.executeJavaScript('window.__slimnotePdfReady || Promise.resolve(true)', true)
+    await new Promise((resolve) => setTimeout(resolve, 80))
 
     const pdfBuffer = await pdfWindow.webContents.printToPDF({
       printBackground: true,
@@ -183,12 +445,13 @@ async function exportMarkdownPdf({ html, defaultPath } = {}) {
 }
 
 function createWindow() {
+  rendererReady = false
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     frame: false, // Custom TitleBar
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: true,
@@ -201,13 +464,19 @@ function createWindow() {
     mainWindow?.show()
   })
 
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level < 2) return
+    console.error(`[renderer:${level}] ${sourceId || 'unknown'}:${line || 0} ${message}`)
+  })
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(rendererIndexPath)
   }
 
   mainWindow.on('closed', () => {
+    rendererReady = false
     mainWindow = null
   })
 
@@ -249,6 +518,11 @@ function createMenu() {
           accelerator: 'CmdOrCtrl+O',
           click: () => mainWindow?.webContents.send('menu-open-file')
         },
+        {
+          label: t('menu.openFolder'),
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => mainWindow?.webContents.send('menu-open-folder')
+        },
         { type: 'separator' },
         {
           label: t('menu.save'),
@@ -265,6 +539,10 @@ function createMenu() {
           label: t('menu.settings'),
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu-open-settings')
+        },
+        {
+          label: 'About SlimNote',
+          click: () => mainWindow?.webContents.send('menu-open-about')
         },
         { type: 'separator' },
         { label: t('menu.exit'), role: 'quit' }
@@ -284,9 +562,26 @@ function createMenu() {
           click: () => mainWindow?.webContents.send('menu-redo')
         },
         { type: 'separator' },
-        { label: t('menu.cut'), role: 'cut' },
-        { label: t('menu.copy'), role: 'copy' },
-        { label: t('menu.paste'), role: 'paste' }
+        { label: t('menu.cut'), role: 'cut', accelerator: 'CmdOrCtrl+X' },
+        { label: t('menu.copy'), role: 'copy', accelerator: 'CmdOrCtrl+C' },
+        { label: t('menu.paste'), role: 'paste', accelerator: 'CmdOrCtrl+V' },
+        { label: t('menu.selectAll'), role: 'selectAll', accelerator: 'CmdOrCtrl+A' },
+        { type: 'separator' },
+        {
+          label: t('menu.find'),
+          accelerator: 'CmdOrCtrl+F',
+          click: () => mainWindow?.webContents.send('menu-find')
+        },
+        {
+          label: t('menu.replace'),
+          accelerator: 'CmdOrCtrl+H',
+          click: () => mainWindow?.webContents.send('menu-replace')
+        },
+        {
+          label: t('menu.globalSearch'),
+          accelerator: 'CmdOrCtrl+Shift+F',
+          click: () => mainWindow?.webContents.send('menu-global-search')
+        }
       ]
     },
     {
@@ -300,6 +595,10 @@ function createMenu() {
         { label: t('menu.zoomIn'), role: 'zoomIn' },
         { label: t('menu.zoomOut'), role: 'zoomOut' },
         { type: 'separator' },
+        {
+          label: 'Toggle Sidebar',
+          click: () => mainWindow?.webContents.send('menu-toggle-sidebar')
+        },
         {
           label: t('menu.toggleTheme'),
           click: () => mainWindow?.webContents.send('menu-toggle-theme')
@@ -342,9 +641,21 @@ function registerIpcHandlers() {
     }
   })
   ipcMain.on('window-close', () => mainWindow?.close())
+  ipcMain.on('window-toggle-fullscreen', () => {
+    if (!mainWindow) return
+    mainWindow.setFullScreen(!mainWindow.isFullScreen())
+  })
+  ipcMain.on('window-reload', () => mainWindow?.webContents.reload())
+  ipcMain.on('window-force-reload', () => mainWindow?.webContents.reloadIgnoringCache())
+  ipcMain.on('window-toggle-devtools', () => mainWindow?.webContents.toggleDevTools())
 
   ipcMain.on('set-theme', (event, theme) => {
     nativeTheme.themeSource = theme
+  })
+
+  ipcMain.handle('open-external', async (_event, url) => {
+    await shell.openExternal(url)
+    return true
   })
 
   // File System Operations
@@ -467,6 +778,10 @@ function registerIpcHandlers() {
     return result
   })
 
+  ipcMain.handle('search-in-workspace', async (event, payload = {}) => {
+    return await searchInWorkspace(payload)
+  })
+
   ipcMain.handle('export-markdown-pdf', async (event, payload) => {
     try {
       return await exportMarkdownPdf(payload || {})
@@ -474,6 +789,15 @@ function registerIpcHandlers() {
       console.error('Error exporting markdown PDF:', error)
       throw error
     }
+  })
+
+  ipcMain.handle('open-file-association-settings', async () => {
+    return await openFileAssociationSettings()
+  })
+
+  ipcMain.on('renderer-ready', () => {
+    rendererReady = true
+    flushPendingOpenFiles()
   })
 
   // Pin Window
@@ -487,7 +811,7 @@ function registerIpcHandlers() {
       alwaysOnTop: true,
       frame: false,
       webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
+        preload: preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
       }
@@ -499,7 +823,7 @@ function registerIpcHandlers() {
     if (isDev) {
       win.loadURL(`http://localhost:5173/#/pin?id=${winId}`)
     } else {
-      win.loadFile(join(__dirname, '../renderer/index.html'), { hash: `/pin?id=${winId}` })
+      win.loadFile(rendererIndexPath, { hash: `/pin?id=${winId}` })
     }
 
     win.webContents.once('did-finish-load', () => {
@@ -543,14 +867,20 @@ function registerIpcHandlers() {
   })
 }
 
-app.whenReady().then(() => {
-  createWindow()
-  registerIpcHandlers()
+if (gotSingleInstanceLock) {
+  app.whenReady().then(() => {
+    createWindow()
+    registerIpcHandlers()
+    queueOpenFiles(extractOpenableFilesFromArgv(process.argv))
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow()
+        flushPendingOpenFiles()
+      }
+    })
   })
-})
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

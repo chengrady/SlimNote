@@ -1,6 +1,6 @@
 <template>
-  <div class="empty-editor">
-    <div class="empty-badge">{{ t('app.slogan') }}</div>
+  <div class="empty-editor ui-pane">
+    <div class="empty-badge ui-chip">{{ t('app.slogan') }}</div>
     <h2>{{ t('app.name') }}</h2>
     <p>{{ t('welcome.description') }}</p>
     <div class="quick-actions">
@@ -14,34 +14,34 @@
       </div>
     </div>
     <div class="workflow-highlights">
-      <button class="workflow-card markdown" type="button" @click="emitTemplate(markdownTemplate)">
+      <button class="workflow-card ui-card markdown" type="button" @click="emitTemplate(markdownTemplate)">
         <span class="workflow-label">{{ t('welcome.workflow.document') }}</span>
         <strong>{{ t('welcome.workflowMeta.document') }}</strong>
         <p>{{ t('welcome.workflow.documentDesc') }}</p>
       </button>
-      <button class="workflow-card json" type="button" @click="emitTemplate(jsonTemplate)">
+      <button class="workflow-card ui-card json" type="button" @click="emitTemplate(jsonTemplate)">
         <span class="workflow-label">{{ t('welcome.workflow.data') }}</span>
         <strong>{{ t('welcome.workflowMeta.data') }}</strong>
         <p>{{ t('welcome.workflow.dataDesc') }}</p>
       </button>
-      <button class="workflow-card log" type="button" @click="emitTemplate(logTemplate)">
+      <button class="workflow-card ui-card log" type="button" @click="emitTemplate(logTemplate)">
         <span class="workflow-label">{{ t('welcome.workflow.debug') }}</span>
         <strong>{{ t('welcome.workflowMeta.debug') }}</strong>
         <p>{{ t('welcome.workflow.debugDesc') }}</p>
       </button>
     </div>
     <div class="welcome-overview-strip">
-      <div class="overview-pill">
+      <div class="overview-pill ui-card ui-card--compact">
         <span class="overview-label">{{ t('welcome.overview.recentFiles') }}</span>
         <strong>{{ recentQuickFiles.length }}</strong>
       </div>
-      <div class="overview-pill">
+      <div class="overview-pill ui-card ui-card--compact">
         <span class="overview-label">{{ t('welcome.overview.supportedTypes') }}</span>
         <strong>{{ t('welcome.overviewValues.supportedTypes') }}</strong>
       </div>
     </div>
     <div class="welcome-grid">
-      <div class="welcome-card start-card">
+      <div class="welcome-card ui-card start-card">
         <div class="welcome-card-header">
           <h3>{{ t('welcome.start.title') }}</h3>
           <span>{{ t('welcome.start.subtitle') }}</span>
@@ -77,7 +77,7 @@
         </div>
       </div>
       <template v-if="!isCompactWelcomeMode">
-        <div class="welcome-card template-card">
+        <div class="welcome-card ui-card template-card">
           <div class="welcome-card-header">
             <h3>{{ t('welcome.templates.title') }}</h3>
             <span>{{ t('welcome.templates.subtitle') }}</span>
@@ -93,7 +93,7 @@
             </button>
           </div>
         </div>
-        <div class="welcome-card shortcut-card">
+        <div class="welcome-card ui-card shortcut-card">
           <div class="welcome-card-header">
             <h3>{{ t('welcome.scenarios.title') }}</h3>
             <span>{{ t('welcome.scenarios.subtitle') }}</span>
@@ -124,7 +124,7 @@
       </button>
       <p class="welcome-compact-tip">{{ t('welcome.compact.tip') }}</p>
       <div v-if="showCompactExtras" class="welcome-extra-stack">
-        <div class="welcome-card template-card compact-card">
+        <div class="welcome-card ui-card template-card compact-card">
           <div class="welcome-card-header">
             <h3>{{ t('welcome.templates.title') }}</h3>
             <span>{{ t('welcome.templates.subtitle') }}</span>
@@ -140,7 +140,7 @@
             </button>
           </div>
         </div>
-        <div class="welcome-card shortcut-card compact-card">
+        <div class="welcome-card ui-card shortcut-card compact-card">
           <div class="welcome-card-header">
             <h3>{{ t('welcome.scenarios.title') }}</h3>
             <span>{{ t('welcome.scenarios.subtitle') }}</span>
@@ -244,22 +244,15 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   color: var(--text-muted);
-  background: var(--bg-primary);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
   margin: 12px;
-  padding: 36px 28px;
+  padding: 32px 28px;
   text-align: center;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .empty-badge {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(var(--accent-primary-rgb), 0.08);
   color: var(--accent-primary);
-  font-size: var(--ui-font-size-sm);
   font-weight: var(--ui-font-weight-semibold);
   margin-bottom: 16px;
 }
@@ -309,11 +302,7 @@ onUnmounted(() => {
 }
 
 .workflow-card {
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  padding: 16px;
   text-align: left;
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.02));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -375,10 +364,6 @@ onUnmounted(() => {
 }
 
 .overview-pill {
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -452,10 +437,6 @@ onUnmounted(() => {
 }
 
 .welcome-card {
-  background: color-mix(in srgb, var(--glass-bg) 92%, rgba(var(--accent-primary-rgb), 0.04));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);

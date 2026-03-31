@@ -1,6 +1,9 @@
 <template>
   <div class="window-container">
-    <TitleBar @open-settings="showSettingsDialog = true" />
+    <TitleBar
+      @open-settings="showSettingsDialog = true"
+      @menu-action="handleTitleBarMenuAction"
+    />
     <div class="main-editor" :class="{ resizing: isResizing, 'sidebar-collapsed': isSidebarCollapsed }">
       <div
         v-if="isResizing && !isSidebarCollapsed"
@@ -34,6 +37,18 @@
       :show="showSettingsDialog"
       @close="showSettingsDialog = false"
     />
+
+    <AboutDialog
+      :show="showAboutDialog"
+      @close="showAboutDialog = false"
+    />
+
+    <GlobalSearchDialog
+      :show="showGlobalSearchDialog"
+      :root-path="fileStore.rootPath"
+      @close="showGlobalSearchDialog = false"
+      @open-result="handleOpenSearchResult"
+    />
   </div>
 </template>
 
@@ -46,6 +61,8 @@ import EditorPanel from '../components/EditorPanel.vue'
 import StatusBar from '../components/StatusBar.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import SettingsDialog from '../components/SettingsDialog.vue'
+import AboutDialog from '../components/AboutDialog.vue'
+import GlobalSearchDialog from '../components/GlobalSearchDialog.vue'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import { useSettingsStore } from '../stores/settings'
@@ -65,6 +82,8 @@ const isResizing = ref(false)
 const resizePointerX = ref(0)
 const showErrorDialog = ref(false)
 const showSettingsDialog = ref(false)
+const showAboutDialog = ref(false)
+const showGlobalSearchDialog = ref(false)
 const errorMessage = ref('')
 const cleanups = []
 
@@ -89,6 +108,90 @@ const handleOpenFileEvent = (e) => {
 const handleSaveTabsEvent = (e) => {
   const customEvent = e
   saveTabs(customEvent.detail?.tabIds || [])
+}
+
+const handleOpenGlobalSearchEvent = () => {
+  showGlobalSearchDialog.value = true
+}
+
+function dispatchEditorEvent(eventName, detail) {
+  window.dispatchEvent(new CustomEvent(eventName, detail ? { detail } : undefined))
+}
+
+async function openFileFromDialog() {
+  const result = await window.electronAPI.openFileDialog()
+  if (!result.canceled && result.filePaths.length > 0) {
+    await openFile(result.filePaths[0])
+  }
+}
+
+async function openFolderFromDialog() {
+  const result = await window.electronAPI.openFolderDialog()
+  if (!result.canceled && result.filePaths.length > 0) {
+    await fileStore.loadFolder(result.filePaths[0])
+  }
+}
+
+async function handleTitleBarMenuAction(action) {
+  switch (action) {
+    case 'new-file':
+      editorStore.createTab()
+      break
+    case 'open-file':
+      await openFileFromDialog()
+      break
+    case 'open-folder':
+      await openFolderFromDialog()
+      break
+    case 'save':
+      await saveCurrentFile()
+      break
+    case 'save-as':
+      await saveCurrentFileAs()
+      break
+    case 'open-about':
+      showAboutDialog.value = true
+      break
+    case 'exit':
+      window.electronAPI.close()
+      break
+    case 'undo':
+      dispatchEditorEvent('editor-undo')
+      break
+    case 'redo':
+      dispatchEditorEvent('editor-redo')
+      break
+    case 'find':
+      dispatchEditorEvent('editor-find')
+      break
+    case 'replace':
+      dispatchEditorEvent('editor-replace')
+      break
+    case 'global-search':
+      showGlobalSearchDialog.value = true
+      break
+    case 'select-all':
+      dispatchEditorEvent('editor-select-all')
+      break
+    case 'toggle-sidebar':
+      toggleSidebar()
+      break
+    case 'toggle-theme':
+      settingsStore.toggleTheme()
+      break
+    case 'toggle-fullscreen':
+      window.electronAPI.toggleFullScreen?.()
+      break
+    case 'reload':
+      window.electronAPI.reloadWindow?.()
+      break
+    case 'force-reload':
+      window.electronAPI.forceReloadWindow?.()
+      break
+    case 'toggle-devtools':
+      window.electronAPI.toggleDevTools?.()
+      break
+  }
 }
 
 // 窗口大小调整
@@ -176,17 +279,11 @@ onMounted(() => {
   }))
 
   cleanups.push(window.electronAPI.onMenuOpenFile(async () => {
-    const result = await window.electronAPI.openFileDialog()
-    if (!result.canceled && result.filePaths.length > 0) {
-      openFile(result.filePaths[0])
-    }
+    await openFileFromDialog()
   }))
 
   cleanups.push(window.electronAPI.onMenuOpenFolder(async () => {
-    const result = await window.electronAPI.openFolderDialog()
-    if (!result.canceled && result.filePaths.length > 0) {
-      await fileStore.loadFolder(result.filePaths[0])
-    }
+    await openFolderFromDialog()
   }))
 
   cleanups.push(window.electronAPI.onMenuSave(() => {
@@ -198,25 +295,48 @@ onMounted(() => {
   }))
 
   cleanups.push(window.electronAPI.onMenuUndo(() => {
-    window.dispatchEvent(new CustomEvent('editor-undo'))
+    dispatchEditorEvent('editor-undo')
   }))
 
   cleanups.push(window.electronAPI.onMenuRedo(() => {
-    window.dispatchEvent(new CustomEvent('editor-redo'))
+    dispatchEditorEvent('editor-redo')
   }))
 
   cleanups.push(window.electronAPI.onMenuOpenSettings(() => {
     showSettingsDialog.value = true
   }))
 
+  cleanups.push(window.electronAPI.onMenuOpenAbout(() => {
+    showAboutDialog.value = true
+  }))
+
   cleanups.push(window.electronAPI.onMenuToggleTheme(() => {
     settingsStore.toggleTheme()
+  }))
+
+  cleanups.push(window.electronAPI.onMenuFind(() => {
+    dispatchEditorEvent('editor-find')
+  }))
+
+  cleanups.push(window.electronAPI.onMenuReplace(() => {
+    dispatchEditorEvent('editor-replace')
+  }))
+
+  cleanups.push(window.electronAPI.onMenuGlobalSearch(() => {
+    showGlobalSearchDialog.value = true
+  }))
+
+  cleanups.push(window.electronAPI.onMenuToggleSidebar(() => {
+    toggleSidebar()
   }))
 
   cleanups.push(window.electronAPI.onAppOpenFile((filePath) => {
     openFile(filePath)
   }))
 
+  window.electronAPI.notifyRendererReady()
+
+  window.addEventListener('open-global-search', handleOpenGlobalSearchEvent)
   window.addEventListener('open-file', handleOpenFileEvent)
   window.addEventListener('save-tabs', handleSaveTabsEvent)
 
@@ -241,6 +361,7 @@ onUnmounted(() => {
       cleanup()
     }
   })
+  window.removeEventListener('open-global-search', handleOpenGlobalSearchEvent)
   window.removeEventListener('open-file', handleOpenFileEvent)
   window.removeEventListener('save-tabs', handleSaveTabsEvent)
   document.removeEventListener('mousemove', handleMouseMove)
@@ -292,6 +413,16 @@ async function openFile(filePath, options = {}) {
       if (options.sqlDialect) {
         editorStore.updateTabSqlDialect(existingTab.id, options.sqlDialect)
       }
+      if (options.lineNumber) {
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new CustomEvent('editor-jump-to-location', {
+            detail: {
+              lineNumber: options.lineNumber,
+              column: options.column || 1
+            }
+          }))
+        })
+      }
       return
     }
 
@@ -303,11 +434,31 @@ async function openFile(filePath, options = {}) {
     fileStore.addRecentFile(filePath)
         fileStore.addRecentFolder(filePath.replace(/[\\/][^\\/]+$/, ''))
     window.electronAPI.watchFile(filePath)
+
+    if (options.lineNumber) {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('editor-jump-to-location', {
+          detail: {
+            lineNumber: options.lineNumber,
+            column: options.column || 1
+          }
+        }))
+      })
+    }
   } catch (error) {
     console.error('Failed to open file:', error)
     errorMessage.value = '打开文件失败: ' + error.message
     showErrorDialog.value = true
   }
+}
+
+function handleOpenSearchResult(result) {
+  if (!result?.filePath) return
+  showGlobalSearchDialog.value = false
+  openFile(result.filePath, {
+    lineNumber: result.lineNumber,
+    column: result.column
+  })
 }
 
 // 保存当前文件
@@ -548,6 +699,26 @@ async function saveCurrentFileAs() {
 
   .resizer {
     width: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .main-editor {
+    padding: var(--space-1) var(--space-1) 0;
+  }
+
+  .main-editor:not(.sidebar-collapsed) .sidebar {
+    min-width: min(176px, 44vw);
+    max-width: min(196px, 48vw);
+  }
+
+  .main-editor.sidebar-collapsed .sidebar {
+    min-width: 56px;
+    max-width: 56px;
+  }
+
+  .resizer {
+    width: 6px;
   }
 }
 </style>

@@ -20,6 +20,7 @@ import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css' // Or another style
 import { useSettingsStore } from '../stores/settings'
+import { buildStructuredPlainText, decorateListPrefixes } from '../utils/markdownListFormat'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
@@ -70,13 +71,13 @@ function selectAllContent(container) {
   selection.addRange(range)
 }
 
-function getSelectionHtml(selection) {
+function getSelectionFragment(selection) {
   if (!selection || selection.rangeCount === 0) return ''
 
   const fragment = selection.getRangeAt(0).cloneContents()
   const wrapper = document.createElement('div')
   wrapper.appendChild(fragment)
-  return wrapper.innerHTML
+  return wrapper
 }
 
 function slugifyHeading(text) {
@@ -190,8 +191,13 @@ function handleCopy(event) {
   if (!previewContainer.value || !isSelectionInsideContainer(previewContainer.value)) return
 
   const selection = window.getSelection()
-  const html = getSelectionHtml(selection)
-  const text = selection?.toString() || ''
+  const fragment = getSelectionFragment(selection)
+  if (!fragment) return
+
+  decorateListPrefixes(fragment)
+
+  const html = fragment.innerHTML
+  const text = buildStructuredPlainText(fragment)
 
   if (!html && !text) return
 
@@ -310,6 +316,7 @@ const htmlContent = computed(() => {
 watch(htmlContent, async () => {
   await nextTick()
   await renderMermaidDiagrams()
+  decorateListPrefixes(previewContent.value)
   syncActiveHeading()
 }, { immediate: true })
 
@@ -319,6 +326,7 @@ watch(() => settingsStore.settings.theme, async () => {
   }
   await nextTick()
   await renderMermaidDiagrams()
+  decorateListPrefixes(previewContent.value)
   syncActiveHeading()
 })
 </script>
@@ -464,17 +472,40 @@ watch(() => settingsStore.settings.theme, async () => {
 }
 
 .markdown-preview-content :deep(ol) {
-  list-style-position: inside;
-  padding-left: 0;
+  list-style: none;
+  padding-left: 2.2em;
+}
+
+.markdown-preview-content :deep(ul) {
+  list-style: none;
 }
 
 .markdown-preview-content :deep(ol li) {
-  padding-left: 0.25em;
+  padding-left: 0.35em;
+}
+
+.markdown-preview-content :deep(ol ol) {
+  margin-top: 6px;
+  margin-bottom: 10px;
+  padding-left: 2.4em;
+}
+
+.markdown-preview-content :deep(ul ol),
+.markdown-preview-content :deep(ol ul) {
+  margin-top: 6px;
+  margin-bottom: 10px;
 }
 
 .markdown-preview-content :deep(ol li::marker) {
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
+}
+
+.markdown-preview-content :deep(.slimnote-list-prefix) {
+  display: inline;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
 }
 
 .markdown-preview-content :deep(img) {
