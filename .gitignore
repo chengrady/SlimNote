@@ -1,5 +1,6 @@
 # Claude Code local settings
 .claude/
+.github/
 
 # Logs
 logs
