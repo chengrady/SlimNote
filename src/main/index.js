@@ -3,71 +3,26 @@ const { join } = require('path')
 const fs = require('fs')
 const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
+const zhCN = require('../renderer/locales/zh-CN.json')
+const enUS = require('../renderer/locales/en-US.json')
 
 let mainWindow = null
 let pinWindows = new Map()
 let fileWatchers = new Map()
-let currentLocale = 'zh-CN' // 默认语言
+let currentLocale = 'zh-CN'
 
-// 语言包
 const locales = {
   'zh-CN': {
-    menu: {
-      file: '文件',
-      newFile: '新建文件',
-      openFile: '打开文件',
-      save: '保存',
-      saveAs: '另存为',
-      settings: '设置',
-      exit: '退出',
-      edit: '编辑',
-      undo: '撤销',
-      redo: '重做',
-      cut: '剪切',
-      copy: '复制',
-      paste: '粘贴',
-      view: '视图',
-      reload: '重新加载',
-      forceReload: '强制重新加载',
-      toggleDevTools: '切换开发者工具',
-      resetZoom: '重置缩放',
-      zoomIn: '放大',
-      zoomOut: '缩小',
-      toggleTheme: '切换主题',
-      toggleFullscreen: '切换全屏'
-    },
+    ...zhCN,
     context: {
-      cut: '剪切',
-      copy: '复制',
-      paste: '粘贴',
-      selectAll: '全选'
+      cut: '\u526a\u5207',
+      copy: '\u590d\u5236',
+      paste: '\u7c98\u8d34',
+      selectAll: '\u5168\u9009'
     }
   },
   'en-US': {
-    menu: {
-      file: 'File',
-      newFile: 'New File',
-      openFile: 'Open File',
-      save: 'Save',
-      saveAs: 'Save As',
-      settings: 'Settings',
-      exit: 'Exit',
-      edit: 'Edit',
-      undo: 'Undo',
-      redo: 'Redo',
-      cut: 'Cut',
-      copy: 'Copy',
-      paste: 'Paste',
-      view: 'View',
-      reload: 'Reload',
-      forceReload: 'Force Reload',
-      toggleDevTools: 'Toggle Developer Tools',
-      resetZoom: 'Reset Zoom',
-      zoomIn: 'Zoom In',
-      zoomOut: 'Zoom Out',
-      toggleTheme: 'Toggle Theme',
-      toggleFullscreen: 'Toggle Fullscreen'
-    },
+    ...enUS,
     context: {
       cut: 'Cut',
       copy: 'Copy',
@@ -86,6 +41,22 @@ function t(key) {
   return value || key
 }
 
+function localizedLabel(key, zhFallback, enFallback) {
+  const value = t(key)
+  if (value !== key) return value
+  return currentLocale === 'zh-CN' ? zhFallback : enFallback
+}
+
+function sendToRenderer(channel, payload) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send(channel, payload)
+}
+
+function toggleMainWindowFullscreen() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.setFullScreen(!mainWindow.isFullScreen())
+}
+
 const MAIN_WINDOW_MIN_WIDTH = 980
 const MAIN_WINDOW_MIN_HEIGHT = 680
 const PIN_WINDOW_MIN_WIDTH = 320
@@ -95,6 +66,8 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 const iconPath = isDev
   ? join(__dirname, '../../public/logo.ico')
   : join(__dirname, '../dist/logo.ico')
+const rendererIndexPath = join(__dirname, '../dist/index.html')
+const preloadPath = join(__dirname, 'preload.js')
 
 const appDataRoot = app.getPath('appData')
 const userDataDir = join(appDataRoot, isDev ? 'SlimNote-dev' : 'SlimNote')
@@ -112,7 +85,6 @@ if (!isDev && process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-gpu-compositing')
 }
 
-// Window State Management
 function getStorePath() {
   return join(app.getPath('userData'), 'window-state.json')
 }
@@ -150,15 +122,15 @@ function createWindow() {
     height: 900,
     minWidth: MAIN_WINDOW_MIN_WIDTH,
     minHeight: MAIN_WINDOW_MIN_HEIGHT,
-    frame: false, // Custom TitleBar
+    frame: false,
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: true,
+      webSecurity: true
     },
     icon: iconPath,
-    show: false,
+    show: false
   })
 
   mainWindow.once('ready-to-show', () => {
@@ -167,9 +139,8 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(rendererIndexPath)
   }
 
   mainWindow.on('closed', () => {
@@ -177,14 +148,13 @@ function createWindow() {
   })
 
   mainWindow.on('maximize', () => {
-    mainWindow?.webContents.send('window-maximized')
+    sendToRenderer('window-maximized')
   })
 
   mainWindow.on('unmaximize', () => {
-    mainWindow?.webContents.send('window-unmaximized')
+    sendToRenderer('window-unmaximized')
   })
 
-  // Context Menu
   ipcMain.on('show-editor-context-menu', (event) => {
     const menu = Menu.buildFromTemplate([
       { label: t('context.cut'), role: 'cut' },
@@ -196,13 +166,9 @@ function createWindow() {
     menu.popup({ window: BrowserWindow.fromWebContents(event.sender) })
   })
 
-  // 获取系统语言
-  ipcMain.handle('get-system-locale', () => {
-    return app.getLocale()
-  })
+  ipcMain.handle('get-system-locale', () => app.getLocale())
 
-  // 更新语言（从渲染进程调用）
-  ipcMain.on('update-locale', (event, locale) => {
+  ipcMain.on('update-locale', (_event, locale) => {
     if (locales[locale]) {
       currentLocale = locale
       createMenu()
@@ -213,6 +179,28 @@ function createWindow() {
 }
 
 function createMenu() {
+  const fullscreenAccelerator = process.platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11'
+  const devSubmenu = isDev
+    ? [
+        { type: 'separator' },
+        {
+          label: t('menu.reload'),
+          accelerator: 'CmdOrCtrl+R',
+          click: () => mainWindow?.webContents.reload()
+        },
+        {
+          label: t('menu.forceReload'),
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: () => mainWindow?.webContents.reloadIgnoringCache()
+        },
+        {
+          label: t('menu.toggleDevTools'),
+          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+          click: () => mainWindow?.webContents.toggleDevTools()
+        }
+      ]
+    : []
+
   const template = [
     {
       label: t('menu.file'),
@@ -220,29 +208,38 @@ function createMenu() {
         {
           label: t('menu.newFile'),
           accelerator: 'CmdOrCtrl+N',
-          click: () => mainWindow?.webContents.send('menu-new-file')
+          click: () => sendToRenderer('menu-new-file')
         },
         {
           label: t('menu.openFile'),
           accelerator: 'CmdOrCtrl+O',
-          click: () => mainWindow?.webContents.send('menu-open-file')
+          click: () => sendToRenderer('menu-open-file')
+        },
+        {
+          label: t('menu.openFolder'),
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => sendToRenderer('menu-open-folder')
         },
         { type: 'separator' },
         {
           label: t('menu.save'),
           accelerator: 'CmdOrCtrl+S',
-          click: () => mainWindow?.webContents.send('menu-save')
+          click: () => sendToRenderer('menu-save')
         },
         {
           label: t('menu.saveAs'),
           accelerator: 'CmdOrCtrl+Shift+S',
-          click: () => mainWindow?.webContents.send('menu-save-as')
+          click: () => sendToRenderer('menu-save-as')
         },
         { type: 'separator' },
         {
           label: t('menu.settings'),
           accelerator: 'CmdOrCtrl+,',
-          click: () => mainWindow?.webContents.send('menu-open-settings')
+          click: () => sendToRenderer('menu-open-settings')
+        },
+        {
+          label: localizedLabel('menu.about', '关于 SlimNote', 'About SlimNote'),
+          click: () => sendToRenderer('menu-open-about')
         },
         { type: 'separator' },
         { label: t('menu.exit'), role: 'quit' }
@@ -254,36 +251,58 @@ function createMenu() {
         {
           label: t('menu.undo'),
           accelerator: 'CmdOrCtrl+Z',
-          click: () => mainWindow?.webContents.send('menu-undo')
+          click: () => sendToRenderer('menu-undo')
         },
         {
           label: t('menu.redo'),
           accelerator: process.platform === 'darwin' ? 'Cmd+Shift+Z' : 'Ctrl+Y',
-          click: () => mainWindow?.webContents.send('menu-redo')
+          click: () => sendToRenderer('menu-redo')
+        },
+        { type: 'separator' },
+        {
+          label: t('menu.find'),
+          accelerator: 'CmdOrCtrl+F',
+          click: () => sendToRenderer('menu-find')
+        },
+        {
+          label: t('menu.replace'),
+          accelerator: 'CmdOrCtrl+H',
+          click: () => sendToRenderer('menu-replace')
+        },
+        {
+          label: t('menu.globalSearch'),
+          accelerator: 'CmdOrCtrl+Shift+F',
+          click: () => sendToRenderer('menu-global-search')
         },
         { type: 'separator' },
         { label: t('menu.cut'), role: 'cut' },
         { label: t('menu.copy'), role: 'copy' },
-        { label: t('menu.paste'), role: 'paste' }
+        { label: t('menu.paste'), role: 'paste' },
+        {
+          label: t('menu.selectAll'),
+          accelerator: 'CmdOrCtrl+A',
+          role: 'selectAll'
+        }
       ]
     },
     {
       label: t('menu.view'),
       submenu: [
-        { label: t('menu.reload'), role: 'reload' },
-        { label: t('menu.forceReload'), role: 'forceReload' },
-        { label: t('menu.toggleDevTools'), role: 'toggleDevTools' },
-        { type: 'separator' },
-        { label: t('menu.resetZoom'), role: 'resetZoom' },
-        { label: t('menu.zoomIn'), role: 'zoomIn' },
-        { label: t('menu.zoomOut'), role: 'zoomOut' },
-        { type: 'separator' },
+        {
+          label: localizedLabel('menu.toggleSidebar', '切换工作台', 'Toggle Sidebar'),
+          accelerator: 'CmdOrCtrl+B',
+          click: () => sendToRenderer('menu-toggle-sidebar')
+        },
         {
           label: t('menu.toggleTheme'),
-          click: () => mainWindow?.webContents.send('menu-toggle-theme')
+          click: () => sendToRenderer('menu-toggle-theme')
         },
-        { type: 'separator' },
-        { label: t('menu.toggleFullscreen'), role: 'togglefullscreen' }
+        {
+          label: t('menu.toggleFullscreen'),
+          accelerator: fullscreenAccelerator,
+          click: toggleMainWindowFullscreen
+        },
+        ...devSubmenu
       ]
     }
   ]
@@ -292,26 +311,33 @@ function createMenu() {
   Menu.setApplicationMenu(menu)
 }
 
-// Register all IPC handlers
 function registerIpcHandlers() {
-  // Window Controls
   ipcMain.handle('is-maximized', () => mainWindow?.isMaximized())
   ipcMain.on('window-min', () => mainWindow?.minimize())
   ipcMain.on('window-max', () => {
     if (mainWindow?.isMaximized()) {
       mainWindow.unmaximize()
     } else {
-      mainWindow.maximize()
+      mainWindow?.maximize()
     }
   })
   ipcMain.on('window-close', () => mainWindow?.close())
+  ipcMain.on('window-toggle-fullscreen', () => toggleMainWindowFullscreen())
+  ipcMain.on('window-reload', () => mainWindow?.webContents.reload())
+  ipcMain.on('window-force-reload', () => mainWindow?.webContents.reloadIgnoringCache())
+  ipcMain.on('window-toggle-devtools', () => mainWindow?.webContents.toggleDevTools())
 
-  ipcMain.on('set-theme', (event, theme) => {
+  ipcMain.on('set-theme', (_event, theme) => {
     nativeTheme.themeSource = theme
   })
 
-  // File System Operations
-  ipcMain.handle('read-file', async (event, filePath) => {
+  ipcMain.handle('open-external', async (_event, url) => {
+    if (typeof url !== 'string' || !url) return false
+    await shell.openExternal(url)
+    return true
+  })
+
+  ipcMain.handle('read-file', async (_event, filePath) => {
     try {
       const buffer = await fs.promises.readFile(filePath)
       const str = iconv.decode(buffer, 'utf8')
@@ -326,7 +352,7 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('write-file', async (event, { filePath, content, encoding }) => {
+  ipcMain.handle('write-file', async (_event, { filePath, content, encoding }) => {
     try {
       const buffer = iconv.encode(content, encoding || 'utf8')
       await fs.promises.writeFile(filePath, buffer)
@@ -337,7 +363,7 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('read-dir', async (event, dirPath) => {
+  ipcMain.handle('read-dir', async (_event, dirPath) => {
     try {
       const files = await fs.promises.readdir(dirPath, { withFileTypes: true })
       return files.map(file => ({
@@ -351,58 +377,42 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('create-file', async (event, filePath) => {
-    try {
-      await fs.promises.writeFile(filePath, '')
-      return true
-    } catch (error) {
-      throw error
-    }
+  ipcMain.handle('create-file', async (_event, filePath) => {
+    await fs.promises.writeFile(filePath, '')
+    return true
   })
 
-  ipcMain.handle('create-folder', async (event, folderPath) => {
-    try {
-      await fs.promises.mkdir(folderPath)
-      return true
-    } catch (error) {
-      throw error
-    }
+  ipcMain.handle('create-folder', async (_event, folderPath) => {
+    await fs.promises.mkdir(folderPath)
+    return true
   })
 
-  ipcMain.handle('delete-path', async (event, path) => {
-    try {
-      await fs.promises.rm(path, { recursive: true, force: true })
-      return true
-    } catch (error) {
-      throw error
-    }
+  ipcMain.handle('delete-path', async (_event, path) => {
+    await fs.promises.rm(path, { recursive: true, force: true })
+    return true
   })
 
-  ipcMain.handle('rename-path', async (event, { oldPath, newPath }) => {
-    try {
-      await fs.promises.rename(oldPath, newPath)
-      return true
-    } catch (error) {
-      throw error
-    }
+  ipcMain.handle('rename-path', async (_event, { oldPath, newPath }) => {
+    await fs.promises.rename(oldPath, newPath)
+    return true
   })
 
-  ipcMain.handle('show-item-in-folder', async (event, filePath) => {
+  ipcMain.handle('show-item-in-folder', async (_event, filePath) => {
     shell.showItemInFolder(filePath)
   })
 
-  ipcMain.handle('watch-file', (event, filePath) => {
+  ipcMain.handle('watch-file', (_event, filePath) => {
     if (fileWatchers.has(filePath)) return
 
     const watcher = watch(filePath)
     watcher.on('change', () => {
-      mainWindow?.webContents.send('file-changed', filePath)
+      sendToRenderer('file-changed', filePath)
     })
 
     fileWatchers.set(filePath, watcher)
   })
 
-  ipcMain.handle('unwatch-file', (event, filePath) => {
+  ipcMain.handle('unwatch-file', (_event, filePath) => {
     const watcher = fileWatchers.get(filePath)
     if (watcher) {
       watcher.close()
@@ -410,18 +420,15 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('show-save-dialog', async (event, options) => {
-    const result = await dialog.showSaveDialog(mainWindow, options)
-    return result
+  ipcMain.handle('show-save-dialog', async (_event, options) => {
+    return dialog.showSaveDialog(mainWindow, options)
   })
 
-  ipcMain.handle('show-open-dialog', async (event, options) => {
-    const result = await dialog.showOpenDialog(mainWindow, options)
-    return result
+  ipcMain.handle('show-open-dialog', async (_event, options) => {
+    return dialog.showOpenDialog(mainWindow, options)
   })
 
-  // Pin Window
-  ipcMain.handle('create-pin-window', (event, { content, theme, language }) => {
+  ipcMain.handle('create-pin-window', (_event, { content, theme, language }) => {
     const bounds = loadPinWindowBounds()
     const win = new BrowserWindow({
       width: bounds.width,
@@ -433,9 +440,9 @@ function registerIpcHandlers() {
       alwaysOnTop: true,
       frame: false,
       webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
+        preload: preloadPath,
         contextIsolation: true,
-        nodeIntegration: false,
+        nodeIntegration: false
       }
     })
 
@@ -445,7 +452,7 @@ function registerIpcHandlers() {
     if (isDev) {
       win.loadURL(`http://localhost:5173/#/pin?id=${winId}`)
     } else {
-      win.loadFile(join(__dirname, '../renderer/index.html'), { hash: `/pin?id=${winId}` })
+      win.loadFile(rendererIndexPath, { hash: `/pin?id=${winId}` })
     }
 
     win.webContents.once('did-finish-load', () => {
@@ -468,24 +475,24 @@ function registerIpcHandlers() {
     return winId
   })
 
-  ipcMain.handle('close-pin-window', (event, id) => {
+  ipcMain.handle('close-pin-window', (_event, id) => {
     const win = pinWindows.get(id)
     if (win) {
       win.close()
     }
   })
 
-  // Context menu
   ipcMain.on('show-context-menu', (event, menuName, position) => {
     const template = Menu.getApplicationMenu()?.items.find(item => item.label === menuName)?.submenu
-    if (template) {
-      const opts = { window: BrowserWindow.fromWebContents(event.sender) }
-      if (position) {
-        opts.x = position.x
-        opts.y = position.y
-      }
-      template.popup(opts)
+    if (!template) return
+
+    const options = { window: BrowserWindow.fromWebContents(event.sender) }
+    if (position) {
+      options.x = position.x
+      options.y = position.y
     }
+
+    template.popup(options)
   })
 }
 

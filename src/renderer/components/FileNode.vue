@@ -2,7 +2,12 @@
   <div v-if="isVisible" class="file-node">
     <div 
       class="node-label"
-      :class="{ active: !node.isDirectory && node.path === activePath, selected: node.path === selectedPath, 'is-search-hit': isSearchHit }"
+      :class="{
+        active: !node.isDirectory && node.path === activePath,
+        selected: node.path === selectedPath,
+        'is-search-hit': isSearchHit,
+        'is-directory-selected': node.isDirectory && node.path === selectedPath
+      }"
       :style="{ paddingLeft: `calc(${depth} * 13px + 8px)` }"
       @click="handleClick"
       @keydown.enter="handleClick"
@@ -125,38 +130,47 @@ function nodeMatchesSearch(node, searchQuery) {
 .node-label {
   display: flex;
   align-items: center;
-  min-height: 34px;
-  padding: 4px 8px;
+  min-height: 24px;
+  padding: 2px 8px;
   cursor: pointer;
-  margin: 0 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
   transition: var(--transition-fast);
   color: var(--text-main);
   line-height: 1.2;
-  gap: 6px;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .node-label.active {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.08) 80%, var(--glass-bg));
-  color: var(--accent-primary);
-  border-color: rgba(var(--accent-primary-rgb), 0.1);
-  box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.72);
+  background: rgba(var(--accent-primary-rgb), 0.22);
+  color: var(--text-main);
+  box-shadow: none;
 }
 
 .node-label.selected {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.05) 84%, var(--glass-bg));
+  background: rgba(var(--accent-primary-rgb), 0.1);
   color: var(--text-main);
-  border-color: rgba(var(--accent-primary-rgb), 0.08);
-  box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.55);
+  box-shadow: none;
 }
 
 .node-label.active.selected {
-  box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.75);
+  background: rgba(var(--accent-primary-rgb), 0.24);
 }
 
 .node-label.is-search-hit {
   background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.06) 78%, var(--glass-bg));
+}
+
+.node-label.active.is-search-hit,
+.node-label.selected.is-search-hit {
+  background: inherit;
+}
+
+.node-label.is-directory-selected:not(.active) {
+  background: rgba(127, 127, 127, 0.12);
 }
 
 .twisty {
@@ -177,12 +191,11 @@ function nodeMatchesSearch(node, searchQuery) {
 .node-label:hover {
   background: var(--interactive-hover-bg);
   color: var(--text-main);
-  border-color: rgba(var(--accent-primary-rgb), 0.08);
 }
 
 .node-label:active {
-  background: rgba(var(--accent-primary-rgb), 0.14);
-  color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.16);
+  color: var(--text-main);
 }
 
 .icon {
@@ -214,7 +227,6 @@ function nodeMatchesSearch(node, searchQuery) {
 
 .node-label:focus-visible {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring), inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.5);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-primary-rgb), 0.55);
 }
 </style>

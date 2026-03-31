@@ -1,151 +1,200 @@
 <template>
-  <Transition name="modal">
-    <div v-if="show" class="modal-mask">
-      <div class="modal-wrapper" @click.self="$emit('close')">
-        <div class="modal-container">
-          <div class="modal-header">
-            <div class="modal-title-group">
-              <h3>{{ t('settings.title') }}</h3>
-              <p class="modal-subtitle">{{ t('settings.subtitle') }}</p>
+  <ModalDialog
+    :show="show"
+    :title="t('settings.title')"
+    :subtitle="t('settings.subtitle')"
+    body-class="modal-body--flush"
+    width="min(1080px, calc(100vw - 48px))"
+    max-width="min(1080px, calc(100vw - 48px))"
+    height="min(760px, calc(100vh - 48px))"
+    max-height="min(760px, calc(100vh - 48px))"
+    @close="$emit('close')"
+  >
+    <template #body>
+      <div class="settings-dialog-layout">
+        <div class="settings-sidebar">
+          <button
+            class="sidebar-item"
+            :class="{ active: activeSection === 'appearance' }"
+            type="button"
+            @click="activeSection = 'appearance'"
+          >
+            <span class="sidebar-item-title">{{ t('settings.appearance') }}</span>
+            <span class="sidebar-item-desc">{{ t('settings.appearanceDesc') }}</span>
+          </button>
+          <button
+            class="sidebar-item"
+            :class="{ active: activeSection === 'editor' }"
+            type="button"
+            @click="activeSection = 'editor'"
+          >
+            <span class="sidebar-item-title">{{ t('settings.editor') }}</span>
+            <span class="sidebar-item-desc">{{ t('settings.editorDesc') }}</span>
+          </button>
+          <button
+            class="sidebar-item"
+            :class="{ active: activeSection === 'files' }"
+            type="button"
+            @click="activeSection = 'files'"
+          >
+            <span class="sidebar-item-title">{{ t('settings.files') }}</span>
+            <span class="sidebar-item-desc">{{ t('settings.filesDesc') }}</span>
+          </button>
+          <button
+            class="sidebar-item"
+            :class="{ active: activeSection === 'about' }"
+            type="button"
+            @click="activeSection = 'about'"
+          >
+            <span class="sidebar-item-title">{{ aboutTitle }}</span>
+            <span class="sidebar-item-desc">{{ aboutDesc }}</span>
+          </button>
+        </div>
+
+        <div class="settings-content">
+          <!-- Appearance Settings -->
+          <div v-if="activeSection === 'appearance'" class="settings-section">
+            <div class="section-header">
+              <h4>{{ t('settings.appearance') }}</h4>
+              <p>{{ t('settings.appearanceSection') }}</p>
             </div>
-            <button class="close-btn" @click="$emit('close')">×</button>
-          </div>
-
-          <div class="modal-body">
-            <div class="settings-sidebar">
-              <div
-                class="sidebar-item"
-                :class="{ active: activeSection === 'appearance' }"
-                @click="activeSection = 'appearance'"
-              >
-                <span class="sidebar-item-title">{{ t('settings.appearance') }}</span>
-                <span class="sidebar-item-desc">{{ t('settings.appearanceDesc') }}</span>
-              </div>
-              <div
-                class="sidebar-item"
-                :class="{ active: activeSection === 'editor' }"
-                @click="activeSection = 'editor'"
-              >
-                <span class="sidebar-item-title">{{ t('settings.editor') }}</span>
-                <span class="sidebar-item-desc">{{ t('settings.editorDesc') }}</span>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.language') }}</label>
+              <select class="ui-select" v-model="localSettings.locale" @change="handleLocaleChange">
+                <option v-for="loc in supportedLocales" :key="loc.value" :value="loc.value">
+                  {{ loc.label }}
+                </option>
+              </select>
+            </div>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.theme') }}</label>
+              <div class="theme-preview-grid">
+                <button
+                  class="theme-preview"
+                  :class="{ active: localSettings.theme === 'light' }"
+                  @click="localSettings.theme = 'light'"
+                  type="button"
+                >
+                  <span class="theme-preview-canvas light"></span>
+                  <span class="theme-preview-label">{{ t('settings.light') }}</span>
+                </button>
+                <button
+                  class="theme-preview"
+                  :class="{ active: localSettings.theme === 'dark' }"
+                  @click="localSettings.theme = 'dark'"
+                  type="button"
+                >
+                  <span class="theme-preview-canvas dark"></span>
+                  <span class="theme-preview-label">{{ t('settings.dark') }}</span>
+                </button>
               </div>
             </div>
-
-            <div class="settings-content">
-              <!-- Appearance Settings -->
-              <div v-if="activeSection === 'appearance'" class="settings-section">
-                <div class="section-header">
-                  <h4>{{ t('settings.appearance') }}</h4>
-                  <p>{{ t('settings.appearanceSection') }}</p>
-                </div>
-                <div class="setting-item card-like">
-                  <label>{{ t('settings.language') }}</label>
-                  <select v-model="localSettings.locale" @change="handleLocaleChange">
-                    <option v-for="loc in supportedLocales" :key="loc.value" :value="loc.value">
-                      {{ loc.label }}
-                    </option>
-                  </select>
-                </div>
-                <div class="setting-item card-like">
-                  <label>{{ t('settings.theme') }}</label>
-                  <div class="theme-preview-grid">
-                    <button
-                      class="theme-preview"
-                      :class="{ active: localSettings.theme === 'light' }"
-                      @click="localSettings.theme = 'light'"
-                      type="button"
-                    >
-                      <span class="theme-preview-canvas light"></span>
-                      <span class="theme-preview-label">{{ t('settings.light') }}</span>
-                    </button>
-                    <button
-                      class="theme-preview"
-                      :class="{ active: localSettings.theme === 'dark' }"
-                      @click="localSettings.theme = 'dark'"
-                      type="button"
-                    >
-                      <span class="theme-preview-canvas dark"></span>
-                      <span class="theme-preview-label">{{ t('settings.dark') }}</span>
-                    </button>
-                  </div>
-                </div>
-                <div class="setting-item card-like">
-                  <label>{{ t('settings.fontSize', { size: localSettings.fontSize }) }}</label>
-                  <input type="range" v-model.number="localSettings.fontSize" min="8" max="32" step="1">
-                </div>
-                <div class="setting-item card-like">
-                  <label>{{ t('settings.fontFamily') }}</label>
-                  <select v-model="localSettings.fontFamily">
-                    <option v-for="font in fontFamilies" :key="font.value" :value="font.value">
-                      {{ font.label }}
-                    </option>
-                  </select>
-                </div>
-                <div class="setting-item card-like">
-                  <label>{{ t('settings.livePreview') }}</label>
-                  <div class="live-preview" :class="localSettings.theme" :style="previewStyle">
-                    <div class="live-preview-toolbar"></div>
-                    <div class="live-preview-content">
-                      <div class="live-preview-title">{{ t('settings.previewTitle') }}</div>
-                      <div class="live-preview-text">{{ t('settings.previewSample') }}</div>
-                      <div class="live-preview-line">- {{ t('settings.previewFont', { font: currentPreviewFont }) }}</div>
-                      <div class="live-preview-line">- {{ t('settings.previewSize', { size: localSettings.fontSize }) }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Editor Settings -->
-              <div v-if="activeSection === 'editor'" class="settings-section">
-                <div class="section-header">
-                  <h4>{{ t('settings.editor') }}</h4>
-                  <p>{{ t('settings.editorDesc') }}</p>
-                </div>
-                <div class="setting-item card-like">
-                  <label>{{ t('settings.tabDensity') }}</label>
-                  <select v-model="localSettings.tabDensity">
-                    <option value="comfortable">{{ t('settings.comfortable') }}</option>
-                    <option value="compact">{{ t('settings.compact') }}</option>
-                  </select>
-                </div>
-                <div class="setting-item checkbox card-like">
-                  <label>
-                    <input type="checkbox" v-model="localSettings.wordWrap">
-                    {{ t('settings.wordWrap') }}
-                  </label>
-                </div>
-                <div class="setting-item checkbox card-like">
-                  <label>
-                    <input type="checkbox" v-model="localSettings.lineNumbers">
-                    {{ t('settings.lineNumbers') }}
-                  </label>
-                </div>
-                <div class="setting-item checkbox card-like">
-                  <label>
-                    <input type="checkbox" v-model="localSettings.minimap">
-                    {{ t('settings.minimap') }}
-                  </label>
-                </div>
-                <div class="setting-item card-like">
-                  <label>{{ t('settings.tabSize') }}</label>
-                  <select v-model.number="localSettings.tabSize">
-                    <option value="2">{{ t('settings.spaces', { count: 2 }) }}</option>
-                    <option value="4">{{ t('settings.spaces', { count: 4 }) }}</option>
-                    <option value="8">{{ t('settings.spaces', { count: 8 }) }}</option>
-                  </select>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.fontSize', { size: localSettings.fontSize }) }}</label>
+              <input type="range" v-model.number="localSettings.fontSize" min="8" max="32" step="1">
+            </div>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.fontFamily') }}</label>
+              <select class="ui-select" v-model="localSettings.fontFamily">
+                <option v-for="font in fontFamilies" :key="font.value" :value="font.value">
+                  {{ font.label }}
+                </option>
+              </select>
+            </div>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.livePreview') }}</label>
+              <div class="live-preview" :class="localSettings.theme" :style="previewStyle">
+                <div class="live-preview-toolbar"></div>
+                <div class="live-preview-content">
+                  <div class="live-preview-title">{{ t('settings.previewTitle') }}</div>
+                  <div class="live-preview-text">{{ t('settings.previewSample') }}</div>
+                  <div class="live-preview-line">- {{ t('settings.previewFont', { font: currentPreviewFont }) }}</div>
+                  <div class="live-preview-line">- {{ t('settings.previewSize', { size: localSettings.fontSize }) }}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="modal-footer">
-            <button class="modal-btn" @click="handleReset">{{ t('settings.restoreDefaults') }}</button>
-            <button class="modal-btn primary" @click="$emit('close')">{{ t('settings.closeSettings') }}</button>
+          <!-- Editor Settings -->
+          <div v-if="activeSection === 'editor'" class="settings-section">
+            <div class="section-header">
+              <h4>{{ t('settings.editor') }}</h4>
+              <p>{{ t('settings.editorDesc') }}</p>
+            </div>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.tabDensity') }}</label>
+              <select class="ui-select" v-model="localSettings.tabDensity">
+                <option value="comfortable">{{ t('settings.comfortable') }}</option>
+                <option value="compact">{{ t('settings.compact') }}</option>
+              </select>
+            </div>
+            <div class="setting-item checkbox card-like">
+              <label>
+                <input type="checkbox" v-model="localSettings.wordWrap">
+                {{ t('settings.wordWrap') }}
+              </label>
+            </div>
+            <div class="setting-item checkbox card-like">
+              <label>
+                <input type="checkbox" v-model="localSettings.lineNumbers">
+                {{ t('settings.lineNumbers') }}
+              </label>
+            </div>
+            <div class="setting-item checkbox card-like">
+              <label>
+                <input type="checkbox" v-model="localSettings.minimap">
+                {{ t('settings.minimap') }}
+              </label>
+            </div>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.tabSize') }}</label>
+              <select class="ui-select" v-model.number="localSettings.tabSize">
+                <option value="2">{{ t('settings.spaces', { count: 2 }) }}</option>
+                <option value="4">{{ t('settings.spaces', { count: 4 }) }}</option>
+                <option value="8">{{ t('settings.spaces', { count: 8 }) }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="activeSection === 'files'" class="settings-section">
+            <div class="section-header">
+              <h4>{{ t('settings.files') }}</h4>
+              <p>{{ t('settings.filesSection') }}</p>
+            </div>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.fileAssociations') }}</label>
+              <p class="setting-desc">{{ t('settings.fileAssociationsSummary') }}</p>
+              <div class="association-tags">
+                <span v-for="item in associationGroups" :key="item" class="association-tag ui-chip">{{ item }}</span>
+              </div>
+            </div>
+            <div class="setting-item card-like">
+              <label>{{ t('settings.systemAssociationControl') }}</label>
+              <p class="setting-desc">{{ t('settings.systemAssociationHint') }}</p>
+              <div class="settings-action-row">
+                <button class="modal-btn association-btn" type="button" @click="handleOpenFileAssociations">
+                  {{ t('settings.openSystemAssociations') }}
+                </button>
+              </div>
+              <p v-if="associationStatus" class="setting-desc association-status">{{ associationStatus }}</p>
+            </div>
+          </div>
+
+          <div v-if="activeSection === 'about'" class="settings-section">
+            <div class="section-header">
+              <h4>{{ aboutTitle }}</h4>
+              <p>{{ aboutSection }}</p>
+            </div>
+            <AboutOverview />
           </div>
         </div>
       </div>
-    </div>
-  </Transition>
+    </template>
+    <template #footer>
+      <button type="button" class="modal-btn" @click="handleReset">{{ t('settings.restoreDefaults') }}</button>
+      <button type="button" class="modal-btn primary" @click="$emit('close')">{{ t('settings.closeSettings') }}</button>
+    </template>
+  </ModalDialog>
 </template>
 
 <script setup>
@@ -153,8 +202,10 @@ import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settings'
 import { setLocale, getSupportedLocales } from '../locales'
+import AboutOverview from './AboutOverview.vue'
+import ModalDialog from './ModalDialog.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const props = defineProps({
   show: Boolean
 })
@@ -163,8 +214,21 @@ const emit = defineEmits(['close'])
 const settingsStore = useSettingsStore()
 const activeSection = ref('appearance')
 const supportedLocales = getSupportedLocales()
+const associationStatus = ref('')
+const associationGroups = [
+  'Markdown',
+  'Text',
+  'Log',
+  'JSON',
+  'YAML',
+  'TOML / INI',
+  'CSV / TSV'
+]
 
 const localSettings = ref({})
+const aboutTitle = computed(() => localizeText('settings.about', '\u5173\u4e8e', 'About'))
+const aboutDesc = computed(() => localizeText('settings.aboutDesc', '\u9879\u76ee\u4ecb\u7ecd\u3001\u7248\u672c\u4e0e GitHub', 'Overview, version and GitHub'))
+const aboutSection = computed(() => localizeText('settings.aboutSection', '\u67e5\u770b SlimNote \u7684\u9879\u76ee\u4ecb\u7ecd\u3001\u7248\u672c\u4fe1\u606f\u548c GitHub \u4ed3\u5e93\u3002', 'View project overview, version details and the GitHub repository.'))
 const previewStyle = computed(() => ({
   fontFamily: localSettings.value.fontFamily || 'Microsoft YaHei',
   fontSize: `${Math.max(12, (localSettings.value.fontSize || 14) - 1)}px`
@@ -189,6 +253,7 @@ const fontFamilies = [
 
 watch(() => props.show, (newVal) => {
   if (newVal) {
+    associationStatus.value = ''
     // Clone settings to local state
     localSettings.value = {
       ...settingsStore.settings,
@@ -240,114 +305,42 @@ function handleLocaleChange() {
     settingsStore.updateLocale(newLocale)
   }
 }
+
+function localizeText(key, zhFallback, enFallback) {
+  const value = t(key)
+  if (value !== key) return value
+  return locale.value === 'zh-CN' ? zhFallback : enFallback
+}
+
+async function handleOpenFileAssociations() {
+  const result = await window.electronAPI.openFileAssociationSettings()
+  associationStatus.value = result?.ok
+    ? t('settings.systemAssociationOpened')
+    : (result?.message || t('settings.systemAssociationFailed'))
+}
 </script>
 
 <style scoped>
-.modal-mask {
-  position: fixed;
-  z-index: 9998;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  transition: opacity 0.3s ease;
-  backdrop-filter: blur(6px);
-}
-
-.modal-wrapper {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-container {
-  width: min(760px, calc(100vw - 40px));
-  height: min(560px, calc(100vh - 48px));
-  background: var(--glass-bg-active);
-  border-radius: var(--radius-md);
-  box-shadow: var(--menu-card-shadow);
-  transition: all 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--glass-border);
-  color: var(--text-main);
-}
-
-.modal-header {
-  padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid var(--glass-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-title-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--panel-title-gap);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: var(--ui-font-weight-semibold);
-}
-
-.modal-subtitle {
-  margin: 0;
-  font-size: var(--ui-font-size-sm);
-  line-height: var(--panel-subtitle-line-height);
-  color: var(--text-muted);
-}
-
-.close-btn {
-  width: var(--icon-button-size-md);
-  height: var(--icon-button-size-md);
-  background: rgba(var(--accent-primary-rgb), 0.05);
-  border: 1px solid transparent;
-  border-radius: var(--icon-button-radius);
-  font-size: 20px;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-fast);
-}
-
-.close-btn:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
-  border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
-}
-
-.close-btn:focus-visible {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
-}
-
-.modal-body {
+.settings-dialog-layout {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow: hidden;
 }
 
 .settings-sidebar {
-  width: 180px;
+  width: 220px;
   background: color-mix(in srgb, var(--btn-bg) 94%, rgba(var(--accent-primary-rgb), 0.04));
   border-right: 1px solid var(--glass-border);
-  padding: var(--space-2);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .sidebar-item {
+  appearance: none;
+  width: 100%;
   padding: var(--space-3) var(--space-4);
   cursor: pointer;
   font-size: var(--field-font-size);
@@ -358,6 +351,8 @@ function handleLocaleChange() {
   flex-direction: column;
   gap: var(--panel-title-gap);
   border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
 }
 
 .sidebar-item:hover {
@@ -393,7 +388,7 @@ function handleLocaleChange() {
 
 .settings-content {
   flex: 1;
-  padding: var(--space-5);
+  padding: 22px 26px;
   overflow-y: auto;
   background: color-mix(in srgb, var(--glass-bg) 96%, transparent);
 }
@@ -401,7 +396,7 @@ function handleLocaleChange() {
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .section-header h4 {
@@ -420,15 +415,7 @@ function handleLocaleChange() {
 .setting-item {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-}
-
-.card-like {
-  padding: var(--space-4);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 92%, rgba(var(--accent-primary-rgb), 0.03));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  gap: var(--space-3);
 }
 
 .theme-preview-grid {
@@ -577,29 +564,33 @@ function handleLocaleChange() {
   margin: 0;
 }
 
-.path-input-group {
+.association-tags {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.association-tag {
+  justify-content: center;
+}
+
+.settings-action-row {
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
 
-input[type="text"],
-select {
-  height: var(--field-height-md);
-  padding: 0 var(--field-padding-x);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--field-radius);
-  background: var(--input-bg);
-  color: var(--text-main);
-  font-size: var(--field-font-size);
-  width: 100%;
-  transition: var(--transition-fast);
+.association-btn {
+  align-self: flex-start;
 }
 
-input[type="text"]:focus,
-select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
+.association-status {
+  margin-top: 2px;
+}
+
+.path-input-group {
+  display: flex;
+  gap: 10px;
 }
 
 .path-input-group input {
@@ -629,55 +620,8 @@ select:focus {
   box-shadow: var(--field-focus-ring);
 }
 
-.modal-footer {
-  padding: var(--modal-footer-padding-y) var(--modal-footer-padding-x);
-  border-top: 1px solid var(--glass-border);
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--modal-footer-gap);
-}
-
-.modal-btn {
-  min-height: var(--btn-height-md);
-  padding: 0 var(--btn-padding-x);
-  border-radius: var(--field-radius);
-  border: 1px solid var(--glass-border);
-  background: var(--btn-bg);
-  color: var(--text-main);
-  cursor: pointer;
-  font-size: var(--field-font-size);
-  font-weight: var(--btn-font-weight);
-  transition: var(--transition-fast);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-btn:hover {
-  background: var(--interactive-hover-bg);
-  border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
-}
-
-.modal-btn:focus-visible {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
-}
-
-.modal-btn.primary {
-  background: var(--accent-gradient);
-  color: white;
-  border-color: transparent;
-  box-shadow: var(--btn-primary-shadow);
-}
-
-.modal-btn.primary:hover {
-  opacity: 0.9;
-}
-
 @media (max-width: 820px) {
-  .modal-body {
+  .settings-dialog-layout {
     flex-direction: column;
   }
 
@@ -686,11 +630,16 @@ select:focus {
     border-right: none;
     border-bottom: 1px solid var(--glass-border);
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .theme-preview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .settings-sidebar {
     grid-template-columns: 1fr;
   }
 }

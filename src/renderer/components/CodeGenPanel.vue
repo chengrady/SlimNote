@@ -1,37 +1,35 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="codegen-modal">
-      <div class="modal-header">
-        <h3>{{ t('codegen.title') }}</h3>
-        <button class="close-btn" @click="$emit('close')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="modal-body">
+  <ModalDialog
+    :show="true"
+    :title="t('codegen.title')"
+    width="min(700px, calc(100vw - 40px))"
+    max-width="min(700px, calc(100vw - 40px))"
+    height="min(70vh, calc(100vh - 48px))"
+    max-height="min(70vh, calc(100vh - 48px))"
+    @close="$emit('close')"
+  >
+    <template #body>
+      <div class="codegen-layout">
         <div class="options-row">
-          <div class="option-group">
-            <label>{{ t('codegen.targetLanguage') }}</label>
-            <select v-model="selectedLanguage">
+          <div class="option-group card-like">
+            <label class="field-label">{{ t('codegen.targetLanguage') }}</label>
+            <select class="ui-select" v-model="selectedLanguage">
               <option v-for="lang in languages" :key="lang.id" :value="lang.id">
                 {{ lang.name }}
               </option>
             </select>
           </div>
-          <div class="option-group">
-            <label>{{ t('codegen.typeName') }}</label>
-            <input v-model="typeName" type="text" :placeholder="t('codegen.typeNamePlaceholder')" />
+          <div class="option-group card-like">
+            <label class="field-label">{{ t('codegen.typeName') }}</label>
+            <input class="ui-field" v-model="typeName" type="text" :placeholder="t('codegen.typeNamePlaceholder')" />
           </div>
         </div>
 
-        <div class="code-output">
-          <div class="output-header">
+        <div class="code-output ui-pane">
+          <div class="output-header ui-pane-header">
             <span>{{ currentLanguage?.name }} {{ currentLanguage?.extension }}</span>
             <div class="output-actions">
-              <button @click="copyCode" :title="t('codegen.copyCode')">
+              <button type="button" class="btn output-action-btn" @click="copyCode" :title="t('codegen.copyCode')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -43,18 +41,18 @@
           <pre class="code-content" :class="{ 'has-error': error }"><code>{{ error || generatedCode }}</code></pre>
         </div>
       </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">{{ t('codegen.close') }}</button>
-      </div>
-    </div>
-  </div>
+    </template>
+    <template #footer>
+      <button type="button" class="modal-btn" @click="$emit('close')">{{ t('codegen.close') }}</button>
+    </template>
+  </ModalDialog>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { languages, generateCode } from '../utils/codeGenerator'
+import ModalDialog from './ModalDialog.vue'
 
 const { t } = useI18n()
 
@@ -106,115 +104,26 @@ watch([() => props.content, selectedLanguage, typeName], () => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(var(--backdrop-blur, 8px));
-}
-
-.codegen-modal {
-  background: var(--bg-primary, #1e1e1e);
-  border-radius: var(--radius-md, 10px);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  width: 90%;
-  max-width: 700px;
-  height: 70vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: var(--text-main, #d4d4d4);
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted, #888);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm, 6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  background: var(--btn-hover-bg, rgba(255, 255, 255, 0.1));
-  color: var(--text-main, #d4d4d4);
-}
-
-.modal-body {
+.codegen-layout {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px 20px;
-  gap: 16px;
+  min-height: 0;
+  gap: var(--space-4);
   overflow: hidden;
 }
 
 .options-row {
-  display: flex;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
 }
 
 .option-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.option-group label {
-  font-size: var(--ui-font-size-xs);
-  font-weight: var(--ui-font-weight-medium);
-  line-height: var(--panel-subtitle-line-height);
-  color: var(--text-muted, #888);
-}
-
-.option-group select,
-.option-group input {
-  height: var(--field-height-md, 34px);
-  padding: 0 var(--field-padding-x, 12px);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--field-radius, 6px);
-  background: var(--bg-secondary, #252526);
-  color: var(--text-main, #d4d4d4);
-  font-size: var(--field-font-size, 13px);
-  transition: var(--transition-fast, 0.16s ease);
-}
-
-.option-group select:focus,
-.option-group input:focus {
-  outline: none;
-  border-color: var(--accent-primary, #007acc);
-  box-shadow: var(--field-focus-ring, 0 0 0 1px rgba(0, 122, 204, 0.14));
-}
-
-.option-group select {
-  min-width: 150px;
-}
-
-.option-group input {
-  width: 150px;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 .code-output {
@@ -224,45 +133,21 @@ watch([() => props.content, selectedLanguage, typeName], () => {
   min-height: 0;
 }
 
-.output-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 13px;
-  color: var(--text-muted, #888);
-}
-
 .output-actions {
   display: flex;
   gap: 8px;
 }
 
-.output-actions button {
-  background: transparent;
-  border: none;
-  color: var(--text-muted, #888);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm, 6px);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-}
-
-.output-actions button:hover {
-  background: var(--btn-hover-bg, rgba(255, 255, 255, 0.1));
-  color: var(--text-main, #d4d4d4);
+.output-action-btn {
+  min-width: 92px;
 }
 
 .code-content {
   flex: 1;
   margin: 0;
-  padding: 16px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-sm, 6px);
-  background: var(--bg-secondary, #252526);
+  padding: var(--space-4);
+  border: none;
+  background: transparent;
   overflow: auto;
   font-family: var(--font-family-mono, 'Consolas', 'Monaco', monospace);
   font-size: 13px;
@@ -276,29 +161,9 @@ watch([() => props.content, selectedLanguage, typeName], () => {
   color: #f44336;
 }
 
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--modal-footer-gap, 8px);
-  padding: var(--modal-footer-padding-y, 16px) var(--modal-footer-padding-x, 20px);
-  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: var(--radius-sm, 6px);
-  font-size: 13px;
-  cursor: pointer;
-  transition: var(--transition-fast, 0.16s ease);
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  color: var(--text-main, #d4d4d4);
-}
-
-.btn-secondary:hover {
-  background: var(--btn-hover-bg, rgba(255, 255, 255, 0.1));
+@media (max-width: 760px) {
+  .options-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

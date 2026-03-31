@@ -6,7 +6,7 @@
         <span v-if="!collapsed && sidebarSubtitle" class="panel-subtitle">{{ sidebarSubtitle }}</span>
       </div>
       <div class="header-actions">
-        <button @click="$emit('toggle-collapse')" :title="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')" :aria-label="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')">
+        <button type="button" class="ui-icon-btn" @click="$emit('toggle-collapse')" :title="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')" :aria-label="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline v-if="collapsed" points="9 18 15 12 9 6"/>
             <polyline v-else points="15 18 9 12 15 6"/>
@@ -18,13 +18,13 @@
     <div class="panel-content">
       <div v-if="collapsed" class="collapsed-list">
         <div class="collapsed-action-stack">
-          <button class="collapsed-open-btn" @click="newFile" :title="t('workspaceSidebar.newFile')" :aria-label="t('workspaceSidebar.newFile')">
+          <button type="button" class="collapsed-open-btn ui-icon-btn" @click="newFile" :title="t('workspaceSidebar.newFile')" :aria-label="t('workspaceSidebar.newFile')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </button>
-          <button class="collapsed-open-btn" @click="openFileDialog" :title="t('workspaceSidebar.openFile')" :aria-label="t('workspaceSidebar.openFile')">
+          <button type="button" class="collapsed-open-btn ui-icon-btn" @click="openFileDialog" :title="t('workspaceSidebar.openFile')" :aria-label="t('workspaceSidebar.openFile')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
           </button>
-          <button class="collapsed-open-btn" @click="openFolderDialog" :title="t('workspaceSidebar.openFolder')" :aria-label="t('workspaceSidebar.openFolder')">
+          <button type="button" class="collapsed-open-btn ui-icon-btn" @click="openFolderDialog" :title="t('workspaceSidebar.openFolder')" :aria-label="t('workspaceSidebar.openFolder')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/></svg>
           </button>
         </div>
@@ -44,24 +44,6 @@
       </div>
 
       <template v-else>
-        <div class="quick-toolbar sidebar-section sidebar-section--actions">
-          <button class="quick-primary-btn" @click="newFile">
-            <span class="quick-primary-icon" aria-hidden="true">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-            </span>
-            <span>{{ t('workspaceSidebar.new') }}</span>
-          </button>
-          <button class="quick-tool-btn" @click="openFileDialog" :title="t('workspaceSidebar.openFile')" :aria-label="t('workspaceSidebar.openFile')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
-          </button>
-          <button class="quick-tool-btn" @click="openFolderDialog" :title="t('workspaceSidebar.openFolder')" :aria-label="t('workspaceSidebar.openFolder')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/></svg>
-          </button>
-          <button v-if="currentRootPath" class="quick-tool-btn" @click="refreshWorkspace" :title="t('workspaceSidebar.refreshCurrent')" :aria-label="t('workspaceSidebar.refreshCurrent')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-          </button>
-        </div>
-
         <div v-if="currentRootPath" class="file-group workspace-group sidebar-section sidebar-section--workspace">
           <div class="group-header workspace-header">
             <div class="group-heading">
@@ -69,14 +51,14 @@
               <div class="group-title group-title--workspace">{{ workspaceDisplayName }}</div>
             </div>
             <div class="group-actions">
-              <button class="group-action-btn" @click.stop="showWorkspaceRootMenuFromButton" :title="t('workspaceSidebar.moreActions')" :aria-label="t('workspaceSidebar.moreActions')">
+              <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click.stop="showWorkspaceRootMenuFromButton" :title="t('workspaceSidebar.moreActions')" :aria-label="t('workspaceSidebar.moreActions')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
                   <circle cx="19" cy="12" r="1.2" fill="currentColor" stroke="none"/>
                   <circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none"/>
                 </svg>
               </button>
-              <button class="group-action-btn" @click="toggleWorkspaceExpansion" :title="showWorkspaceSection ? t('workspaceSidebar.collapseCurrentDir') : t('workspaceSidebar.expandCurrentDir')" :aria-label="showWorkspaceSection ? t('workspaceSidebar.collapseCurrentDir') : t('workspaceSidebar.expandCurrentDir')">
+              <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="toggleWorkspaceExpansion" :title="showWorkspaceSection ? t('workspaceSidebar.collapseCurrentDir') : t('workspaceSidebar.expandCurrentDir')" :aria-label="showWorkspaceSection ? t('workspaceSidebar.collapseCurrentDir') : t('workspaceSidebar.expandCurrentDir')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polyline v-if="showWorkspaceSection" points="18 15 12 9 6 15"/>
                   <polyline v-else points="6 9 12 15 18 9"/>
@@ -95,19 +77,19 @@
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 </span>
                 <input v-model="workspaceFilter" type="text" :placeholder="t('workspaceSidebar.filterPlaceholder')" spellcheck="false">
-                <button v-if="workspaceFilter" class="workspace-filter-clear" @click="workspaceFilter = ''" :title="t('workspaceSidebar.clearFilter')" :aria-label="t('workspaceSidebar.clearFilter')">
+                <button v-if="workspaceFilter" type="button" class="workspace-filter-clear ui-icon-btn ui-icon-btn--sm" @click="workspaceFilter = ''" :title="t('workspaceSidebar.clearFilter')" :aria-label="t('workspaceSidebar.clearFilter')">
                   ×
                 </button>
               </label>
             </div>
             <div class="workspace-toolbar">
-              <button class="workspace-icon-btn" @click="createWorkspaceFile()" :title="t('workspaceSidebar.newFile')" :aria-label="t('workspaceSidebar.newFile')">
+              <button type="button" class="workspace-icon-btn ui-icon-btn" @click="createWorkspaceFile()" :title="t('workspaceSidebar.newFile')" :aria-label="t('workspaceSidebar.newFile')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
               </button>
-              <button class="workspace-icon-btn" @click="createWorkspaceFolder()" :title="t('workspaceSidebar.newFolder')" :aria-label="t('workspaceSidebar.newFolder')">
+              <button type="button" class="workspace-icon-btn ui-icon-btn" @click="createWorkspaceFolder()" :title="t('workspaceSidebar.newFolder')" :aria-label="t('workspaceSidebar.newFolder')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>
               </button>
-              <button class="workspace-icon-btn" @click="refreshWorkspace" :title="t('workspaceSidebar.refresh')" :aria-label="t('workspaceSidebar.refresh')">
+              <button type="button" class="workspace-icon-btn ui-icon-btn" @click="refreshWorkspace" :title="t('workspaceSidebar.refresh')" :aria-label="t('workspaceSidebar.refresh')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
               </button>
             </div>
@@ -146,7 +128,7 @@
                 <div class="group-meta">{{ t('workspaceSidebar.itemCount', { count: filteredPinnedFiles.length }) }}</div>
               </div>
               <div class="group-actions">
-                <button v-if="currentRootPath" class="group-action-btn" @click="togglePinnedExpansion" :title="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')" :aria-label="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')">
+                <button v-if="currentRootPath" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="togglePinnedExpansion" :title="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')" :aria-label="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline v-if="showPinnedSection" points="18 15 12 9 6 15"/>
                     <polyline v-else points="6 9 12 15 18 9"/>
@@ -182,11 +164,11 @@
                   <span class="file-name" :title="file.path">{{ getFileName(file.path) }}</span>
                   <span class="file-path" :title="file.path">{{ file.path }}</span>
                 </div>
-                <span v-if="file.path === activeFilePath" class="file-badge">{{ t('workspaceSidebar.openInProgress') }}</span>
-                <button class="pin-btn active" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.unpin')" :aria-label="t('workspaceSidebar.unpin')">
+                <span v-if="file.path === activeFilePath" class="file-badge ui-chip">{{ t('workspaceSidebar.openInProgress') }}</span>
+                <button type="button" class="pin-btn active ui-icon-btn ui-icon-btn--sm" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.unpin')" :aria-label="t('workspaceSidebar.unpin')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
                 </button>
-                <button class="remove-btn" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
+                <button type="button" class="remove-btn ui-icon-btn ui-icon-btn--sm" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
               </div>
               <div v-if="filteredPinnedFiles.length === 0" class="drop-placeholder">{{ t('workspaceSidebar.dropToPin') }}</div>
             </div>
@@ -199,10 +181,10 @@
                 <div class="group-meta">{{ t('workspaceSidebar.itemCount', { count: filteredUnpinnedFiles.length }) }}</div>
               </div>
               <div class="group-actions">
-                <button v-if="unpinnedRecentFiles.length > 0" class="group-action-btn" @click="clearRecent" :title="t('workspaceSidebar.clearRecentFiles')" :aria-label="t('workspaceSidebar.clearRecentFiles')">
+                <button v-if="unpinnedRecentFiles.length > 0" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="clearRecent" :title="t('workspaceSidebar.clearRecentFiles')" :aria-label="t('workspaceSidebar.clearRecentFiles')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
-                <button v-if="currentRootPath" class="group-action-btn" @click="toggleRecentFilesExpansion" :title="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')" :aria-label="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')">
+                <button v-if="currentRootPath" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="toggleRecentFilesExpansion" :title="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')" :aria-label="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline v-if="showRecentFilesSection" points="18 15 12 9 6 15"/>
                     <polyline v-else points="6 9 12 15 18 9"/>
@@ -238,11 +220,11 @@
                   <span class="file-name" :title="file.path">{{ getFileName(file.path) }}</span>
                   <span class="file-path" :title="file.path">{{ file.path }}</span>
                 </div>
-                <span v-if="file.path === activeFilePath" class="file-badge">{{ t('workspaceSidebar.openInProgress') }}</span>
-                <button class="pin-btn" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.pinTop')" :aria-label="t('workspaceSidebar.pinTop')">
+                <span v-if="file.path === activeFilePath" class="file-badge ui-chip">{{ t('workspaceSidebar.openInProgress') }}</span>
+                <button type="button" class="pin-btn ui-icon-btn ui-icon-btn--sm" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.pinTop')" :aria-label="t('workspaceSidebar.pinTop')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
                 </button>
-                <button class="remove-btn" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
+                <button type="button" class="remove-btn ui-icon-btn ui-icon-btn--sm" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
               </div>
               <div v-if="filteredUnpinnedFiles.length === 0" class="drop-placeholder">{{ t('workspaceSidebar.dropToRecent') }}</div>
             </div>
@@ -255,10 +237,10 @@
                 <div class="group-meta">{{ t('workspaceSidebar.folderCount', { count: recentFolders.length }) }}</div>
               </div>
               <div class="group-actions">
-                <button class="group-action-btn" @click="clearRecentFolders" :title="t('workspaceSidebar.clearRecentFolders')" :aria-label="t('workspaceSidebar.clearRecentFolders')">
+                <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="clearRecentFolders" :title="t('workspaceSidebar.clearRecentFolders')" :aria-label="t('workspaceSidebar.clearRecentFolders')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
-                <button v-if="currentRootPath" class="group-action-btn" @click="toggleRecentFoldersExpansion" :title="showRecentFoldersSection ? t('workspaceSidebar.collapseRecentFolders') : t('workspaceSidebar.expandRecentFolders')" :aria-label="showRecentFoldersSection ? t('workspaceSidebar.collapseRecentFolders') : t('workspaceSidebar.expandRecentFolders')">
+                <button v-if="currentRootPath" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="toggleRecentFoldersExpansion" :title="showRecentFoldersSection ? t('workspaceSidebar.collapseRecentFolders') : t('workspaceSidebar.expandRecentFolders')" :aria-label="showRecentFoldersSection ? t('workspaceSidebar.collapseRecentFolders') : t('workspaceSidebar.expandRecentFolders')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline v-if="showRecentFoldersSection" points="18 15 12 9 6 15"/>
                     <polyline v-else points="6 9 12 15 18 9"/>
@@ -281,8 +263,8 @@
                   <span class="folder-name">{{ getFileName(folder.path) }}</span>
                   <span class="folder-path">{{ folder.path }}</span>
                 </span>
-                <span v-if="folder.path === currentRootPath" class="folder-badge">{{ t('workspaceSidebar.current') }}</span>
-                <span class="folder-remove" @click.stop="removeRecentFolder(folder.path)">×</span>
+                <span v-if="folder.path === currentRootPath" class="folder-badge ui-chip">{{ t('workspaceSidebar.current') }}</span>
+                <span class="folder-remove ui-icon-btn ui-icon-btn--sm" @click.stop="removeRecentFolder(folder.path)">×</span>
               </button>
             </div>
           </div>
@@ -295,33 +277,33 @@
       <div
         v-if="contextMenu.visible"
         ref="contextMenuRef"
-        class="context-menu"
+        class="context-menu ui-context-menu"
         :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
       >
         <template v-if="contextMenu.type === 'recent'">
-          <div class="menu-item" @click="handleContextAction('open')">{{ t('workspaceSidebar.menuOpen') }}</div>
-          <div class="menu-item" @click="handleContextAction('togglePin')">{{ contextMenu.file?.pinned ? t('workspaceSidebar.unpin') : t('workspaceSidebar.pinTop') }}</div>
-          <div class="menu-item" @click="handleContextAction('remove')">{{ t('workspaceSidebar.remove') }}</div>
-          <div class="menu-separator"></div>
-          <div class="menu-item" @click="handleContextAction('clearUnpinned')">{{ t('workspaceSidebar.menuClearUnpinned') }}</div>
+          <div class="menu-item ui-menu-item" @click="handleContextAction('open')">{{ t('workspaceSidebar.menuOpen') }}</div>
+          <div class="menu-item ui-menu-item" @click="handleContextAction('togglePin')">{{ contextMenu.file?.pinned ? t('workspaceSidebar.unpin') : t('workspaceSidebar.pinTop') }}</div>
+          <div class="menu-item ui-menu-item" @click="handleContextAction('remove')">{{ t('workspaceSidebar.remove') }}</div>
+          <div class="menu-separator ui-menu-separator"></div>
+          <div class="menu-item ui-menu-item" @click="handleContextAction('clearUnpinned')">{{ t('workspaceSidebar.menuClearUnpinned') }}</div>
         </template>
         <template v-else-if="contextMenu.type === 'workspace'">
           <template v-if="contextMenu.node?.isRoot">
-            <div class="menu-item" @click="handleContextAction('workspace-collapse-all')">{{ t('workspaceSidebar.menuCollapseAll') }}</div>
-            <div class="menu-separator"></div>
-            <div class="menu-item" @click="handleContextAction('workspace-change-root')">{{ t('workspaceSidebar.menuChangeRoot') }}</div>
-            <div class="menu-item" @click="handleContextAction('workspace-reveal')">{{ t('workspaceSidebar.menuReveal') }}</div>
-            <div class="menu-separator"></div>
-            <div class="menu-item danger" @click="handleContextAction('workspace-close-root')">{{ t('workspaceSidebar.menuCloseRoot') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-collapse-all')">{{ t('workspaceSidebar.menuCollapseAll') }}</div>
+            <div class="menu-separator ui-menu-separator"></div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-change-root')">{{ t('workspaceSidebar.menuChangeRoot') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-reveal')">{{ t('workspaceSidebar.menuReveal') }}</div>
+            <div class="menu-separator ui-menu-separator"></div>
+            <div class="menu-item danger ui-menu-item ui-menu-item--danger" @click="handleContextAction('workspace-close-root')">{{ t('workspaceSidebar.menuCloseRoot') }}</div>
           </template>
           <template v-else>
-            <div class="menu-item" @click="handleContextAction('workspace-open')">{{ contextMenu.node?.isDirectory ? (contextMenu.node?.expanded ? t('workspaceSidebar.menuCollapseDir') : t('workspaceSidebar.menuExpandDir')) : t('workspaceSidebar.menuOpen') }}</div>
-            <div class="menu-item" @click="handleContextAction('workspace-create-file')">{{ t('workspaceSidebar.menuCreateFile') }}</div>
-            <div class="menu-item" @click="handleContextAction('workspace-create-folder')">{{ t('workspaceSidebar.menuCreateFolder') }}</div>
-            <div class="menu-item" @click="handleContextAction('workspace-reveal')">{{ t('workspaceSidebar.menuReveal') }}</div>
-            <div class="menu-separator"></div>
-            <div class="menu-item" @click="handleContextAction('workspace-rename')">{{ t('workspaceSidebar.menuRename') }}</div>
-            <div class="menu-item danger" @click="handleContextAction('workspace-delete')">{{ t('workspaceSidebar.menuDelete') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-open')">{{ contextMenu.node?.isDirectory ? (contextMenu.node?.expanded ? t('workspaceSidebar.menuCollapseDir') : t('workspaceSidebar.menuExpandDir')) : t('workspaceSidebar.menuOpen') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-create-file')">{{ t('workspaceSidebar.menuCreateFile') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-create-folder')">{{ t('workspaceSidebar.menuCreateFolder') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-reveal')">{{ t('workspaceSidebar.menuReveal') }}</div>
+            <div class="menu-separator ui-menu-separator"></div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-rename')">{{ t('workspaceSidebar.menuRename') }}</div>
+            <div class="menu-item danger ui-menu-item ui-menu-item--danger" @click="handleContextAction('workspace-delete')">{{ t('workspaceSidebar.menuDelete') }}</div>
           </template>
         </template>
       </div>
@@ -340,7 +322,7 @@
             v-if="dialogState.mode === 'input'"
             ref="dialogInputRef"
             v-model="dialogInputValue"
-            class="workspace-dialog-input"
+            class="workspace-dialog-input ui-field"
             type="text"
             :placeholder="dialogState.placeholder"
             @keydown.enter.prevent="handleDialogConfirm"
@@ -348,8 +330,8 @@
         </div>
       </template>
       <template #footer>
-        <button class="modal-btn" @click="handleDialogClose">{{ t('common.cancel') }}</button>
-        <button class="modal-btn primary" @click="handleDialogConfirm">{{ t('common.confirm') }}</button>
+        <button type="button" class="modal-btn" @click="handleDialogClose">{{ t('common.cancel') }}</button>
+        <button type="button" class="modal-btn primary" @click="handleDialogConfirm">{{ t('common.confirm') }}</button>
       </template>
     </ModalDialog>
   </div>
@@ -801,7 +783,7 @@ async function revealActiveFileInWorkspace() {
   }
 
   await expandTreeToFile(activeFilePath.value)
-  selectedWorkspacePath.value = getParentPath(activeFilePath.value) || currentRootPath.value
+  selectedWorkspacePath.value = activeFilePath.value
 
   await nextTick()
   const activeNode = workspaceTreeShellRef.value?.querySelector('.node-label.active')
@@ -1089,24 +1071,12 @@ onUnmounted(() => {
 }
 
 .header-actions button {
-  width: var(--icon-button-size-md);
-  height: var(--icon-button-size-md);
-  background: var(--icon-button-bg);
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0;
   border-radius: var(--icon-button-radius);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .header-actions button:hover,
 .collapsed-open-btn:hover,
 .collapsed-file:hover,
-.quick-primary-btn:hover,
-.quick-tool-btn:hover,
 .folder-item:hover,
 .recent-file:hover,
 .section-link:hover {
@@ -1119,8 +1089,6 @@ onUnmounted(() => {
 .header-actions button:focus-visible,
 .collapsed-open-btn:focus-visible,
 .collapsed-file:focus-visible,
-.quick-primary-btn:focus-visible,
-.quick-tool-btn:focus-visible,
 .folder-item:focus-visible,
 .recent-file:focus-visible,
 .menu-item:focus-visible,
@@ -1135,24 +1103,20 @@ onUnmounted(() => {
 .panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 0 16px;
+  padding: var(--space-3) 0 var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   scrollbar-gutter: stable;
 }
 
 .sidebar-section {
   position: relative;
-  margin: 0 16px;
+  margin: 0 14px;
   border: 1px solid color-mix(in srgb, var(--glass-border) 94%, rgba(var(--accent-primary-rgb), 0.06));
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--glass-bg) 98%, rgba(var(--accent-primary-rgb), 0.01));
-  box-shadow: none;
-}
-
-.sidebar-section--actions {
-  background: color-mix(in srgb, var(--glass-bg) 96%, rgba(var(--accent-primary-rgb), 0.03));
+  box-shadow: var(--panel-inner-shadow);
 }
 
 .sidebar-section--session {
@@ -1232,55 +1196,6 @@ onUnmounted(() => {
   box-shadow: 0 0 0 1px rgba(var(--accent-primary-rgb), 0.08);
 }
 
-.quick-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(3, 32px);
-  gap: 8px;
-  padding: 10px;
-  align-items: center;
-}
-
-.quick-primary-btn {
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(var(--accent-primary-rgb), 0.16);
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.12) 62%, var(--glass-bg));
-  color: var(--text-main);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: var(--ui-font-weight-semibold);
-}
-
-.quick-primary-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: rgba(var(--accent-primary-rgb), 0.12);
-  color: var(--accent-primary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.quick-tool-btn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: var(--icon-button-bg);
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
 .section-card {
   margin: 0;
   padding: 14px;
@@ -1315,31 +1230,8 @@ onUnmounted(() => {
 }
 
 .group-action-btn {
-  width: var(--icon-button-size-sm);
-  height: var(--icon-button-size-sm);
-  border: 1px solid transparent;
   border-radius: var(--icon-button-radius);
-  background: var(--icon-button-bg);
-  color: var(--text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  transition: var(--transition-fast);
-}
-
-.group-action-btn:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
-  border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
-}
-
-.group-action-btn:focus-visible {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
 }
 
 .group-heading {
@@ -1458,7 +1350,7 @@ onUnmounted(() => {
 }
 
 .file-group.sidebar-section {
-  padding: 12px 12px 10px;
+  padding: var(--space-3);
 }
 
 .file-group + .file-group {
@@ -1530,12 +1422,12 @@ onUnmounted(() => {
 }
 
 .workspace-filter {
-  min-height: 34px;
+  min-height: 36px;
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
+  padding: 0 12px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--glass-border) 92%, rgba(var(--accent-primary-rgb), 0.08));
   background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.012));
@@ -1572,22 +1464,7 @@ onUnmounted(() => {
 }
 
 .workspace-filter-clear {
-  width: 22px;
-  height: 22px;
-  border: 1px solid transparent;
   border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-fast);
-}
-
-.workspace-filter-clear:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
 }
 
 .workspace-toolbar {
@@ -1599,30 +1476,7 @@ onUnmounted(() => {
 }
 
 .workspace-icon-btn {
-  width: var(--icon-button-size-md);
-  height: var(--icon-button-size-md);
-  border: 1px solid transparent;
   border-radius: var(--icon-button-radius);
-  background: var(--icon-button-bg);
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.workspace-icon-btn:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
-  border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
-}
-
-.workspace-icon-btn:focus-visible {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
 }
 
 .workspace-dialog-body {
@@ -1639,19 +1493,6 @@ onUnmounted(() => {
 
 .workspace-dialog-input {
   width: 100%;
-  min-height: var(--field-height-md);
-  padding: 0 12px;
-  border-radius: var(--field-radius);
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 96%, rgba(var(--accent-primary-rgb), 0.02));
-  color: var(--text-main);
-  font-size: var(--field-font-size);
-}
-
-.workspace-dialog-input:focus-visible {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
 }
 
 .workspace-tree-shell {
@@ -1659,6 +1500,7 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.008));
   overflow: hidden;
+  box-shadow: var(--panel-inner-shadow);
 }
 
 .workspace-tree {
@@ -1956,48 +1798,11 @@ onUnmounted(() => {
 }
 
 .context-menu {
-  position: fixed;
-  background: color-mix(in srgb, var(--glass-bg) 92%, var(--bg-deep));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--menu-card-shadow);
-  padding: 4px 0;
   min-width: 144px;
-  z-index: 5000;
-  backdrop-filter: blur(10px);
 }
 
 .menu-item {
-  min-height: var(--menu-item-min-height);
-  padding: var(--menu-item-padding-y) var(--menu-item-padding-x);
-  display: flex;
-  align-items: center;
-  font-size: var(--ui-font-size-sm);
-  font-weight: var(--ui-font-weight-medium);
-  color: var(--text-main);
-  cursor: pointer;
-}
-
-.menu-item:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--accent-primary);
-}
-
-.menu-item.danger:hover {
-  color: var(--danger-soft-color);
-  background: var(--danger-soft-bg);
-}
-
-.menu-separator {
-  height: 1px;
-  background: var(--glass-border);
-  margin: 4px 0;
-}
-
-@media (max-width: 720px) {
-  .quick-toolbar {
-    grid-template-columns: minmax(0, 1fr) repeat(2, 32px);
-  }
+  transition: var(--transition-fast);
 }
 
 @container workspace-sidebar (max-width: 320px) {
@@ -2017,12 +1822,6 @@ onUnmounted(() => {
   .file-group.sidebar-section,
   .session-group.sidebar-section {
     padding: 10px;
-  }
-
-  .quick-toolbar {
-    grid-template-columns: minmax(0, 1fr) repeat(3, 30px);
-    gap: 6px;
-    padding: 8px;
   }
 
   .workspace-summary {
@@ -2116,10 +1915,6 @@ onUnmounted(() => {
 }
 
 @container workspace-sidebar (max-width: 280px) {
-  .quick-toolbar {
-    grid-template-columns: minmax(0, 1fr) repeat(2, 30px);
-  }
-
   .workspace-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2150,21 +1945,11 @@ onUnmounted(() => {
 }
 
 @container workspace-sidebar (max-width: 260px) {
-  .quick-primary-btn span:last-child,
   .session-badge,
   .folder-badge,
   .file-badge,
   .section-link {
     display: none;
-  }
-
-  .quick-toolbar {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .quick-primary-btn {
-    padding: 0;
-    justify-content: center;
   }
 
   .recent-file,

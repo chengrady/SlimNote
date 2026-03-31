@@ -6,6 +6,7 @@
     tabindex="0"
     @keydown.capture="handleKeydown"
     @copy.capture="handleCopy"
+    @paste.capture="handlePaste"
   ></div>
 </template>
 
@@ -33,7 +34,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'paste-content'])
 
 const settingsStore = useSettingsStore()
 const editorRef = ref()
@@ -116,6 +117,16 @@ function handleCopy(event) {
   event.clipboardData?.setData('text/plain', text)
   event.clipboardData?.setData('text/html', html || text)
   event.preventDefault()
+}
+
+function handlePaste(event) {
+  const text = event.clipboardData?.getData('text/plain') || ''
+  if (!text) return
+
+  emit('paste-content', {
+    text,
+    hadContentBeforePaste: String(getEditableRoot()?.textContent || '').trim().length > 0
+  })
 }
 
 function getCurrentMarkdown() {

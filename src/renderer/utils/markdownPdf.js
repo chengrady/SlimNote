@@ -1,6 +1,7 @@
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
+import { DEFAULT_LIST_PREFIX_CLASS, buildStructuredPlainText, decorateListPrefixes, getListDepth } from './markdownListFormat'
 
 function escapeHtml(value = '') {
 	return String(value)
@@ -114,7 +115,198 @@ async function renderMermaidBlocksInHtml(html = '', theme = 'light') {
 		}
 	}
 
+	decorateListPrefixes(root)
+
 	return root.innerHTML
+}
+
+function buildPdfPreparationScript() {
+	return String.raw`<script>
+		(function () {
+			const MM_TO_PX = 96 / 25.4
+			const PAGE_CONTENT_WIDTH_MM = 210 - 14 - 14
+			const PAGE_CONTENT_HEIGHT_MM = 297 - 16 - 18
+			const MAX_SINGLE_PAGE_HEIGHT_RATIO = 0.92
+			const MIN_SINGLE_PAGE_SCALE = 0.58
+			const OUTPUT_SCALE = 2
+
+			function mmToPx(mm) {
+				return mm * MM_TO_PX
+			}
+
+			function waitForImageLoad(image) {
+				return new Promise((resolve, reject) => {
+					if (image.complete && image.naturalWidth > 0) {
+						resolve()
+						return
+					}
+
+					image.onload = () => resolve()
+					image.onerror = (error) => reject(error)
+				})
+			}
+
+			function getSvgMetrics(svg) {
+				const viewBox = svg.viewBox && svg.viewBox.baseVal
+				const width = viewBox && viewBox.width
+					? viewBox.width
+					: svg.width && svg.width.baseVal && svg.width.baseVal.value
+						? svg.width.baseVal.value
+						: svg.getBBox().width
+				const height = viewBox && viewBox.height
+					? viewBox.height
+					: svg.height && svg.height.baseVal && svg.height.baseVal.value
+						? svg.height.baseVal.value
+						: svg.getBBox().height
+
+				return {
+					width: Number(width) || 0,
+					height: Number(height) || 0
+				}
+			}
+
+			function ensureSvgViewBox(svg, width, height) {
+				if (!svg.getAttribute('viewBox') && width > 0 && height > 0) {
+					svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height)
+				}
+			}
+
+			function createSvgDataUrl(svg) {
+				const serialized = new XMLSerializer().serializeToString(svg)
+				return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(serialized)
+			}
+
+			async function drawSvgToCanvas(svg, targetWidth, targetHeight) {
+				const image = new Image()
+				image.decoding = 'sync'
+				image.src = createSvgDataUrl(svg)
+				await waitForImageLoad(image)
+
+				const canvas = document.createElement('canvas')
+				canvas.width = Math.max(1, Math.round(targetWidth * OUTPUT_SCALE))
+				canvas.height = Math.max(1, Math.round(targetHeight * OUTPUT_SCALE))
+				const context = canvas.getContext('2d')
+				context.scale(OUTPUT_SCALE, OUTPUT_SCALE)
+				context.fillStyle = '#ffffff'
+				context.fillRect(0, 0, targetWidth, targetHeight)
+				context.drawImage(image, 0, 0, targetWidth, targetHeight)
+				return canvas
+			}
+
+			function applySinglePageScale(block, svg, width, height) {
+				block.classList.add('mermaid-block--single')
+				block.classList.remove('mermaid-block--paginated')
+				svg.style.width = Math.max(1, Math.round(width)) + 'px'
+				svg.style.maxWidth = '100%'
+				svg.style.height = Math.max(1, Math.round(height)) + 'px'
+				svg.style.margin = '0 auto'
+			}
+
+			async function paginateBlock(block, svg, metrics, widthScale, sliceHeight) {
+				const targetWidth = Math.max(1, Math.round(metrics.width * widthScale))
+				const targetHeight = Math.max(1, Math.round(metrics.height * widthScale))
+				const fullCanvas = await drawSvgToCanvas(svg, targetWidth, targetHeight)
+				const pageSliceHeight = Math.max(240, Math.floor(sliceHeight))
+				const fragment = document.createDocumentFragment()
+
+				for (let offset = 0; offset < targetHeight; offset += pageSliceHeight) {
+					const currentSliceHeight = Math.min(pageSliceHeight, targetHeight - offset)
+					const sliceCanvas = document.createElement('canvas')
+					sliceCanvas.width = fullCanvas.width
+					sliceCanvas.height = Math.max(1, Math.round(currentSliceHeight * OUTPUT_SCALE))
+					const sliceContext = sliceCanvas.getContext('2d')
+					sliceContext.fillStyle = '#ffffff'
+					sliceContext.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
+					sliceContext.drawImage(
+						fullCanvas,
+						0,
+						Math.round(offset * OUTPUT_SCALE),
+						fullCanvas.width,
+						Math.round(currentSliceHeight * OUTPUT_SCALE),
+						0,
+						0,
+						sliceCanvas.width,
+						sliceCanvas.height
+					)
+
+					const slice = document.createElement('div')
+					slice.className = 'mermaid-page-slice'
+
+					const image = document.createElement('img')
+					image.alt = 'Mermaid diagram page slice'
+					image.src = sliceCanvas.toDataURL('image/png')
+					slice.appendChild(image)
+
+					if (offset + currentSliceHeight < targetHeight) {
+						slice.classList.add('mermaid-page-slice--continued')
+					}
+
+					fragment.appendChild(slice)
+				}
+
+				block.classList.remove('mermaid-block--single')
+				block.classList.add('mermaid-block--paginated')
+				block.innerHTML = ''
+				block.appendChild(fragment)
+			}
+
+			async function prepareMermaidBlock(block) {
+				const svg = block.querySelector('svg')
+				if (!svg) return
+
+				const metrics = getSvgMetrics(svg)
+				if (!metrics.width || !metrics.height) return
+
+				ensureSvgViewBox(svg, metrics.width, metrics.height)
+
+				const contentWidth = mmToPx(PAGE_CONTENT_WIDTH_MM)
+				const contentHeight = mmToPx(PAGE_CONTENT_HEIGHT_MM)
+				const blockWidth = block.getBoundingClientRect().width || contentWidth
+				const usableWidth = Math.max(220, Math.min(contentWidth, blockWidth - 16))
+				const widthScale = Math.min(1, usableWidth / metrics.width)
+				const fittedHeight = metrics.height * widthScale
+				const maxSinglePageHeight = contentHeight * MAX_SINGLE_PAGE_HEIGHT_RATIO
+				const singlePageScale = Math.min(widthScale, maxSinglePageHeight / metrics.height)
+
+				if (fittedHeight <= maxSinglePageHeight || singlePageScale >= MIN_SINGLE_PAGE_SCALE) {
+					const finalScale = fittedHeight <= maxSinglePageHeight ? widthScale : singlePageScale
+					applySinglePageScale(block, svg, metrics.width * finalScale, metrics.height * finalScale)
+					return
+				}
+
+				await paginateBlock(block, svg, metrics, widthScale, maxSinglePageHeight)
+			}
+
+			async function preparePdfMermaidLayout() {
+				const blocks = Array.from(document.querySelectorAll('.markdown-body .mermaid-block'))
+				for (const block of blocks) {
+					await prepareMermaidBlock(block)
+				}
+				return true
+			}
+
+			window.__slimnotePdfReady = new Promise((resolve) => {
+				const run = async () => {
+					try {
+						if (document.fonts && document.fonts.ready) {
+							await document.fonts.ready
+						}
+						await preparePdfMermaidLayout()
+						resolve(true)
+					} catch (error) {
+						console.error('SlimNote PDF layout preparation failed:', error)
+						resolve(false)
+					}
+				}
+
+				if (document.readyState === 'complete') {
+					run()
+				} else {
+					window.addEventListener('load', run, { once: true })
+				}
+			})
+		})()
+	</script>`
 }
 
 function createClipboardHtmlFragment(html = '') {
@@ -140,97 +332,9 @@ function createClipboardHtmlFragment(html = '') {
 		})
 	}
 
-	const getIndentByDepth = (depth) => `${Math.min(depth, 6) * 28}px`
-	const getMarkerWidthByDepth = (depth) => `${28 + Math.min(depth, 5) * 6}px`
+	const getIndentByDepth = (depth) => `${18 + Math.min(depth, 6) * 30}px`
 
-	const getListDepth = (element) => {
-		let depth = 0
-		let current = element?.parentElement
-
-		while (current) {
-			if (current.tagName === 'UL' || current.tagName === 'OL') {
-				depth += 1
-			}
-			current = current.parentElement
-		}
-
-		return Math.max(0, depth - 1)
-	}
-
-	const buildPlainText = (sourceRoot) => {
-		const textRoot = sourceRoot.cloneNode(true)
-		textRoot.querySelectorAll('style').forEach((node) => node.remove())
-
-		textRoot.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
-			const level = Number(heading.tagName.slice(1)) || 1
-			if (level > 1) {
-				heading.prepend(textRoot.ownerDocument.createTextNode('  '.repeat(level - 1)))
-			}
-		})
-
-		textRoot.querySelectorAll('li').forEach((item) => {
-			const depth = getListDepth(item)
-			if (depth <= 0) return
-
-			const indent = '    '.repeat(depth)
-			const target = item.querySelector(':scope > p, :scope > div') || item
-			target.prepend(textRoot.ownerDocument.createTextNode(indent))
-		})
-
-		const text = textRoot.innerText || textRoot.textContent || ''
-		return text
-			.replace(/\n{3,}/g, '\n\n')
-			.replace(/[ \t]+\n/g, '\n')
-			.trim()
-	}
-
-	const injectMarker = (li, markerText) => {
-		if (!li || li.querySelector(':scope > .slimnote-list-marker')) return
-
-		const depth = getListDepth(li)
-
-		const marker = doc.createElement('span')
-		marker.className = 'slimnote-list-marker'
-		marker.textContent = markerText
-		applyStyles(marker, {
-			display: 'inline-block',
-			minWidth: getMarkerWidthByDepth(depth),
-			whiteSpace: 'pre',
-			fontWeight: '400',
-			color: '#1f2937',
-			verticalAlign: 'top'
-		})
-
-		const firstElement = li.firstElementChild
-		if (firstElement && ['P', 'DIV'].includes(firstElement.tagName)) {
-			firstElement.prepend(marker)
-		} else {
-			li.prepend(marker)
-		}
-	}
-
-	root.querySelectorAll('ol').forEach((list) => {
-		const start = Number(list.getAttribute('start') || 1)
-		Array.from(list.children)
-			.filter((child) => child.tagName === 'LI')
-			.forEach((li, index) => injectMarker(li, `${start + index}. `))
-	})
-
-	root.querySelectorAll('ul').forEach((list) => {
-		Array.from(list.children)
-			.filter((child) => child.tagName === 'LI')
-			.forEach((li) => {
-				const checkbox = li.querySelector(':scope > input[type="checkbox"], :scope > p > input[type="checkbox"]')
-				if (checkbox) {
-					const checked = checkbox.hasAttribute('checked') || checkbox.checked
-					checkbox.remove()
-					injectMarker(li, checked ? '[x] ' : '[ ] ')
-					return
-				}
-
-				injectMarker(li, '• ')
-			})
-	})
+	decorateListPrefixes(root)
 
 	applyStyles(root, {
 		fontFamily: '"Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
@@ -277,8 +381,19 @@ function createClipboardHtmlFragment(html = '') {
 		applyStyles(list, {
 			margin: isNested ? '6px 0 8px' : '0 0 12px',
 			marginLeft: getIndentByDepth(depth),
-			paddingLeft: '0',
+			paddingLeft: isNested ? '12px' : '4px',
+			borderLeft: isNested ? '2px solid #dbe3f0' : 'none',
 			listStyle: 'none'
+		})
+	})
+
+	root.querySelectorAll(`.${DEFAULT_LIST_PREFIX_CLASS}`).forEach((prefix) => {
+		applyStyles(prefix, {
+			display: 'inline',
+			whiteSpace: 'pre-wrap',
+			fontWeight: '400',
+			color: '#1f2937',
+			fontVariantNumeric: 'tabular-nums'
 		})
 	})
 
@@ -287,14 +402,15 @@ function createClipboardHtmlFragment(html = '') {
 		applyStyles(item, {
 			display: 'block',
 			margin: '0 0 6px',
-			paddingLeft: `${depth > 0 ? 4 : 0}px`
+			paddingLeft: `${depth > 0 ? 6 : 0}px`
 		})
 
 		const leadBlock = item.querySelector(':scope > p, :scope > div')
 		if (leadBlock) {
 			applyStyles(leadBlock, {
 				margin: '0',
-				display: 'block'
+				display: 'block',
+				paddingLeft: `${depth > 0 ? 2 : 0}px`
 			})
 		}
 	})
@@ -433,7 +549,7 @@ function createClipboardHtmlFragment(html = '') {
 		}
 		.slimnote-clipboard ul,
 		.slimnote-clipboard ol {
-			padding-left: 0;
+			padding-left: 4px;
 			list-style: none;
 		}
 		.slimnote-clipboard li {
@@ -441,9 +557,11 @@ function createClipboardHtmlFragment(html = '') {
 		}
 		.slimnote-clipboard li ul,
 		.slimnote-clipboard li ol {
-			margin-left: 28px;
+			margin-left: 48px;
 			margin-top: 6px;
 			margin-bottom: 8px;
+			padding-left: 12px;
+			border-left: 2px solid #dbe3f0;
 		}
 		.slimnote-clipboard code {
 			font-family: Consolas, "Cascadia Code", monospace;
@@ -451,17 +569,16 @@ function createClipboardHtmlFragment(html = '') {
 		.slimnote-clipboard pre {
 			white-space: pre-wrap;
 		}
-		.slimnote-clipboard .slimnote-list-marker {
-			display: inline-block;
-			min-width: 28px;
+		.slimnote-clipboard .${DEFAULT_LIST_PREFIX_CLASS} {
+			display: inline;
 			font-weight: 400;
-			white-space: pre;
-			vertical-align: top;
+			white-space: pre-wrap;
+			font-variant-numeric: tabular-nums;
 		}
 	`
 	root.prepend(style)
 
-	const text = buildPlainText(root)
+	const text = buildStructuredPlainText(root)
 
 	return {
 		html: root.outerHTML,
@@ -631,16 +748,27 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 
 			.markdown-body ul,
 			.markdown-body ol {
-				padding-left: 2em;
-			}
-
-			.markdown-body ol {
-				list-style-position: inside;
-				padding-left: 0;
+				padding-left: 4px;
+				list-style: none;
 			}
 
 			.markdown-body li + li {
 				margin-top: 0.35em;
+			}
+
+			.markdown-body li ul,
+			.markdown-body li ol {
+				margin-left: 48px;
+				margin-top: 6px;
+				margin-bottom: 8px;
+				padding-left: 12px;
+				border-left: 2px solid var(--border-color);
+			}
+
+			.markdown-body .${DEFAULT_LIST_PREFIX_CLASS} {
+				display: inline;
+				white-space: pre-wrap;
+				font-variant-numeric: tabular-nums;
 			}
 
 			.markdown-body a {
@@ -693,15 +821,46 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 				background: #ffffff;
 				border: 1px solid var(--border-color);
 				border-radius: 12px;
-				overflow: visible;
+				overflow: hidden;
 				text-align: center;
+				page-break-inside: auto;
+				break-inside: auto;
+			}
+
+			.markdown-body .mermaid-block--paginated {
+				padding: 0;
+				background: transparent;
+				border: 0;
+			}
+
+			.markdown-body .mermaid-page-slice {
+				margin: 0 0 12px;
+				padding: 10px 8px;
+				background: #ffffff;
+				border: 1px solid var(--border-color);
+				border-radius: 12px;
+				overflow: hidden;
+				page-break-inside: avoid;
+				break-inside: avoid-page;
+			}
+
+			.markdown-body .mermaid-page-slice--continued {
+				page-break-after: always;
+				break-after: page;
+			}
+
+			.markdown-body .mermaid-page-slice img {
+				display: block;
+				width: 100%;
+				height: auto;
+				margin: 0;
 			}
 
 			.markdown-body .mermaid-block svg {
 				display: block;
-				width: auto !important;
-				max-width: 100% !important;
-				height: auto !important;
+				width: auto;
+				max-width: 100%;
+				height: auto;
 				margin: 0 auto;
 				overflow: visible;
 			}
@@ -787,6 +946,7 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 			${documentHeaderHtml}
 			<article class="markdown-body">${html}</article>
 		</main>
+		${buildPdfPreparationScript()}
 	</body>
 </html>`
 }

@@ -23,7 +23,7 @@
     <div class="panel-content">
       <div v-if="!collapsed" class="search-box">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input v-model="searchTerm" type="search" :placeholder="t('recentFilesPanel.searchPlaceholder')" :aria-label="t('recentFilesPanel.searchPlaceholder')">
+        <input v-model="searchTerm" class="ui-field" type="search" :placeholder="t('recentFilesPanel.searchPlaceholder')" :aria-label="t('recentFilesPanel.searchPlaceholder')">
       </div>
       <div v-if="collapsed" class="collapsed-list">
         <button class="collapsed-open-btn" @click="openFileDialog" :aria-label="t('recentFilesPanel.openFile')">
@@ -44,7 +44,7 @@
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2z"/></svg>
         </div>
         <p>{{ t('recentFilesPanel.empty') }}</p>
-        <button class="btn empty-action" @click="openFileDialog">{{ t('recentFilesPanel.emptyAction') }}</button>
+        <button type="button" class="btn empty-action" @click="openFileDialog">{{ t('recentFilesPanel.emptyAction') }}</button>
       </div>
       <div v-else-if="filteredEntries.length === 0" class="empty-state search-empty">
         <div class="empty-icon" aria-hidden="true">
@@ -150,6 +150,19 @@
         <div class="menu-item" @click="handleContextAction('clearUnpinned')">{{ t('recentFilesPanel.menuClearUnpinned') }}</div>
       </div>
     </Teleport>
+
+    <ModalDialog
+      :show="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      @close="closeConfirmDialog"
+      @confirm="confirmDialogAccept"
+    >
+      <template #footer>
+        <button type="button" class="modal-btn" @click="closeConfirmDialog">{{ t('common.cancel') }}</button>
+        <button type="button" class="modal-btn primary" @click="confirmDialogAccept">{{ t('common.confirm') }}</button>
+      </template>
+    </ModalDialog>
   </div>
 </template>
 
@@ -158,6 +171,7 @@ import { computed, nextTick, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFileStore } from '../stores/file'
 import FileIcon from './FileIcon.vue'
+import ModalDialog from './ModalDialog.vue'
 
 const { t } = useI18n()
 
@@ -175,6 +189,8 @@ const searchTerm = ref('')
 const recentDrag = ref({ dragPath: null, targetPath: null, targetPinned: null, position: 'before' })
 const contextMenu = ref({ visible: false, x: 0, y: 0, file: null })
 const contextMenuRef = ref(null)
+const confirmDialog = ref({ visible: false, title: '', message: '' })
+let confirmAction = null
 const CONTEXT_MENU_MARGIN = 8
 const totalRecentCount = computed(() => fileStore.recentFiles.length)
 const filteredEntries = computed(() => {
@@ -296,10 +312,28 @@ function onRecentDragEnd() {
   recentDrag.value = { dragPath: null, targetPath: null, targetPinned: null, position: 'before' }
 }
 
+function openConfirmDialog({ title, message, onConfirm }) {
+  confirmDialog.value = { visible: true, title, message }
+  confirmAction = onConfirm
+}
+
+function closeConfirmDialog() {
+  confirmDialog.value = { visible: false, title: '', message: '' }
+  confirmAction = null
+}
+
+function confirmDialogAccept() {
+  const action = confirmAction
+  closeConfirmDialog()
+  action?.()
+}
+
 function clearRecent() {
-  if (confirm('确定要清空未固定的最近文件记录吗？')) {
-    fileStore.clearRecentFiles()
-  }
+  openConfirmDialog({
+    title: t('recentFilesPanel.clearRecentTitle'),
+    message: t('recentFilesPanel.clearRecentMessage'),
+    onConfirm: () => fileStore.clearRecentFiles()
+  })
 }
 
 function handleOpenFile(filePath) {
@@ -509,27 +543,9 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
-.search-box input {
+.search-box .ui-field {
   flex: 1;
   min-width: 0;
-  height: var(--field-height-md);
-  padding: 0 var(--field-padding-x);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--field-radius);
-  background: var(--input-bg);
-  color: var(--text-main);
-  font-size: var(--field-font-size);
-  transition: var(--transition-fast);
-}
-
-.search-box input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: var(--field-focus-ring);
-}
-
-.search-box input::placeholder {
-  color: var(--text-muted);
 }
 
 .collapsed-list {

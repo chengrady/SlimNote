@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-min'),
   maximize: () => ipcRenderer.send('window-max'),
   close: () => ipcRenderer.send('window-close'),
+  toggleFullScreen: () => ipcRenderer.send('window-toggle-fullscreen'),
+  reloadWindow: () => ipcRenderer.send('window-reload'),
+  forceReloadWindow: () => ipcRenderer.send('window-force-reload'),
+  toggleDevTools: () => ipcRenderer.send('window-toggle-devtools'),
   isMaximized: () => ipcRenderer.invoke('is-maximized'),
   onWindowMaximized: (callback) => onIpc('window-maximized', callback),
   onWindowUnmaximized: (callback) => onIpc('window-unmaximized', callback),
@@ -33,6 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Dialogs
   showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
   showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
+  searchInWorkspace: (payload) => ipcRenderer.invoke('search-in-workspace', payload),
   
   // Helper Dialogs
   openFileDialog: () => ipcRenderer.invoke('show-open-dialog', {
@@ -45,6 +50,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     defaultPath
   }),
   exportMarkdownPdf: (payload) => ipcRenderer.invoke('export-markdown-pdf', payload),
+  openFileAssociationSettings: () => ipcRenderer.invoke('open-file-association-settings'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
   // Pin Window
   createPinWindow: (content, theme, language) => ipcRenderer.invoke('create-pin-window', { content, theme, language }),
@@ -60,10 +67,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuSave: (callback) => onIpc('menu-save', callback),
   onMenuSaveAs: (callback) => onIpc('menu-save-as', callback),
   onMenuOpenSettings: (callback) => onIpc('menu-open-settings', callback),
+  onMenuOpenAbout: (callback) => onIpc('menu-open-about', callback),
   onMenuUndo: (callback) => onIpc('menu-undo', callback),
   onMenuRedo: (callback) => onIpc('menu-redo', callback),
   onMenuToggleTheme: (callback) => onIpc('menu-toggle-theme', callback),
+  onMenuFind: (callback) => onIpc('menu-find', callback),
+  onMenuReplace: (callback) => onIpc('menu-replace', callback),
+  onMenuGlobalSearch: (callback) => onIpc('menu-global-search', callback),
+  onMenuToggleSidebar: (callback) => onIpc('menu-toggle-sidebar', callback),
   onAppOpenFile: (callback) => onIpc('app-open-file', callback),
+  notifyRendererReady: () => ipcRenderer.send('renderer-ready'),
 
   // System Locale
   getSystemLocale: () => ipcRenderer.invoke('get-system-locale'),

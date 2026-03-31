@@ -1,67 +1,65 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="converter-modal">
-      <div class="modal-header">
-        <h3>{{ t('jsonConverter.title') }}</h3>
-        <button class="close-btn" @click="$emit('close')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="modal-body">
-        <div class="format-selector">
+  <ModalDialog
+    :show="true"
+    :title="t('jsonConverter.title')"
+    width="min(900px, calc(100vw - 40px))"
+    max-width="min(900px, calc(100vw - 40px))"
+    height="min(80vh, calc(100vh - 48px))"
+    max-height="min(80vh, calc(100vh - 48px))"
+    @close="$emit('close')"
+  >
+    <template #body>
+      <div class="converter-layout">
+        <div class="format-selector card-like">
           <div class="format-group">
-            <label>{{ t('jsonConverter.sourceFormat') }}</label>
-            <select v-model="fromFormat">
+            <label class="field-label">{{ t('jsonConverter.sourceFormat') }}</label>
+            <select class="ui-select" v-model="fromFormat">
               <option v-for="format in formatOptions" :key="`from-${format.value}`" :value="format.value">{{ format.label }}</option>
             </select>
           </div>
 
-          <button class="swap-btn" @click="swapFormats" :title="t('jsonConverter.swap')">
+          <button type="button" class="swap-btn ui-icon-btn" @click="swapFormats" :title="t('jsonConverter.swap')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/>
             </svg>
           </button>
 
           <div class="format-group">
-            <label>{{ t('jsonConverter.targetFormat') }}</label>
-            <select v-model="toFormat">
+            <label class="field-label">{{ t('jsonConverter.targetFormat') }}</label>
+            <select class="ui-select" v-model="toFormat">
               <option v-for="format in formatOptions" :key="`to-${format.value}`" :value="format.value">{{ format.label }}</option>
             </select>
           </div>
         </div>
 
         <div class="editor-row">
-          <div class="editor-pane">
-            <div class="pane-header">
+          <div class="editor-pane ui-pane">
+            <div class="pane-header ui-pane-header">
               <span>{{ formatNames[fromFormat] }}</span>
-              <button @click="formatInput" :title="t('jsonConverter.format')">
+              <button type="button" class="ui-icon-btn ui-icon-btn--sm" @click="formatInput" :title="t('jsonConverter.format')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 10H3M21 6H3M21 14H3M21 18H3"/>
                 </svg>
               </button>
             </div>
-            <textarea v-model="inputContent" :placeholder="t('jsonConverter.inputPlaceholder')"></textarea>
+            <textarea class="ui-textarea" v-model="inputContent" :placeholder="t('jsonConverter.inputPlaceholder')"></textarea>
           </div>
 
-          <div class="editor-pane">
-            <div class="pane-header">
+          <div class="editor-pane ui-pane">
+            <div class="pane-header ui-pane-header">
               <span>{{ formatNames[toFormat] }}</span>
-              <button @click="copyOutput" :title="t('jsonConverter.copy')">
+              <button type="button" class="ui-icon-btn ui-icon-btn--sm" @click="copyOutput" :title="t('jsonConverter.copy')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
               </button>
             </div>
-            <textarea v-model="outputContent" readonly :class="{ 'has-error': error }"></textarea>
+            <textarea class="ui-textarea" v-model="outputContent" readonly :class="{ 'has-error': error }"></textarea>
           </div>
         </div>
 
-        <div class="error-message" v-if="error">
+        <div class="error-message ui-card ui-card--compact" v-if="error">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="8" x2="12" y2="12"/>
@@ -70,19 +68,19 @@
           {{ error }}
         </div>
       </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">{{ t('jsonConverter.close') }}</button>
-        <button class="btn btn-primary" @click="doConvert">{{ t('jsonConverter.convert') }}</button>
-      </div>
-    </div>
-  </div>
+    </template>
+    <template #footer>
+      <button type="button" class="modal-btn" @click="$emit('close')">{{ t('jsonConverter.close') }}</button>
+      <button type="button" class="modal-btn primary" @click="doConvert">{{ t('jsonConverter.convert') }}</button>
+    </template>
+  </ModalDialog>
 </template>
 
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { convert, formats } from '../utils/jsonConverter'
+import ModalDialog from './ModalDialog.vue'
 
 const { t } = useI18n()
 
@@ -167,121 +165,38 @@ watch([inputContent, fromFormat, toFormat], () => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(var(--backdrop-blur, 8px));
-}
-
-.converter-modal {
-  background: var(--bg-primary, #1e1e1e);
-  border-radius: var(--radius-md, 10px);
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  width: 90%;
-  max-width: 900px;
-  height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: var(--text-main, #d4d4d4);
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted, #888);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm, 6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  background: var(--btn-hover-bg, rgba(255, 255, 255, 0.1));
-  color: var(--text-main, #d4d4d4);
-}
-
-.modal-body {
+.converter-layout {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px 20px;
-  gap: 16px;
+  min-height: 0;
+  gap: var(--space-4);
   overflow: hidden;
 }
 
 .format-selector {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-3);
 }
 
 .format-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.format-group label {
-  font-size: 11px;
-  color: var(--text-muted, #888);
-}
-
-.format-group select {
-  padding: 6px 12px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-sm, 6px);
-  background: var(--bg-secondary, #252526);
-  color: var(--text-main, #d4d4d4);
-  font-size: 13px;
-  min-width: 100px;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .swap-btn {
-  background: transparent;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  color: var(--text-muted, #888);
-  cursor: pointer;
-  padding: 8px;
-  border-radius: var(--radius-sm, 6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 18px;
-}
-
-.swap-btn:hover {
-  background: var(--btn-hover-bg, rgba(255, 255, 255, 0.1));
-  color: var(--text-main, #d4d4d4);
+  align-self: end;
 }
 
 .editor-row {
   flex: 1;
-  display: flex;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
   min-height: 0;
 }
 
@@ -292,99 +207,41 @@ watch([inputContent, fromFormat, toFormat], () => {
   min-width: 0;
 }
 
-.pane-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 13px;
-  color: var(--text-muted, #888);
-}
-
-.pane-header button {
-  background: transparent;
-  border: none;
-  color: var(--text-muted, #888);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm, 6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pane-header button:hover {
-  background: var(--btn-hover-bg, rgba(255, 255, 255, 0.1));
-  color: var(--text-main, #d4d4d4);
-}
-
-.editor-pane textarea {
+.editor-pane .ui-textarea {
   flex: 1;
-  resize: none;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-sm, 6px);
-  background: var(--bg-secondary, #252526);
-  color: var(--text-main, #d4d4d4);
-  font-family: var(--font-family-mono, 'Consolas', 'Monaco', monospace);
-  font-size: 13px;
-  padding: 12px;
-  line-height: 1.5;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.editor-pane textarea:focus {
-  outline: none;
-  border-color: var(--accent-primary, #007acc);
+.editor-pane .ui-textarea:focus {
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-primary-rgb), 0.18);
 }
 
-.editor-pane textarea.has-error {
+.editor-pane .ui-textarea.has-error {
   border-color: #f44336;
+  box-shadow: inset 0 0 0 1px rgba(244, 67, 54, 0.28);
 }
 
 .error-message {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
   background: rgba(244, 67, 54, 0.1);
   border: 1px solid rgba(244, 67, 54, 0.3);
-  border-radius: var(--radius-sm, 6px);
   color: #f44336;
   font-size: 13px;
 }
 
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--modal-footer-gap, 8px);
-  padding: var(--modal-footer-padding-y, 16px) var(--modal-footer-padding-x, 20px);
-  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-}
+@media (max-width: 900px) {
+  .format-selector,
+  .editor-row {
+    grid-template-columns: 1fr;
+  }
 
-.btn {
-  padding: 8px 16px;
-  border-radius: var(--radius-sm, 6px);
-  font-size: 13px;
-  cursor: pointer;
-  transition: var(--transition-fast, 0.16s ease);
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-  color: var(--text-main, #d4d4d4);
-}
-
-.btn-secondary:hover {
-  background: var(--btn-hover-bg, rgba(255, 255, 255, 0.1));
-}
-
-.btn-primary {
-  background: var(--accent-primary, #007acc);
-  border: 1px solid var(--accent-primary, #007acc);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--accent-primary-hover, #005a9e);
+  .swap-btn {
+    justify-self: start;
+  }
 }
 </style>

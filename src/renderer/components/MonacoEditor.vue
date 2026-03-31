@@ -31,7 +31,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'scroll', 'cursor-change', 'change-font-size'])
+const emit = defineEmits(['update:modelValue', 'scroll', 'cursor-change', 'change-font-size', 'paste-content'])
 
 const settingsStore = useSettingsStore()
 const editorContainer = ref()
@@ -93,6 +93,18 @@ const handleRedo = () => {
   editor?.trigger('keyboard', 'redo', null)
 }
 
+const handleFind = () => {
+  editor?.getAction('actions.find')?.run()
+}
+
+const handleReplace = () => {
+  editor?.getAction('editor.action.startFindReplaceAction')?.run()
+}
+
+const handleSelectAll = () => {
+  editor?.trigger('keyboard', 'editor.action.selectAll', null)
+}
+
 const handleWheel = (e) => {
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault()
@@ -113,6 +125,9 @@ onMounted(() => {
 
   window.addEventListener('editor-undo', handleUndo)
   window.addEventListener('editor-redo', handleRedo)
+  window.addEventListener('editor-find', handleFind)
+  window.addEventListener('editor-replace', handleReplace)
+  window.addEventListener('editor-select-all', handleSelectAll)
   // Use capture phase to intercept the event before Monaco consumes it
   editorContainer.value.addEventListener('wheel', handleWheel, { passive: false, capture: true })
 
@@ -218,13 +233,23 @@ onMounted(() => {
 
   // 粘贴时自动格式化 JSON
   editor.onDidPaste((e) => {
+    const model = editor.getModel()
+    const pastedText = model?.getValueInRange(e.range) || ''
+    const fullContent = model?.getValue() || ''
+    const startOffset = model ? model.getOffsetAt(e.range.getStartPosition()) : 0
+    const endOffset = model ? model.getOffsetAt(e.range.getEndPosition()) : 0
+    const surroundingContent = `${fullContent.slice(0, startOffset)}${fullContent.slice(endOffset)}`
+
+    emit('paste-content', {
+      text: pastedText,
+      hadContentBeforePaste: surroundingContent.trim().length > 0
+    })
+
     if (props.language !== 'json') return
 
-    const model = editor.getModel()
     if (!model) return
 
     // 获取粘贴的内容
-    const pastedText = model.getValueInRange(e.range)
     if (!pastedText.trim()) return
 
     // 尝试解析并格式化
@@ -304,6 +329,9 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('editor-undo', handleUndo)
   window.removeEventListener('editor-redo', handleRedo)
+  window.removeEventListener('editor-find', handleFind)
+  window.removeEventListener('editor-replace', handleReplace)
+  window.removeEventListener('editor-select-all', handleSelectAll)
   if (editorContainer.value) {
     editorContainer.value.removeEventListener('wheel', handleWheel)
   }
@@ -399,10 +427,10 @@ function replaceSelection(text) {
 }
 
 // 跳转到指定行
-function jumpToLine(lineNumber) {
+function jumpToLine(lineNumber, column = 1) {
   if (!editor) return
   editor.revealLineInCenter(lineNumber)
-  editor.setPosition({ lineNumber, column: 1 })
+  editor.setPosition({ lineNumber, column })
   editor.focus()
 }
 
@@ -498,6 +526,9 @@ onUnmounted(() => {
   }
   window.removeEventListener('editor-undo', handleUndo)
   window.removeEventListener('editor-redo', handleRedo)
+  window.removeEventListener('editor-find', handleFind)
+  window.removeEventListener('editor-replace', handleReplace)
+  window.removeEventListener('editor-select-all', handleSelectAll)
 })
 </script>
 
