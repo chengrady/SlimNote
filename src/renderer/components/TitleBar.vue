@@ -177,8 +177,7 @@ const menus = computed(() => {
           { action: 'save-as', label: t('menu.saveAs'), shortcut: shortcuts.saveAs }
         ],
         [
-          { action: 'open-settings', label: t('menu.settings'), shortcut: shortcuts.settings },
-          { action: 'open-about', label: menuLabel('menu.about', '\u5173\u4e8e SlimNote', 'About SlimNote') }
+          { action: 'open-settings', label: t('menu.settings'), shortcut: shortcuts.settings }
         ],
         [
           { action: 'exit', label: t('menu.exit'), danger: true }
@@ -219,6 +218,16 @@ const menus = computed(() => {
               { action: 'toggle-devtools', label: t('menu.toggleDevTools'), shortcut: shortcuts.toggleDevTools }
             ]]
           : [])
+      ]
+    },
+    {
+      key: 'help',
+      label: menuLabel('menu.help', '\u5e2e\u52a9', 'Help'),
+      sections: [
+        [
+          { action: 'check-for-updates', label: menuLabel('menu.checkUpdates', '\u68c0\u67e5\u66f4\u65b0', 'Check for Updates') },
+          { action: 'open-about', label: menuLabel('menu.about', '\u5173\u4e8e SlimNote', 'About SlimNote') }
+        ]
       ]
     }
   ]
@@ -428,7 +437,7 @@ onUnmounted(() => {
   align-items: center;
   font-size: var(--ui-font-size-sm);
   font-weight: var(--ui-font-weight-medium);
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   border-radius: var(--icon-button-radius);
   transition: var(--transition-fast);
@@ -436,14 +445,14 @@ onUnmounted(() => {
 
 .menu-trigger:hover,
 .menu-trigger.active {
-  background-color: var(--interactive-hover-bg);
-  color: var(--text-main);
+  background-color: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }
 
 .menu-trigger.active {
-  color: var(--accent-primary);
-  background-color: var(--interactive-selected-bg);
+  color: var(--text-interactive-active, var(--accent-primary));
+  background-color: var(--interactive-selected-bg-strong, var(--interactive-selected-bg));
   box-shadow: var(--field-focus-ring);
 }
 
@@ -490,7 +499,9 @@ onUnmounted(() => {
 }
 
 .title-menu-panel {
-  min-width: 252px;
+  width: max-content;
+  min-width: 188px;
+  max-width: min(236px, calc(100vw - 16px));
   padding: var(--space-1);
   z-index: 6000;
 }
@@ -501,20 +512,22 @@ onUnmounted(() => {
   background: transparent;
   border-radius: var(--radius-sm);
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
   text-align: left;
 }
 
 .title-menu-item-label {
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
 }
 
 .title-menu-item-shortcut {
   flex-shrink: 0;
-  color: var(--text-dim);
+  color: var(--text-shortcut, var(--text-dim));
   font-size: var(--ui-font-size-xs);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .title-menu-item:hover .title-menu-item-shortcut {

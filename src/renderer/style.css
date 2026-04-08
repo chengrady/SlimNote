@@ -140,6 +140,13 @@
   --text-main: #1e1e1e;
   --text-muted: #616161;
   --text-dim: #8a8a8a;
+  --text-interactive: #4f4f4f;
+  --text-interactive-hover: #1e1e1e;
+  --text-interactive-active: #007acc;
+  --text-shortcut: #7a7a7a;
+  --interactive-hover-bg-strong: color-mix(in srgb, var(--interactive-hover-bg) 92%, rgba(var(--accent-primary-rgb), 0.1));
+  --interactive-selected-bg-strong: rgba(var(--accent-primary-rgb), 0.12);
+  --interactive-selected-border-strong: rgba(var(--accent-primary-rgb), 0.3);
 
   --input-bg: #ffffff;
   --btn-bg: #f3f3f3;
@@ -203,11 +210,14 @@
   --panel-card-shadow: 0 12px 30px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   --interactive-hover-bg: color-mix(in srgb, var(--btn-hover-bg) 72%, rgba(var(--accent-primary-rgb), 0.12));
   --interactive-hover-border: rgba(var(--accent-primary-rgb), 0.24);
-  --interactive-hover-ring: 0 0 0 1px rgba(var(--accent-primary-rgb), 0.1);
+  --interactive-hover-ring: 0 0 0 1px rgba(125, 207, 255, 0.16);
   --menu-card-shadow: 0 18px 34px rgba(0, 0, 0, 0.42), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   --interactive-active-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
-  --interactive-selected-bg: rgba(var(--accent-primary-rgb), 0.1);
-  --interactive-selected-border: rgba(var(--accent-primary-rgb), 0.28);
+  --interactive-selected-bg: rgba(125, 207, 255, 0.14);
+  --interactive-selected-border: rgba(125, 207, 255, 0.3);
+  --interactive-hover-bg-strong: color-mix(in srgb, var(--btn-hover-bg) 62%, rgba(125, 207, 255, 0.18));
+  --interactive-selected-bg-strong: rgba(125, 207, 255, 0.2);
+  --interactive-selected-border-strong: rgba(125, 207, 255, 0.38);
   --interactive-drag-shadow: inset 0 0 0 1px rgba(var(--accent-primary-rgb), 0.28);
   --icon-button-hover-bg: rgba(var(--accent-primary-rgb), 0.1);
   --icon-button-hover-color: var(--accent-primary);
@@ -224,9 +234,13 @@
   --accent-secondary: #1177bb;
   --accent-gradient: linear-gradient(90deg, #0e639c, #1177bb);
 
-  --text-main: #cccccc;
-  --text-muted: #9d9d9d;
-  --text-dim: #808080;
+  --text-main: #e6e6e6;
+  --text-muted: #b6b6b6;
+  --text-dim: #9a9a9a;
+  --text-interactive: #d4d4d4;
+  --text-interactive-hover: #ffffff;
+  --text-interactive-active: #8fd8ff;
+  --text-shortcut: #c3c3c3;
 
   --input-bg: #3c3c3c;
   --btn-bg: #2d2d2d;
@@ -472,7 +486,7 @@ textarea {
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 88%, rgba(var(--accent-primary-rgb), 0.06));
   background: color-mix(in srgb, var(--bg-secondary) 80%, rgba(var(--accent-primary-rgb), 0.03));
   font-size: var(--ui-font-size-sm);
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
 }
 
 .ui-icon-btn {
@@ -482,7 +496,7 @@ textarea {
   border: 1px solid transparent;
   border-radius: var(--icon-button-radius);
   background: var(--icon-button-bg);
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   transition: var(--transition-fast);
   display: inline-flex;
@@ -497,8 +511,8 @@ textarea {
 }
 
 .ui-icon-btn:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
+  color: var(--text-interactive-hover, var(--text-main));
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }
@@ -552,8 +566,8 @@ textarea {
 }
 
 .ui-menu-item:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--accent-primary);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .ui-menu-item:focus-visible {

@@ -7,6 +7,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 import { useSettingsStore } from '../stores/settings'
 import { defineCustomThemes, applyTheme, getDefaultEditorTheme } from '../utils/monacoThemes'
+import { isMonospaceFontFamily } from '../utils/fontFamilies'
 
 const props = defineProps({
   modelValue: {
@@ -41,12 +42,26 @@ let isSyncingScroll = false
 const MONOSPACE_FALLBACK = 'Consolas, "Cascadia Mono", "Courier New", monospace'
 
 function resolveEditorFontFamily(fontFamily) {
-  const nonMonospaceFonts = ['Microsoft YaHei', 'Arial', 'Verdana', 'Times New Roman', '"Times New Roman"']
-  if (!fontFamily || nonMonospaceFonts.includes(fontFamily)) {
+  if (!fontFamily || !isMonospaceFontFamily(fontFamily)) {
     return MONOSPACE_FALLBACK
   }
 
   return `${fontFamily}, ${MONOSPACE_FALLBACK}`
+}
+
+function getUnicodeHighlightOptions(enabled = true) {
+  if (!enabled) {
+    return {
+      ambiguousCharacters: false,
+      invisibleCharacters: false,
+      nonBasicASCII: false
+    }
+  }
+
+  return {
+    ambiguousCharacters: true,
+    invisibleCharacters: true
+  }
 }
 
 function applyIndentationOptions(targetEditor, tabSize) {
@@ -219,6 +234,7 @@ onMounted(() => {
     formatOnPaste: true,
     formatOnType: true,
     mouseWheelZoom: false,
+    unicodeHighlight: getUnicodeHighlightOptions(settingsStore.settings.unicodeHighlight),
     bracketPairColorization: {
       enabled: props.language === 'json'
     },
@@ -392,6 +408,7 @@ watch(() => settingsStore.settings, (newSettings) => {
     // fontSize: newSettings.fontSize, // Use prop instead
     fontFamily: resolveEditorFontFamily(newSettings.fontFamily),
     wordWrap: newSettings.wordWrap ? 'on' : 'off',
+    unicodeHighlight: getUnicodeHighlightOptions(newSettings.unicodeHighlight),
     lineNumbers: newSettings.lineNumbers ? 'on' : 'off',
     minimap: {
       enabled: newSettings.minimap

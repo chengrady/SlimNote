@@ -33,6 +33,30 @@
       @confirm="showErrorDialog = false"
     />
 
+    <ModalDialog
+      :show="showUpdateDialog"
+      :title="updateDialogTitle"
+      :subtitle="updateDialogSubtitle"
+      :show-footer="!isCheckingUpdates"
+      @close="closeUpdateDialog"
+    >
+      <template #body>
+        <div class="update-dialog-message">{{ updateDialogMessage }}</div>
+      </template>
+      <template #footer>
+        <button v-if="updateDialogActionUrl" type="button" class="modal-btn" @click="closeUpdateDialog">
+          {{ updateDialogCloseText }}
+        </button>
+        <button
+          type="button"
+          class="modal-btn primary"
+          @click="updateDialogActionUrl ? openUpdateActionUrl() : closeUpdateDialog()"
+        >
+          {{ updateDialogActionUrl ? updateDialogActionText : updateDialogCloseText }}
+        </button>
+      </template>
+    </ModalDialog>
+
     <SettingsDialog 
       :show="showSettingsDialog"
       @close="showSettingsDialog = false"
@@ -54,6 +78,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import TitleBar from '../components/TitleBar.vue'
 import WorkspaceSidebar from '../components/WorkspaceSidebar.vue'
 import TabBar from '../components/TabBar.vue'
@@ -66,25 +91,38 @@ import GlobalSearchDialog from '../components/GlobalSearchDialog.vue'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import { useSettingsStore } from '../stores/settings'
+import { getFileExtension } from '../utils/fileSupport'
+import packageJson from '../../../package.json'
 
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
 const settingsStore = useSettingsStore()
+const { locale } = useI18n()
 
 const SIDEBAR_MIN_WIDTH = 220
 const SIDEBAR_MAX_WIDTH = 420
 const SIDEBAR_AUTO_COLLAPSE_THRESHOLD = 176
 const DEFAULT_SIDEBAR_WIDTH = 280
+const RELEASES_PAGE_URL = 'https://github.com/chengrady/SlimNote/releases'
+const LATEST_RELEASE_API_URL = 'https://api.github.com/repos/chengrady/SlimNote/releases/latest'
+const APP_VERSION = String(packageJson.version || '1.0.0')
 
 const sidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
 const lastExpandedSidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
 const isResizing = ref(false)
 const resizePointerX = ref(0)
 const showErrorDialog = ref(false)
+const showUpdateDialog = ref(false)
 const showSettingsDialog = ref(false)
 const showAboutDialog = ref(false)
 const showGlobalSearchDialog = ref(false)
 const errorMessage = ref('')
+const isCheckingUpdates = ref(false)
+const updateDialogTitle = ref('')
+const updateDialogSubtitle = ref('')
+const updateDialogMessage = ref('')
+const updateDialogActionUrl = ref('')
+const updateDialogActionText = ref('')
 const cleanups = []
 
 const isSidebarCollapsed = computed(() => settingsStore.settings.sidebarCollapsed)
@@ -99,6 +137,72 @@ const isNearAutoCollapseThreshold = computed(() => {
   if (!isResizing.value) return false
   return resizePointerX.value <= SIDEBAR_AUTO_COLLAPSE_THRESHOLD + 48
 })
+const updateDialogCloseText = computed(() => (
+  updateDialogActionUrl.value
+    ? localizeText('稍后', 'Later')
+    : localizeText('知道了', 'OK')
+))
+
+const LANGUAGE_DEFAULT_EXTENSIONS = {
+  plaintext: ['txt'],
+  markdown: ['md', 'markdown', 'mdx'],
+  json: ['json', 'jsonc'],
+  javascript: ['js'],
+  typescript: ['ts'],
+  html: ['html', 'htm'],
+  css: ['css'],
+  scss: ['scss', 'sass'],
+  xml: ['xml'],
+  yaml: ['yaml', 'yml'],
+  toml: ['toml'],
+  ini: ['ini', 'conf', 'config', 'properties'],
+  python: ['py'],
+  java: ['java'],
+  c: ['c'],
+  cpp: ['cpp', 'cc', 'cxx', 'h', 'hpp'],
+  csharp: ['cs'],
+  sql: ['sql'],
+  log: ['log'],
+  vue: ['vue']
+}
+
+function getPreferredExtensionsForTab(tab) {
+  const languageExtensions = [...(LANGUAGE_DEFAULT_EXTENSIONS[tab?.language] || [])]
+  const titleExtension = getFileExtension(tab?.title || '')
+
+  if (titleExtension) {
+    return [titleExtension, ...languageExtensions.filter((ext) => ext !== titleExtension)]
+  }
+
+  return languageExtensions.length > 0 ? languageExtensions : ['txt']
+}
+
+function buildSaveDialogOptions(tab) {
+  const title = String(tab?.title || '').trim() || 'Untitled'
+  const preferredExtensions = getPreferredExtensionsForTab(tab)
+  const primaryExtension = preferredExtensions[0]
+  const hasExtension = Boolean(getFileExtension(title))
+  const suggestedFileName = hasExtension || !primaryExtension ? title : `${title}.${primaryExtension}`
+  const defaultPath = tab?.filePath || suggestedFileName
+
+  return {
+    defaultPath,
+    filters: [
+      {
+        name: `${(tab?.language || 'text').toUpperCase()} Files`,
+        extensions: preferredExtensions
+      },
+      {
+        name: 'All Files',
+        extensions: ['*']
+      }
+    ]
+  }
+}
+
+async function showSaveDialogForTab(tab) {
+  return await window.electronAPI.showSaveDialog(buildSaveDialogOptions(tab))
+}
 
 const handleOpenFileEvent = (e) => {
   const customEvent = e
@@ -116,6 +220,190 @@ const handleOpenGlobalSearchEvent = () => {
 
 function dispatchEditorEvent(eventName, detail) {
   window.dispatchEvent(new CustomEvent(eventName, detail ? { detail } : undefined))
+}
+
+function localizeText(zhText, enText) {
+  return locale.value === 'zh-CN' ? zhText : enText
+}
+
+function normalizeVersionTag(version = '') {
+  return String(version || '').trim().replace(/^v/i, '')
+}
+
+function compareVersions(leftVersion = '', rightVersion = '') {
+  const leftParts = normalizeVersionTag(leftVersion).split('.')
+  const rightParts = normalizeVersionTag(rightVersion).split('.')
+  const maxLength = Math.max(leftParts.length, rightParts.length)
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftValue = Number.parseInt(leftParts[index] || '0', 10)
+    const rightValue = Number.parseInt(rightParts[index] || '0', 10)
+
+    if (leftValue > rightValue) return 1
+    if (leftValue < rightValue) return -1
+  }
+
+  return 0
+}
+
+function formatReleaseDate(value) {
+  if (!value) return ''
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+
+  try {
+    return new Intl.DateTimeFormat(locale.value === 'zh-CN' ? 'zh-CN' : 'en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(parsed)
+  } catch (error) {
+    return ''
+  }
+}
+
+function closeUpdateDialog() {
+  showUpdateDialog.value = false
+}
+
+function openUpdateActionUrl() {
+  if (!updateDialogActionUrl.value) {
+    closeUpdateDialog()
+    return
+  }
+
+  window.electronAPI.openExternal(updateDialogActionUrl.value)
+  closeUpdateDialog()
+}
+
+async function requestLatestReleaseFromWeb() {
+  const response = await fetch(LATEST_RELEASE_API_URL, {
+    headers: {
+      Accept: 'application/vnd.github+json'
+    }
+  })
+
+  if (!response.ok) {
+    let message = `GitHub API responded with status ${response.status}`
+
+    try {
+      const payload = await response.json()
+      if (payload?.message) {
+        message = payload.message
+      }
+    } catch (error) {
+      // Ignore non-JSON error payloads.
+    }
+
+    throw new Error(message)
+  }
+
+  return await response.json()
+}
+
+async function resolveUpdateInfo() {
+  const fallbackCurrentVersion = normalizeVersionTag(APP_VERSION)
+  const checkUpdates = window.electronAPI?.checkForUpdates
+
+  if (typeof checkUpdates === 'function') {
+    try {
+      const result = await checkUpdates()
+      if (result?.ok) {
+        return result
+      }
+    } catch (error) {
+      console.warn('IPC update check failed, falling back to renderer fetch:', error)
+    }
+  }
+
+  const release = await requestLatestReleaseFromWeb()
+  const latestVersion = normalizeVersionTag(release?.tag_name || release?.name || '')
+
+  if (!latestVersion) {
+    throw new Error('Latest release version is missing')
+  }
+
+  return {
+    ok: true,
+    currentVersion: fallbackCurrentVersion,
+    latestVersion,
+    hasUpdate: compareVersions(latestVersion, fallbackCurrentVersion) > 0,
+    releaseName: release?.name || release?.tag_name || latestVersion,
+    releaseUrl: release?.html_url || RELEASES_PAGE_URL,
+    publishedAt: release?.published_at || ''
+  }
+}
+
+async function handleCheckForUpdates() {
+  if (isCheckingUpdates.value) return
+
+  showUpdateDialog.value = true
+  isCheckingUpdates.value = true
+  updateDialogTitle.value = localizeText('检查更新', 'Check for Updates')
+  updateDialogSubtitle.value = localizeText('正在连接 GitHub Releases...', 'Connecting to GitHub Releases...')
+  updateDialogMessage.value = localizeText('正在检查最新版本，请稍候。', 'Checking the latest release. Please wait.')
+  updateDialogActionUrl.value = ''
+  updateDialogActionText.value = ''
+
+  try {
+    const result = await resolveUpdateInfo()
+    const currentVersion = result?.currentVersion || '1.0.0'
+
+    if (!result?.ok) {
+      updateDialogTitle.value = localizeText('检查更新失败', 'Update Check Failed')
+      updateDialogSubtitle.value = localizeText(`当前版本 ${currentVersion}`, `Current version ${currentVersion}`)
+      updateDialogMessage.value = localizeText(
+        `暂时无法连接 GitHub Releases。\n\n原因：${result?.message || '未知错误'}\n\n你可以稍后重试，或直接打开发布页手动查看。`,
+        `SlimNote could not reach GitHub Releases.\n\nReason: ${result?.message || 'Unknown error'}\n\nTry again later, or open the releases page manually.`
+      )
+      updateDialogActionUrl.value = result?.releaseUrl || RELEASES_PAGE_URL
+      updateDialogActionText.value = localizeText('打开 Releases', 'Open Releases')
+      return
+    }
+
+    if (result.hasUpdate) {
+      const publishedAt = formatReleaseDate(result.publishedAt)
+      updateDialogTitle.value = localizeText('发现新版本', 'Update Available')
+      updateDialogSubtitle.value = localizeText(
+        `当前 ${currentVersion} -> 最新 ${result.latestVersion}`,
+        `Current ${currentVersion} -> Latest ${result.latestVersion}`
+      )
+      updateDialogMessage.value = publishedAt
+        ? localizeText(
+            `已发现新版本 ${result.latestVersion}，发布时间 ${publishedAt}。你可以前往发布页下载最新安装包。`,
+            `Version ${result.latestVersion} is available, published on ${publishedAt}. Open the release page to download the latest installer.`
+          )
+        : localizeText(
+            `已发现新版本 ${result.latestVersion}。你可以前往发布页下载最新安装包。`,
+            `Version ${result.latestVersion} is available. Open the release page to download the latest installer.`
+          )
+      updateDialogActionUrl.value = result.releaseUrl || RELEASES_PAGE_URL
+      updateDialogActionText.value = localizeText('前往下载', 'Open Download Page')
+      return
+    }
+
+    updateDialogTitle.value = localizeText('已是最新版本', 'Up to Date')
+    updateDialogSubtitle.value = localizeText(`当前版本 ${currentVersion}`, `Current version ${currentVersion}`)
+    updateDialogMessage.value = localizeText(
+      `当前已安装最新版本 ${result.latestVersion}。`,
+      `You're already on the latest version ${result.latestVersion}.`
+    )
+    updateDialogActionUrl.value = ''
+    updateDialogActionText.value = ''
+  } catch (error) {
+    console.error('Failed to check for updates:', error)
+    updateDialogTitle.value = localizeText('检查更新失败', 'Update Check Failed')
+    updateDialogSubtitle.value = ''
+    updateDialogMessage.value = localizeText(
+      `检查更新时出现异常。\n\n原因：${error?.message || '未知错误'}\n\n请稍后重试，或直接打开发布页手动查看。`,
+      `An unexpected error occurred while checking for updates.\n\nReason: ${error?.message || 'Unknown error'}\n\nPlease try again later, or open the releases page manually.`
+    )
+    updateDialogActionUrl.value = RELEASES_PAGE_URL
+    updateDialogActionText.value = localizeText('打开 Releases', 'Open Releases')
+  } finally {
+    isCheckingUpdates.value = false
+  }
 }
 
 async function openFileFromDialog() {
@@ -148,6 +436,9 @@ async function handleTitleBarMenuAction(action) {
       break
     case 'save-as':
       await saveCurrentFileAs()
+      break
+    case 'check-for-updates':
+      await handleCheckForUpdates()
       break
     case 'open-about':
       showAboutDialog.value = true
@@ -304,6 +595,10 @@ onMounted(() => {
 
   cleanups.push(window.electronAPI.onMenuOpenSettings(() => {
     showSettingsDialog.value = true
+  }))
+
+  cleanups.push(window.electronAPI.onMenuCheckForUpdates(async () => {
+    await handleCheckForUpdates()
   }))
 
   cleanups.push(window.electronAPI.onMenuOpenAbout(() => {
@@ -478,7 +773,7 @@ async function saveTabById(tabId) {
       await window.electronAPI.writeFile(tab.filePath, tab.content, tab.encoding)
       editorStore.saveTab(tab.id)
     } else {
-      const result = await window.electronAPI.saveFileDialog(tab.title)
+      const result = await showSaveDialogForTab(tab)
       if (result.canceled || !result.filePath) {
         return false
       }
@@ -516,7 +811,7 @@ async function saveCurrentFileAs() {
   if (!tab) return
 
   try {
-    const result = await window.electronAPI.saveFileDialog(tab.title)
+    const result = await showSaveDialogForTab(tab)
     if (!result.canceled && result.filePath) {
       await window.electronAPI.writeFile(result.filePath, tab.content, tab.encoding)
       tab.filePath = result.filePath
@@ -539,6 +834,11 @@ async function saveCurrentFileAs() {
   width: 100%;
   height: 100%;
   background: transparent;
+}
+
+.update-dialog-message {
+  white-space: pre-line;
+  line-height: 1.7;
 }
 
 .main-editor {

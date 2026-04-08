@@ -94,7 +94,7 @@ function getFileName(path) {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   line-height: var(--panel-title-line-height);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   border-bottom: 1px solid var(--glass-border);
 }
 
@@ -112,7 +112,7 @@ function getFileName(path) {
   cursor: pointer;
   border-radius: var(--icon-button-radius);
   font-size: 13px;
-  color: var(--color-text-secondary);
+  color: var(--text-interactive, var(--color-text-secondary));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -120,9 +120,9 @@ function getFileName(path) {
 }
 
 .explorer-actions button:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   border-color: var(--interactive-hover-border);
-  color: var(--color-text);
+  color: var(--text-interactive-hover, var(--color-text));
   box-shadow: var(--interactive-hover-ring);
 }
 
@@ -172,7 +172,7 @@ function getFileName(path) {
   font-size: var(--ui-font-size-xs);
   font-weight: var(--ui-font-weight-bold);
   line-height: var(--panel-title-line-height);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -191,13 +191,13 @@ function getFileName(path) {
 }
 
 .recent-file:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   box-shadow: var(--interactive-hover-ring);
 }
 
 .recent-file:focus-visible {
   outline: none;
-  background: var(--interactive-selected-bg);
+  background: var(--interactive-selected-bg-strong, var(--interactive-selected-bg));
   box-shadow: var(--interactive-hover-ring);
 }
 
@@ -212,7 +212,7 @@ function getFileName(path) {
   opacity: 0;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   font-size: 16px;
   width: var(--icon-button-size-sm);

@@ -8,6 +8,49 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 格式参考 Keep a Changelog，并尽量按照语义化版本的方式维护。
 
+## [1.3.1] - 2026-04-08
+
+### Added / 新增
+
+- Added Help menu actions for checking updates and opening About.
+- 新增帮助菜单入口，用于检查更新和打开 About。
+
+- Added Markdown preview selection actions for plain-text copy and copy to Word/WeChat.
+- 新增 Markdown 预览选区操作，支持复制纯文本和复制到 Word/微信。
+
+- Added a Unicode highlight toggle in editor settings, disabled by default for new installs.
+- 在编辑器设置中新增 Unicode 字符提示开关，并将新安装默认值设为关闭。
+
+### Changed / 调整
+
+- Reworked Settings into a VS Code-style layout with global search, a direct font-size input, and About moved under Help.
+- 将设置页改为更接近 VS Code 的布局，支持全局搜索、直接输入字号，并将 About 收纳到帮助入口。
+
+- Unified and expanded font and language pickers across Settings and the status bar, with alphabetical sorting, icons, and roomier popups.
+- 统一并扩充了设置页与状态栏中的字体、语言列表，补充字母排序、图标和更易点选的弹层尺寸。
+
+- Improved dark-theme readability and selected states across menus, tabs, outline, recent files, search results, and side panels.
+- 提升深色主题下菜单、标签、目录、最近文件、搜索结果和侧栏区域的可读性与选中态表现。
+
+- Improved JSON tree rendering so long values wrap instead of truncating with ellipsis.
+- 优化 JSON 树预览，长文本改为自动换行显示，不再以省略号截断。
+
+### Fixed / 修复
+
+- Fixed Markdown rich copy so ordered and nested lists paste more reliably into Word/WeChat.
+- 修复 Markdown 富文本复制后在 Word/微信中有序列表和嵌套列表易丢失层级的问题。
+
+- Fixed Markdown PDF export failures caused by missing list-prefix decoration wiring.
+- 修复 Markdown 导出 PDF 时因列表前缀装饰逻辑缺失而导致的导出失败问题。
+
+- Fixed blank pages in Mermaid-heavy Markdown PDF exports by refining Mermaid slice pagination behavior.
+- 优化 Mermaid 分页切片策略，修复部分 Mermaid 较多的 Markdown 导出 PDF 时出现空白页的问题。
+
+### Docs / 文档
+
+- Updated `README.md` release highlights and Windows artifact names for `1.3.1`.
+- 更新 `README.md` 中的 `1.3.1` 发版摘要和 Windows 产物文件名。
+
 ## [1.3.0] - 2026-03-31
 
 ### Added / 新增

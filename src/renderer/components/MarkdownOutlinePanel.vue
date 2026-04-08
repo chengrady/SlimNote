@@ -83,20 +83,21 @@ defineEmits(['jump', 'toggle-heading'])
   border: none;
   background: transparent;
   border-radius: 8px;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   transition: var(--transition-fast);
   margin-bottom: 2px;
 }
 
 .outline-item:hover {
-  background: var(--btn-hover-bg);
-  color: var(--text-main);
+  background: var(--interactive-hover-bg-strong, var(--btn-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
 }
 
 .outline-item.active {
-  background: rgba(var(--accent-primary-rgb), 0.12);
-  color: var(--accent-primary);
+  background: var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.12));
+  color: var(--text-interactive-active, var(--accent-primary));
+  box-shadow: inset 0 0 0 1px var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.32));
 }
 
 .outline-item.collapsed {
@@ -109,7 +110,7 @@ defineEmits(['jump', 'toggle-heading'])
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
   flex-shrink: 0;
   border-radius: 4px;
   transition: var(--transition-fast);
@@ -128,8 +129,13 @@ defineEmits(['jump', 'toggle-heading'])
 }
 
 .outline-item:hover .outline-toggle {
-  color: var(--text-main);
-  background: rgba(var(--accent-primary-rgb), 0.08);
+  color: var(--text-interactive-hover, var(--text-main));
+  background: rgba(var(--accent-primary-rgb), 0.12);
+}
+
+.outline-item.active .outline-toggle {
+  color: var(--text-interactive-active, var(--accent-primary));
+  background: rgba(var(--accent-primary-rgb), 0.16);
 }
 
 .outline-toggle.placeholder {
@@ -162,6 +168,7 @@ defineEmits(['jump', 'toggle-heading'])
 
 .outline-item.active .outline-bullet {
   opacity: 1;
+  box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.14);
 }
 
 .outline-text {

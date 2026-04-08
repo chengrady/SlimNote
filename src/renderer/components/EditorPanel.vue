@@ -161,9 +161,11 @@
               <MarkdownPreview
                 ref="markdownPreviewRef"
                 :content="activeTab.content"
+                :source-path="activeTab.filePath || ''"
                 @scroll="handlePreviewScroll"
                 @active-heading-change="handleActiveHeadingChange"
                 @heading-click="handlePreviewHeadingClick"
+                @copy-error="handleMarkdownPreviewCopyError"
               />
             </div>
           </div>
@@ -228,9 +230,11 @@
               ref="markdownPreviewRef"
               class="context-markdown-preview"
               :content="activeTab.content"
+              :source-path="activeTab.filePath || ''"
               @scroll="handlePreviewScroll"
               @active-heading-change="handleActiveHeadingChange"
               @heading-click="handlePreviewHeadingClick"
+              @copy-error="handleMarkdownPreviewCopyError"
             />
           </div>
 
@@ -1218,6 +1222,11 @@ async function copyMarkdownAsRichContent() {
   }
 }
 
+function handleMarkdownPreviewCopyError(message) {
+  errorMessage.value = message || '复制 Markdown 预览内容失败。'
+  showErrorDialog.value = true
+}
+
 function formatActiveSql() {
   if (!activeTab.value || activeTab.value.language !== 'sql') return
   transformActiveContent((content) => formatSql(content))
@@ -1728,7 +1737,7 @@ async function openFolder() {
 .toolbar button {
   background: var(--icon-button-bg);
   border: 1px solid transparent;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   padding: 4px 8px;
   border-radius: var(--toolbar-button-radius);
   cursor: pointer;
@@ -1744,8 +1753,8 @@ async function openFolder() {
 }
 
 .toolbar button:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--text-main);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }
 
@@ -1754,9 +1763,9 @@ async function openFolder() {
 }
 
 .toolbar button.active {
-  background: rgba(var(--accent-primary-rgb), 0.12);
-  border-color: rgba(var(--accent-primary-rgb), 0.16);
-  color: var(--accent-primary);
+  background: var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.12));
+  border-color: var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.16));
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .toolbar-mode-text {
@@ -2055,7 +2064,7 @@ async function openFolder() {
   border-radius: 8px;
   border: 1px solid transparent;
   background: rgba(var(--accent-primary-rgb), 0.05);
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   font-size: 12px;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -2064,15 +2073,17 @@ async function openFolder() {
 .context-tab-button:hover,
 .context-header-button:hover,
 .log-context-shortcuts button:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
+  color: var(--text-interactive-hover, var(--text-main));
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }
 
 .context-tab-button.active {
-  color: var(--accent-primary);
-  background: rgba(var(--accent-primary-rgb), 0.12);
+  color: var(--text-interactive-active, var(--accent-primary));
+  background: var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.12));
+  border-color: var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.18));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.34)) 74%, transparent);
 }
 
 .context-tab-button:disabled {

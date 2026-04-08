@@ -67,7 +67,7 @@ defineEmits(['bold', 'italic', 'heading', 'unordered-list', 'ordered-list', 'che
 .markdown-format-toolbar-meta {
   display: inline-flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -79,7 +79,7 @@ defineEmits(['bold', 'italic', 'heading', 'unordered-list', 'ordered-list', 'che
 .markdown-format-toolbar-button {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -95,8 +95,8 @@ defineEmits(['bold', 'italic', 'heading', 'unordered-list', 'ordered-list', 'che
 }
 
 .markdown-format-toolbar-button:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--text-main);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }
 

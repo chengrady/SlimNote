@@ -10,12 +10,22 @@ const DEFAULT_SETTINGS = {
   autoSave: true,
   autoSaveDelay: 2000,
   wordWrap: true,
+  unicodeHighlight: false,
   lineNumbers: true,
   minimap: true,
   sidebarCollapsed: false,
   sidebarWidth: 250,
   tabDensity: 'comfortable',
   locale: 'zh-CN'
+}
+
+const MIN_FONT_SIZE = 8
+const MAX_FONT_SIZE = 72
+
+function normalizeFontSize(value, fallback = DEFAULT_SETTINGS.fontSize) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, parsed))
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -27,7 +37,11 @@ export const useSettingsStore = defineStore('settings', () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        settings.value = { ...settings.value, ...parsed }
+        settings.value = {
+          ...settings.value,
+          ...parsed,
+          fontSize: normalizeFontSize(parsed.fontSize, settings.value.fontSize)
+        }
       } catch (error) {
         console.error('Failed to load settings:', error)
       }
@@ -44,10 +58,12 @@ export const useSettingsStore = defineStore('settings', () => {
   function updateSettings(newSettings) {
     const nextTabDensity = newSettings.tabDensity ?? settings.value.tabDensity
     const nextSidebarWidth = Number(newSettings.sidebarWidth ?? settings.value.sidebarWidth)
+    const nextFontSize = normalizeFontSize(newSettings.fontSize ?? settings.value.fontSize, DEFAULT_SETTINGS.fontSize)
 
     settings.value = {
       ...settings.value,
       ...newSettings,
+      fontSize: nextFontSize,
       sidebarWidth: Math.max(220, Math.min(420, Number.isFinite(nextSidebarWidth) ? nextSidebarWidth : DEFAULT_SETTINGS.sidebarWidth)),
       tabDensity: ['comfortable', 'compact'].includes(nextTabDensity) ? nextTabDensity : DEFAULT_SETTINGS.tabDensity
     }

@@ -5,30 +5,52 @@
     tabindex="0"
     @scroll="handleScroll"
     @click="handleClick"
+    @contextmenu="handleContextMenu"
     @keydown="handleKeydown"
     @copy="handleCopy"
   >
     <div ref="previewContent" class="markdown-preview-content" v-html="htmlContent"></div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="contextMenu.visible"
+      ref="contextMenuRef"
+      class="preview-context-menu"
+      :style="{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }"
+    >
+      <button type="button" class="preview-context-menu-item" @click="copySelectionAsPlainText">
+        {{ t('markdown.copySelectionPlain') }}
+      </button>
+      <button type="button" class="preview-context-menu-item" @click="copySelectionAsRichContent">
+        {{ t('markdown.copySelectionRich') }}
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css' // Or another style
 import { useSettingsStore } from '../stores/settings'
-import { buildStructuredPlainText, decorateListPrefixes } from '../utils/markdownListFormat'
+import { buildStructuredPlainText, decorateListPrefixes, stripDecoratedListPrefixes } from '../utils/markdownListFormat'
+import { buildMarkdownFragmentClipboardPayload } from '../utils/markdownPdf'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
-const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll'])
+const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll', 'copy-error'])
 
 const props = defineProps({
   content: {
+    type: String,
+    default: ''
+  },
+  sourcePath: {
     type: String,
     default: ''
   }
@@ -36,8 +58,16 @@ const props = defineProps({
 
 const previewContainer = ref(null)
 const previewContent = ref(null)
+const contextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  payload: null
+})
+const contextMenuRef = ref(null)
 let isSyncingScroll = false
 let mermaidRenderVersion = 0
+const CONTEXT_MENU_MARGIN = 8
 
 function escapeHtml(value = '') {
   return String(value)
@@ -170,6 +200,10 @@ function handleScroll() {
 }
 
 function handleClick(event) {
+  if (contextMenu.value.visible) {
+    closeContextMenu()
+  }
+
   const heading = event.target instanceof HTMLElement ? event.target.closest('[data-heading-id]') : null
   const headingId = heading?.getAttribute('data-heading-id') || ''
   if (!headingId) return
@@ -180,6 +214,11 @@ function handleClick(event) {
 function handleKeydown(event) {
   if (!previewContainer.value) return
 
+  if (event.key === 'Escape' && contextMenu.value.visible) {
+    closeContextMenu()
+    return
+  }
+
   if (isPrimarySelectAll(event)) {
     event.preventDefault()
     previewContainer.value.focus()
@@ -187,23 +226,128 @@ function handleKeydown(event) {
   }
 }
 
-function handleCopy(event) {
-  if (!previewContainer.value || !isSelectionInsideContainer(previewContainer.value)) return
-
+function getSelectionClipboardPayload() {
+  if (!previewContainer.value || !isSelectionInsideContainer(previewContainer.value)) return null
   const selection = window.getSelection()
+  if (!selection || selection.isCollapsed) return null
+
   const fragment = getSelectionFragment(selection)
-  if (!fragment) return
+  if (!fragment) return null
 
-  decorateListPrefixes(fragment)
-
-  const html = fragment.innerHTML
+  stripDecoratedListPrefixes(fragment)
+  const standardHtml = fragment.innerHTML
   const text = buildStructuredPlainText(fragment)
+  const richPayload = buildMarkdownFragmentClipboardPayload({
+    html: standardHtml,
+    sourcePath: props.sourcePath || ''
+  })
+  const richHtml = richPayload.html || standardHtml || text
+  const plainText = text || richPayload.text || ''
 
-  if (!html && !text) return
+  if (!standardHtml && !plainText && !richHtml) return null
 
-  event.clipboardData?.setData('text/plain', text)
-  event.clipboardData?.setData('text/html', html || text)
+  return {
+    text: plainText,
+    standardHtml,
+    richHtml
+  }
+}
+
+function handleCopy(event) {
+  const payload = getSelectionClipboardPayload()
+  if (!payload) return
+
+  event.clipboardData?.setData('text/plain', payload.text)
+  event.clipboardData?.setData('text/html', payload.standardHtml || payload.text)
   event.preventDefault()
+}
+
+function handleContextMenu(event) {
+  const payload = getSelectionClipboardPayload()
+  if (!payload) {
+    closeContextMenu()
+    return
+  }
+
+  event.preventDefault()
+  contextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    payload
+  }
+
+  nextTick(() => adjustContextMenuPosition(event.clientX, event.clientY))
+}
+
+function adjustContextMenuPosition(pointerX, pointerY) {
+  const menuEl = contextMenuRef.value
+  if (!menuEl) return
+
+  const rect = menuEl.getBoundingClientRect()
+  const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - rect.width - CONTEXT_MENU_MARGIN)
+  const maxY = Math.max(CONTEXT_MENU_MARGIN, window.innerHeight - rect.height - CONTEXT_MENU_MARGIN)
+
+  contextMenu.value = {
+    ...contextMenu.value,
+    x: Math.min(pointerX, maxX),
+    y: Math.min(pointerY, maxY)
+  }
+}
+
+function closeContextMenu() {
+  contextMenu.value = {
+    visible: false,
+    x: 0,
+    y: 0,
+    payload: null
+  }
+}
+
+function reportCopyError(prefix, error) {
+  const message = error instanceof Error ? error.message : String(error || '')
+  emit('copy-error', `${prefix}: ${message || 'Unknown error'}`)
+}
+
+async function writeClipboardPayload({ text = '', html = '' } = {}) {
+  if (window.electronAPI?.writeClipboard) {
+    await window.electronAPI.writeClipboard({ text, html })
+    return
+  }
+
+  if (text) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  throw new Error('Clipboard API unavailable')
+}
+
+async function copySelectionAsPlainText() {
+  const payload = contextMenu.value.payload || getSelectionClipboardPayload()
+  closeContextMenu()
+  if (!payload?.text) return
+
+  try {
+    await navigator.clipboard.writeText(payload.text)
+  } catch (error) {
+    reportCopyError('复制纯文本失败', error)
+  }
+}
+
+async function copySelectionAsRichContent() {
+  const payload = contextMenu.value.payload || getSelectionClipboardPayload()
+  closeContextMenu()
+  if (!payload) return
+
+  try {
+    await writeClipboardPayload({
+      text: payload.text,
+      html: payload.richHtml || payload.standardHtml || payload.text
+    })
+  } catch (error) {
+    reportCopyError('复制到 Word/微信失败', error)
+  }
 }
 
 function getMermaidTheme() {
@@ -316,7 +460,7 @@ const htmlContent = computed(() => {
 watch(htmlContent, async () => {
   await nextTick()
   await renderMermaidDiagrams()
-  decorateListPrefixes(previewContent.value)
+  decorateListPrefixes(previewContent.value, { includeTaskListPrefix: false })
   syncActiveHeading()
 }, { immediate: true })
 
@@ -326,8 +470,20 @@ watch(() => settingsStore.settings.theme, async () => {
   }
   await nextTick()
   await renderMermaidDiagrams()
-  decorateListPrefixes(previewContent.value)
+  decorateListPrefixes(previewContent.value, { includeTaskListPrefix: false })
   syncActiveHeading()
+})
+
+onMounted(() => {
+  document.addEventListener('click', closeContextMenu)
+  window.addEventListener('resize', closeContextMenu)
+  window.addEventListener('scroll', closeContextMenu, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu)
+  window.removeEventListener('resize', closeContextMenu)
+  window.removeEventListener('scroll', closeContextMenu, true)
 })
 </script>
 
@@ -544,5 +700,43 @@ watch(() => settingsStore.settings.theme, async () => {
   height: 1px;
   margin: 24px 0;
   background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+}
+
+.preview-context-menu {
+  position: fixed;
+  z-index: 5200;
+  display: flex;
+  flex-direction: column;
+  min-width: 172px;
+  padding: 4px 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass-bg) 92%, var(--bg-deep));
+  box-shadow: var(--menu-card-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.preview-context-menu-item {
+  min-height: var(--menu-item-min-height);
+  padding: var(--menu-item-padding-y) var(--menu-item-padding-x);
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: var(--ui-font-size-sm);
+  font-weight: var(--ui-font-weight-medium);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.preview-context-menu-item:hover {
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-active, var(--accent-primary));
+}
+
+.preview-context-menu-item:focus-visible {
+  outline: none;
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 </style>

@@ -1043,7 +1043,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   line-height: var(--panel-title-line-height);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .panel-subtitle {
@@ -1080,8 +1080,8 @@ onUnmounted(() => {
 .folder-item:hover,
 .recent-file:hover,
 .section-link:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
+  color: var(--text-interactive-hover, var(--text-main));
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }
@@ -1255,7 +1255,7 @@ onUnmounted(() => {
   font-size: 11px;
   font-weight: var(--ui-font-weight-bold);
   line-height: var(--panel-title-line-height);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -1304,7 +1304,7 @@ onUnmounted(() => {
 }
 
 .session-badge {
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   background: rgba(var(--accent-primary-rgb), 0.08);
 }
 
@@ -1334,7 +1334,7 @@ onUnmounted(() => {
   border: 1px solid transparent;
   border-radius: var(--icon-button-radius);
   background: var(--icon-button-bg);
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   font-size: var(--ui-font-size-xs);
   display: inline-flex;
@@ -1439,7 +1439,7 @@ onUnmounted(() => {
 }
 
 .workspace-filter-icon {
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1555,7 +1555,7 @@ onUnmounted(() => {
   height: 24px;
   border-radius: 8px;
   background: rgba(var(--accent-primary-rgb), 0.06);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1601,13 +1601,13 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   flex-shrink: 0;
 }
 
 .folder-badge,
 .file-badge {
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   background: rgba(var(--accent-primary-rgb), 0.08);
   flex-shrink: 0;
 }
@@ -1686,7 +1686,7 @@ onUnmounted(() => {
 }
 
 .recent-file:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
 }
 
 .recent-file.active:hover {
@@ -1728,12 +1728,12 @@ onUnmounted(() => {
 
 .recent-file:focus-visible {
   outline: none;
-  background: var(--interactive-selected-bg);
+  background: var(--interactive-selected-bg-strong, var(--interactive-selected-bg));
   box-shadow: var(--field-focus-ring), inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.52);
 }
 
 .recent-file.active .file-name {
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .pin-btn,
@@ -1741,7 +1741,7 @@ onUnmounted(() => {
   opacity: 0;
   background: none;
   border: 1px solid transparent;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   width: var(--icon-button-size-sm);
   height: var(--icon-button-size-sm);

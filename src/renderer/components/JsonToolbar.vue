@@ -70,7 +70,7 @@ defineEmits(['format', 'minify', 'repair', 'unescape', 'expand-all', 'collapse-a
 .json-toolbar-meta {
   display: inline-flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -82,7 +82,7 @@ defineEmits(['format', 'minify', 'repair', 'unescape', 'expand-all', 'collapse-a
 .json-toolbar-button {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -98,8 +98,8 @@ defineEmits(['format', 'minify', 'repair', 'unescape', 'expand-all', 'collapse-a
 }
 
 .json-toolbar-button:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--text-main);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }
 
@@ -108,8 +108,8 @@ defineEmits(['format', 'minify', 'repair', 'unescape', 'expand-all', 'collapse-a
 }
 
 .json-toolbar-button.active {
-  background: var(--json-chip-bg, rgba(var(--accent-primary-rgb), 0.12));
-  color: var(--json-key-color, var(--accent-primary));
+  background: var(--interactive-selected-bg-strong, var(--json-chip-bg, rgba(var(--accent-primary-rgb), 0.12)));
+  color: var(--text-interactive-active, var(--json-key-color, var(--accent-primary)));
 }
 
 .json-toolbar-separator {

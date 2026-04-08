@@ -180,7 +180,7 @@ function nodeMatchesSearch(node, searchQuery) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   transition: transform var(--transition-fast), color var(--transition-fast);
 }
 
@@ -189,12 +189,12 @@ function nodeMatchesSearch(node, searchQuery) {
 }
 
 .node-label:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--text-main);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
 }
 
 .node-label:active {
-  background: rgba(var(--accent-primary-rgb), 0.16);
+  background: var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.16));
   color: var(--text-main);
 }
 
@@ -205,7 +205,7 @@ function nodeMatchesSearch(node, searchQuery) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
 }
 
 .icon-folder.expanded {

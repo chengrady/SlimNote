@@ -349,15 +349,28 @@ async function runSearch() {
   gap: 12px;
   text-align: left;
   cursor: pointer;
+  transition: var(--transition-fast);
 }
 
 .result-item:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  box-shadow: var(--interactive-hover-ring);
+}
+
+.result-item:focus-visible {
+  outline: none;
+  background: var(--interactive-selected-bg-strong, var(--interactive-selected-bg));
+  box-shadow: var(--field-focus-ring), inset 2px 0 0 var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.34));
 }
 
 .result-line {
   font-family: var(--font-family-mono);
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
+}
+
+.result-item:hover .result-line,
+.result-item:focus-visible .result-line {
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .result-text {

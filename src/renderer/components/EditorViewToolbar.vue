@@ -56,7 +56,7 @@ defineEmits(['pin'])
 .editor-view-toolbar-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
@@ -76,7 +76,7 @@ defineEmits(['pin'])
   padding: 0 10px;
   border-radius: 999px;
   background: rgba(var(--accent-primary-rgb), 0.08);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -86,7 +86,7 @@ defineEmits(['pin'])
 .editor-view-toolbar-button {
   background: rgba(var(--accent-primary-rgb), 0.05);
   border: 1px solid transparent;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -103,8 +103,8 @@ defineEmits(['pin'])
 }
 
 .editor-view-toolbar-button:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--text-main);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }

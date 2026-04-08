@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     defaultPath
   }),
   exportMarkdownPdf: (payload) => ipcRenderer.invoke('export-markdown-pdf', payload),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   openFileAssociationSettings: () => ipcRenderer.invoke('open-file-association-settings'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
@@ -67,6 +68,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuSave: (callback) => onIpc('menu-save', callback),
   onMenuSaveAs: (callback) => onIpc('menu-save-as', callback),
   onMenuOpenSettings: (callback) => onIpc('menu-open-settings', callback),
+  onMenuCheckForUpdates: (callback) => onIpc('menu-check-for-updates', callback),
   onMenuOpenAbout: (callback) => onIpc('menu-open-about', callback),
   onMenuUndo: (callback) => onIpc('menu-undo', callback),
   onMenuRedo: (callback) => onIpc('menu-redo', callback),

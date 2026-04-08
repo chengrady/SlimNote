@@ -62,7 +62,7 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
 .sql-toolbar-meta {
   display: inline-flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -78,7 +78,7 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
   padding: 0 8px;
   border-radius: 999px;
   background: rgba(var(--accent-primary-rgb), 0.06);
-  color: var(--text-muted);
+  color: var(--text-shortcut, var(--text-muted));
   font-size: 11px;
   white-space: nowrap;
 }
@@ -86,7 +86,7 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
 .sql-toolbar-button {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -103,8 +103,8 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
 }
 
 .sql-toolbar-button:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--text-main);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-hover, var(--text-main));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }

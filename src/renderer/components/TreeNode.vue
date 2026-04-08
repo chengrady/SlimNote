@@ -212,8 +212,7 @@ const valueIconClass = computed(() => {
 const displayValue = computed(() => {
   if (props.data === null) return 'null'
   if (typeof props.data === 'string') {
-    const truncated = props.data.length > 50 ? props.data.slice(0, 50) + '...' : props.data
-    return `"${truncated}"`
+    return `"${props.data}"`
   }
   if (typeof props.data === 'boolean') return props.data ? 'true' : 'false'
   return String(props.data)
@@ -287,11 +286,16 @@ async function copyValue() {
   position: relative;
   display: flex;
   align-items: center;
+  min-width: 0;
   min-height: 28px;
   padding: 4px 10px;
   cursor: pointer;
   border-radius: 6px;
   transition: background-color 0.15s, box-shadow 0.15s;
+}
+
+.node-leaf {
+  align-items: flex-start;
 }
 
 .tree-node.nested > .node-header::before,
@@ -445,9 +449,11 @@ async function copyValue() {
 
 .value {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .value.type-string {
@@ -478,6 +484,7 @@ async function copyValue() {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   transition: all 0.15s;
   margin-left: 6px;
 }

@@ -528,22 +528,25 @@ onUnmounted(() => {
 }
 
 .tab:hover {
-  background: color-mix(in srgb, var(--interactive-hover-bg) 88%, var(--btn-bg));
+  background: color-mix(in srgb, var(--interactive-hover-bg-strong, var(--interactive-hover-bg)) 88%, var(--btn-bg));
   border-color: var(--interactive-hover-border);
-  color: var(--text-main);
+  color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .tab.active {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.16) 78%, var(--bg-primary));
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  box-shadow: var(--interactive-active-shadow), inset 0 1px 0 rgba(var(--accent-primary-rgb), 0.16);
+  background: color-mix(in srgb, var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.2)) 90%, var(--bg-primary));
+  border-color: var(--interactive-selected-border-strong, var(--accent-primary));
+  color: var(--text-interactive-active, var(--accent-primary));
+  box-shadow:
+    var(--interactive-active-shadow),
+    inset 0 1px 0 rgba(var(--accent-primary-rgb), 0.2),
+    inset 0 0 0 1px color-mix(in srgb, var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.34)) 82%, transparent);
   font-weight: var(--ui-font-weight-semibold);
 }
 
 .tab.selected:not(.active) {
-  background: color-mix(in srgb, var(--interactive-selected-bg) 88%, var(--btn-bg));
+  background: color-mix(in srgb, var(--interactive-selected-bg-strong, var(--interactive-selected-bg)) 88%, var(--btn-bg));
   border-color: var(--interactive-selected-border);
   color: var(--text-main);
   box-shadow: var(--interactive-hover-ring), inset 0 1px 0 rgba(var(--accent-primary-rgb), 0.08);
@@ -606,9 +609,9 @@ onUnmounted(() => {
 }
 
 .tab.active .pin-icon {
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   opacity: 1;
-  background: rgba(var(--accent-primary-rgb), 0.1);
+  background: rgba(var(--accent-primary-rgb), 0.16);
 }
 
 .tab-title {
@@ -665,7 +668,7 @@ onUnmounted(() => {
 }
 
 .tab.active .tab-close {
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .tab-close:hover {
@@ -714,7 +717,7 @@ onUnmounted(() => {
 
 .batch-count {
   font-size: var(--ui-font-size-xs);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
   font-weight: var(--ui-font-weight-semibold);
   white-space: nowrap;
 }

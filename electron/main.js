@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } = require('electron')
 const { join, resolve } = require('path')
 const fs = require('fs')
+const https = require('https')
 const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
 
@@ -101,12 +102,87 @@ function t(key) {
   return value || key
 }
 
+function menuLabel(key, zhFallback, enFallback) {
+  const value = t(key)
+  if (value !== key) return value
+  return currentLocale === 'zh-CN' ? zhFallback : enFallback
+}
+
+function normalizeVersionTag(version = '') {
+  return String(version || '').trim().replace(/^v/i, '')
+}
+
+function compareVersions(leftVersion = '', rightVersion = '') {
+  const leftParts = normalizeVersionTag(leftVersion).split('.')
+  const rightParts = normalizeVersionTag(rightVersion).split('.')
+  const maxLength = Math.max(leftParts.length, rightParts.length)
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftValue = Number.parseInt(leftParts[index] || '0', 10)
+    const rightValue = Number.parseInt(rightParts[index] || '0', 10)
+
+    if (leftValue > rightValue) return 1
+    if (leftValue < rightValue) return -1
+  }
+
+  return 0
+}
+
+function requestJson(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': `SlimNote/${app.getVersion()}`,
+        ...headers
+      }
+    }, (response) => {
+      const chunks = []
+
+      response.on('data', chunk => chunks.push(chunk))
+      response.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8')
+        const statusCode = response.statusCode || 0
+
+        if (statusCode < 200 || statusCode >= 300) {
+          let message = `GitHub API responded with status ${statusCode}`
+
+          try {
+            const payload = JSON.parse(body)
+            if (payload?.message) {
+              message = payload.message
+            }
+          } catch (error) {
+            // Ignore parse errors for non-JSON responses.
+          }
+
+          reject(new Error(message))
+          return
+        }
+
+        try {
+          resolve(JSON.parse(body))
+        } catch (error) {
+          reject(new Error('Invalid response from release service'))
+        }
+      })
+    })
+
+    request.on('error', reject)
+    request.setTimeout(8000, () => {
+      request.destroy(new Error('Request timed out'))
+    })
+  })
+}
+
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 const iconPath = isDev
   ? join(__dirname, '../public/logo.ico')
   : join(__dirname, '../dist/logo.ico')
 const rendererIndexPath = join(__dirname, '../dist/index.html')
 const preloadPath = join(__dirname, 'preload.js')
+const RELEASES_PAGE_URL = 'https://github.com/chengrady/SlimNote/releases'
+const LATEST_RELEASE_API_URL = 'https://api.github.com/repos/chengrady/SlimNote/releases/latest'
 
 const appDataRoot = app.getPath('appData')
 const userDataDir = join(appDataRoot, isDev ? 'SlimNote-dev' : 'SlimNote')
@@ -334,6 +410,37 @@ async function openFileAssociationSettings() {
   }
 }
 
+async function checkForUpdates() {
+  const currentVersion = normalizeVersionTag(app.getVersion())
+
+  try {
+    const release = await requestJson(LATEST_RELEASE_API_URL)
+    const latestVersion = normalizeVersionTag(release?.tag_name || release?.name || '')
+
+    if (!latestVersion) {
+      throw new Error('Latest release version is missing')
+    }
+
+    return {
+      ok: true,
+      currentVersion,
+      latestVersion,
+      hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
+      releaseName: release?.name || release?.tag_name || latestVersion,
+      releaseUrl: release?.html_url || RELEASES_PAGE_URL,
+      publishedAt: release?.published_at || ''
+    }
+  } catch (error) {
+    console.error('Failed to check for updates:', error)
+    return {
+      ok: false,
+      currentVersion,
+      releaseUrl: RELEASES_PAGE_URL,
+      message: error?.message || 'Unable to check for updates right now.'
+    }
+  }
+}
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!gotSingleInstanceLock) {
@@ -540,10 +647,6 @@ function createMenu() {
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu-open-settings')
         },
-        {
-          label: 'About SlimNote',
-          click: () => mainWindow?.webContents.send('menu-open-about')
-        },
         { type: 'separator' },
         { label: t('menu.exit'), role: 'quit' }
       ]
@@ -605,6 +708,19 @@ function createMenu() {
         },
         { type: 'separator' },
         { label: t('menu.toggleFullscreen'), role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: menuLabel('menu.help', '帮助', 'Help'),
+      submenu: [
+        {
+          label: menuLabel('menu.checkUpdates', '检查更新', 'Check for Updates'),
+          click: () => mainWindow?.webContents.send('menu-check-for-updates')
+        },
+        {
+          label: menuLabel('menu.about', '关于 SlimNote', 'About SlimNote'),
+          click: () => mainWindow?.webContents.send('menu-open-about')
+        }
       ]
     }
   ]
@@ -793,6 +909,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('open-file-association-settings', async () => {
     return await openFileAssociationSettings()
+  })
+
+  ipcMain.handle('check-for-updates', async () => {
+    return await checkForUpdates()
   })
 
   ipcMain.on('renderer-ready', () => {

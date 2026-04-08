@@ -136,7 +136,7 @@ defineEmits(['toggle-collapse'])
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--icon-button-bg);
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -145,8 +145,8 @@ defineEmits(['toggle-collapse'])
 }
 
 .context-sidebar-toggle:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
+  color: var(--text-interactive-hover, var(--text-main));
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }

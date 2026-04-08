@@ -22,10 +22,11 @@ function getListItemIndex(item) {
 export function buildListPrefixText(item, options = {}) {
   const {
     indentUnit = '  ',
-    unorderedMarker = '• ',
+    unorderedMarker = '- ',
     checkedMarker = '[x] ',
     uncheckedMarker = '[ ] ',
-    orderedSuffix = '. '
+    orderedSuffix = '. ',
+    includeTaskListPrefix = true
   } = options
 
   const list = item?.parentElement
@@ -36,6 +37,10 @@ export function buildListPrefixText(item, options = {}) {
   const checkbox = item.querySelector(':scope > input[type="checkbox"], :scope > p > input[type="checkbox"]')
 
   if (checkbox) {
+    if (!includeTaskListPrefix) {
+      return ''
+    }
+
     const checked = checkbox.hasAttribute('checked') || checkbox.checked
     return `${indent}${checked ? checkedMarker : uncheckedMarker}`
   }
@@ -74,6 +79,16 @@ export function decorateListPrefixes(container, options = {}) {
       item.prepend(prefix)
     }
   })
+}
+
+export function stripDecoratedListPrefixes(container, options = {}) {
+  if (!container) return
+
+  const {
+    prefixClassName = DEFAULT_LIST_PREFIX_CLASS
+  } = options
+
+  container.querySelectorAll(`.${prefixClassName}`).forEach((node) => node.remove())
 }
 
 export function buildStructuredPlainText(sourceRoot, options = {}) {

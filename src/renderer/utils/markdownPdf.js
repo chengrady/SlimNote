@@ -1,7 +1,7 @@
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
-import { DEFAULT_LIST_PREFIX_CLASS, buildStructuredPlainText, decorateListPrefixes, getListDepth } from './markdownListFormat'
+import { DEFAULT_LIST_PREFIX_CLASS, buildStructuredPlainText, decorateListPrefixes, getListDepth, stripDecoratedListPrefixes } from './markdownListFormat'
 
 function escapeHtml(value = '') {
 	return String(value)
@@ -115,7 +115,7 @@ async function renderMermaidBlocksInHtml(html = '', theme = 'light') {
 		}
 	}
 
-	decorateListPrefixes(root)
+	decorateListPrefixes(root, { includeTaskListPrefix: false })
 
 	return root.innerHTML
 }
@@ -129,6 +129,7 @@ function buildPdfPreparationScript() {
 			const MAX_SINGLE_PAGE_HEIGHT_RATIO = 0.92
 			const MIN_SINGLE_PAGE_SCALE = 0.58
 			const OUTPUT_SCALE = 2
+			const MERMAID_PAGE_SLICE_CHROME_PX = 36
 
 			function mmToPx(mm) {
 				return mm * MM_TO_PX
@@ -231,15 +232,14 @@ function buildPdfPreparationScript() {
 
 					const slice = document.createElement('div')
 					slice.className = 'mermaid-page-slice'
+					if (offset > 0) {
+						slice.classList.add('mermaid-page-slice--followup')
+					}
 
 					const image = document.createElement('img')
 					image.alt = 'Mermaid diagram page slice'
 					image.src = sliceCanvas.toDataURL('image/png')
 					slice.appendChild(image)
-
-					if (offset + currentSliceHeight < targetHeight) {
-						slice.classList.add('mermaid-page-slice--continued')
-					}
 
 					fragment.appendChild(slice)
 				}
@@ -265,7 +265,10 @@ function buildPdfPreparationScript() {
 				const usableWidth = Math.max(220, Math.min(contentWidth, blockWidth - 16))
 				const widthScale = Math.min(1, usableWidth / metrics.width)
 				const fittedHeight = metrics.height * widthScale
-				const maxSinglePageHeight = contentHeight * MAX_SINGLE_PAGE_HEIGHT_RATIO
+				const maxSinglePageHeight = Math.max(
+					240,
+					(contentHeight - MERMAID_PAGE_SLICE_CHROME_PX) * MAX_SINGLE_PAGE_HEIGHT_RATIO
+				)
 				const singlePageScale = Math.min(widthScale, maxSinglePageHeight / metrics.height)
 
 				if (fittedHeight <= maxSinglePageHeight || singlePageScale >= MIN_SINGLE_PAGE_SCALE) {
@@ -333,8 +336,7 @@ function createClipboardHtmlFragment(html = '') {
 	}
 
 	const getIndentByDepth = (depth) => `${18 + Math.min(depth, 6) * 30}px`
-
-	decorateListPrefixes(root)
+	stripDecoratedListPrefixes(root)
 
 	applyStyles(root, {
 		fontFamily: '"Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
@@ -380,29 +382,18 @@ function createClipboardHtmlFragment(html = '') {
 		const isNested = depth > 0
 		applyStyles(list, {
 			margin: isNested ? '6px 0 8px' : '0 0 12px',
-			marginLeft: getIndentByDepth(depth),
-			paddingLeft: isNested ? '12px' : '4px',
-			borderLeft: isNested ? '2px solid #dbe3f0' : 'none',
-			listStyle: 'none'
-		})
-	})
-
-	root.querySelectorAll(`.${DEFAULT_LIST_PREFIX_CLASS}`).forEach((prefix) => {
-		applyStyles(prefix, {
-			display: 'inline',
-			whiteSpace: 'pre-wrap',
-			fontWeight: '400',
-			color: '#1f2937',
-			fontVariantNumeric: 'tabular-nums'
+			marginLeft: depth > 0 ? getIndentByDepth(depth - 1) : '0',
+			paddingLeft: list.tagName === 'OL' ? '28px' : '24px',
+			listStylePosition: 'outside',
+			listStyleType: list.tagName === 'OL' ? 'decimal' : 'disc'
 		})
 	})
 
 	root.querySelectorAll('li').forEach((item) => {
 		const depth = getListDepth(item)
 		applyStyles(item, {
-			display: 'block',
 			margin: '0 0 6px',
-			paddingLeft: `${depth > 0 ? 6 : 0}px`
+			paddingLeft: `${depth > 0 ? 2 : 0}px`
 		})
 
 		const leadBlock = item.querySelector(':scope > p, :scope > div')
@@ -549,31 +540,21 @@ function createClipboardHtmlFragment(html = '') {
 		}
 		.slimnote-clipboard ul,
 		.slimnote-clipboard ol {
-			padding-left: 4px;
-			list-style: none;
-		}
-		.slimnote-clipboard li {
-			display: block;
+			padding-left: 24px;
+			list-style-position: outside;
 		}
 		.slimnote-clipboard li ul,
 		.slimnote-clipboard li ol {
-			margin-left: 48px;
+			margin-left: 0;
 			margin-top: 6px;
 			margin-bottom: 8px;
-			padding-left: 12px;
-			border-left: 2px solid #dbe3f0;
+			padding-left: 24px;
 		}
 		.slimnote-clipboard code {
 			font-family: Consolas, "Cascadia Code", monospace;
 		}
 		.slimnote-clipboard pre {
 			white-space: pre-wrap;
-		}
-		.slimnote-clipboard .${DEFAULT_LIST_PREFIX_CLASS} {
-			display: inline;
-			font-weight: 400;
-			white-space: pre-wrap;
-			font-variant-numeric: tabular-nums;
 		}
 	`
 	root.prepend(style)
@@ -586,8 +567,7 @@ function createClipboardHtmlFragment(html = '') {
 	}
 }
 
-export function buildMarkdownClipboardPayload({ content = '', sourcePath = '' } = {}) {
-	const html = buildMarkdownHtml(content)
+export function buildMarkdownFragmentClipboardPayload({ html = '', sourcePath = '' } = {}) {
 	const baseHref = getDirectoryFileUrl(sourcePath)
 	const payload = createClipboardHtmlFragment(html)
 
@@ -599,6 +579,11 @@ export function buildMarkdownClipboardPayload({ content = '', sourcePath = '' } 
 		html: `${baseHref ? `<base href="${baseHref}">` : ''}${payload.html}`,
 		text: payload.text
 	}
+}
+
+export function buildMarkdownClipboardPayload({ content = '', sourcePath = '' } = {}) {
+	const html = buildMarkdownHtml(content)
+	return buildMarkdownFragmentClipboardPayload({ html, sourcePath })
 }
 
 export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown Document', theme = 'light', sourcePath = '' } = {}) {
@@ -844,9 +829,9 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 				break-inside: avoid-page;
 			}
 
-			.markdown-body .mermaid-page-slice--continued {
-				page-break-after: always;
-				break-after: page;
+			.markdown-body .mermaid-page-slice--followup {
+				page-break-before: always;
+				break-before: page;
 			}
 
 			.markdown-body .mermaid-page-slice img {

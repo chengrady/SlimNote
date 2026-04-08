@@ -411,7 +411,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   line-height: var(--panel-title-line-height);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .panel-subtitle {
@@ -435,7 +435,7 @@ onUnmounted(() => {
   height: var(--icon-button-size-md);
   background: var(--icon-button-bg);
   border: 1px solid transparent;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   transition: var(--transition-fast);
   padding: 0;
@@ -446,8 +446,8 @@ onUnmounted(() => {
 }
 
 .header-actions button:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
+  color: var(--text-interactive-hover, var(--text-main));
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }
@@ -515,8 +515,8 @@ onUnmounted(() => {
 }
 
 .menu-item:hover {
-  background: var(--interactive-hover-bg);
-  color: var(--accent-primary);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .menu-separator {
@@ -601,7 +601,7 @@ onUnmounted(() => {
   justify-content: center;
   border-radius: 50%;
   background: rgba(var(--accent-primary-rgb), 0.08);
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .empty-state p {
@@ -632,8 +632,10 @@ onUnmounted(() => {
 }
 
 .recent-file.active {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.12) 76%, var(--glass-bg));
-  box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.72);
+  background: color-mix(in srgb, var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.18)) 84%, var(--glass-bg));
+  box-shadow:
+    inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.78),
+    inset 0 0 0 1px color-mix(in srgb, var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.34)) 78%, transparent);
 }
 
 .recent-file.dragging {
@@ -666,18 +668,18 @@ onUnmounted(() => {
 }
 
 .recent-file:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
   box-shadow: var(--interactive-hover-ring);
 }
 
 .recent-file.active:hover {
-  background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.14) 76%, var(--glass-bg));
+  background: color-mix(in srgb, var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.22)) 86%, var(--glass-bg));
 }
 
 .recent-file:focus-visible {
   outline: none;
-  background: var(--interactive-selected-bg);
-  box-shadow: var(--field-focus-ring), inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.52);
+  background: var(--interactive-selected-bg-strong, var(--interactive-selected-bg));
+  box-shadow: var(--field-focus-ring), inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.64);
 }
 
 .recent-file-icon,
@@ -706,7 +708,7 @@ onUnmounted(() => {
   opacity: 0;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   width: var(--icon-button-size-sm);
   height: var(--icon-button-size-sm);
@@ -737,7 +739,16 @@ onUnmounted(() => {
 }
 
 .recent-file.active .file-name {
-  color: var(--accent-primary);
+  color: var(--text-interactive-active, var(--accent-primary));
+}
+
+.recent-file.active .file-path {
+  color: var(--text-main);
+}
+
+.recent-file.active .pin-btn {
+  color: var(--text-interactive-active, var(--accent-primary));
+  background: rgba(var(--accent-primary-rgb), 0.14);
 }
 
 .file-path {
