@@ -41,24 +41,27 @@ SlimNote is a lightweight yet powerful text and code editor built with **Electro
 - KaTeX math formulas
 - Prism code highlighting
 - Image upload support
+- Copy selected content as plain text or rich content for Word/WeChat
 - Export to PDF and image
 
 #### File Management
 - Multi-tab editing
+- Pinned tabs with session restore
 - File tree explorer
 - Auto encoding detection
-- Recent files list
+- Recent files and recent folders
 - External file change detection with reload prompt
 - Auto-save support
 
 #### Built-in Tool Panels
 - **JSON Toolkit**: format, compress, diff, tree view, schema generation, repair, and JMESPath query
 - **SQL Toolkit**: formatting with multiple dialect support
-- **Markdown Toolkit**: export to PDF and image
+- **Markdown Toolkit**: export to PDF and image, plus preview copy helpers for plain text and Word/WeChat
 
 #### User Experience
 - Unified desktop UI for dialogs, cards, spacing, and controls
 - File, edit, and view menus in the custom title bar
+- Help menu with update check and About dialog
 - Enlarged settings dialog with About section and GitHub entry
 - Resizable sidebar and improved workspace layout
 - Activity bar with Explorer and Recent views
@@ -126,8 +129,10 @@ Typical Windows outputs:
 | Text | txt, text, md, markdown, mdx, log |
 | Data | json, jsonc, yaml, yml, xml, toml, csv, tsv |
 | Config | ini, conf, config, properties |
-| Web | html, htm, css, scss, sass, less, js, ts, jsx, tsx, vue |
-| Programming | py, java, c, cpp, cs, sh, bash, ps1, bat, sql |
+| Web | html, htm, css, scss, sass, less, js, mjs, cjs, ts, mts, cts, jsx, tsx, vue |
+| Programming | py, java, c, cpp, cc, cxx, h, hpp, cs, sql |
+| Shell & Script | sh, bash, zsh, ps1, bat, cmd |
+| Special Files | .env, .env.*, .gitignore, .gitattributes, .editorconfig, Dockerfile, Makefile, README, LICENSE, CHANGELOG |
 
 ### Keyboard Shortcuts
 
@@ -184,24 +189,27 @@ SlimNote 是一个基于 **Electron**、**Vue 3**、**Monaco Editor** 和 **Milk
 - KaTeX 数学公式
 - Prism 代码高亮
 - 图片上传支持
+- 支持将选中的预览内容复制为纯文本或复制到 Word/微信
 - 导出为 PDF 和图片
 
 #### 文件管理
 - 多标签页编辑
+- 固定标签与会话恢复
 - 文件树浏览器
 - 自动检测文件编码
-- 最近打开文件列表
+- 最近文件与最近文件夹
 - 外部文件变更检测与重载提示
 - 自动保存支持
 
 #### 内置工具面板
 - **JSON 工具箱**：格式化、压缩、Diff 对比、树形视图、Schema 生成、修复和 JMESPath 查询
 - **SQL 工具箱**：支持多种方言的格式化
-- **Markdown 工具箱**：导出为 PDF 和图片
+- **Markdown 工具箱**：导出为 PDF 和图片，并支持预览选区复制为纯文本或复制到 Word/微信
 
 #### 使用体验
 - 统一了弹框、卡片、间距和控件等桌面 UI 风格
 - 在自定义标题栏中提供文件、编辑、视图菜单
+- 帮助菜单内置检查更新与 About 入口
 - 放大设置弹框，并新增 About 与 GitHub 入口
 - 优化工作区侧栏和整体桌面布局
 - 新增活动栏，可在资源管理器和最近视图之间快速切换
@@ -269,8 +277,10 @@ npm run build
 | 文本 | txt, text, md, markdown, mdx, log |
 | 数据 | json, jsonc, yaml, yml, xml, toml, csv, tsv |
 | 配置 | ini, conf, config, properties |
-| Web | html, htm, css, scss, sass, less, js, ts, jsx, tsx, vue |
-| 编程 | py, java, c, cpp, cs, sh, bash, ps1, bat, sql |
+| Web | html, htm, css, scss, sass, less, js, mjs, cjs, ts, mts, cts, jsx, tsx, vue |
+| 编程 | py, java, c, cpp, cc, cxx, h, hpp, cs, sql |
+| Shell / 脚本 | sh, bash, zsh, ps1, bat, cmd |
+| 特殊文件 | .env, .env.*, .gitignore, .gitattributes, .editorconfig, Dockerfile, Makefile, README, LICENSE, CHANGELOG |
 
 ### 快捷键
 
@@ -319,12 +329,14 @@ npm run build
 
 | Technology | Version | Description |
 |------------|---------|-------------|
-| [Electron](https://www.electronjs.org/) | 28 | Cross-platform desktop framework |
-| [Vue](https://vuejs.org/) | 3.4 | Progressive JavaScript framework |
-| [Vite](https://vitejs.dev/) | 5 | Next generation frontend tooling |
-| [Pinia](https://pinia.vuejs.org/) | 2.1 | Vue state management |
-| [Monaco Editor](https://microsoft.github.io/monaco-editor/) | 0.47 | Code editor (VS Code engine) |
-| [Milkdown](https://milkdown.dev/) | 7.18 | WYSIWYG Markdown editor |
+| [Electron](https://www.electronjs.org/) | 28.3.3 | Cross-platform desktop framework |
+| [Vue](https://vuejs.org/) | 3.4.21 | Progressive JavaScript framework |
+| [Vite](https://vitejs.dev/) | 5.1.6 | Next generation frontend tooling |
+| [Pinia](https://pinia.vuejs.org/) | 2.1.7 | Vue state management |
+| [Monaco Editor](https://microsoft.github.io/monaco-editor/) | 0.47.0 | Code editor (VS Code engine) |
+| [Milkdown](https://milkdown.dev/) | 7.18.0 | WYSIWYG Markdown editor |
+| [Vue I18n](https://vue-i18n.intlify.dev/) | 9.14.5 | Internationalization support |
+| [electron-builder](https://www.electron.build/) | 24.13.3 | Packaging and distribution |
 
 ---
 
