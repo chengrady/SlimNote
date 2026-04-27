@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuGlobalSearch: (callback) => bindIpcListener('menu-global-search', callback),
   onMenuToggleTheme: (callback) => bindIpcListener('menu-toggle-theme', callback),
   onMenuToggleSidebar: (callback) => bindIpcListener('menu-toggle-sidebar', callback),
+  onMenuTogglePresentationMode: (callback) => bindIpcListener('menu-toggle-presentation-mode', callback),
 
   // App lifecycle helpers
   onAppOpenFile: (callback) => bindIpcListener('app-open-file', callback),

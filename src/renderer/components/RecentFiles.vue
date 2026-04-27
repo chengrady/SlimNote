@@ -170,6 +170,8 @@
 import { computed, nextTick, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFileStore } from '../stores/file'
+import { getPathFileName as getFileName } from '../utils/pathUtils'
+import { RENDERER_EVENTS, emitRendererEvent } from '../utils/rendererEvents'
 import FileIcon from './FileIcon.vue'
 import ModalDialog from './ModalDialog.vue'
 
@@ -337,11 +339,7 @@ function clearRecent() {
 }
 
 function handleOpenFile(filePath) {
-  window.dispatchEvent(new CustomEvent('open-file', { detail: filePath }))
-}
-
-function getFileName(path) {
-  return path.split(/[\\/]/).pop() || path
+  emitRendererEvent(RENDERER_EVENTS.OPEN_FILE, filePath)
 }
 
 onMounted(() => {
@@ -406,12 +404,12 @@ onUnmounted(() => {
 }
 
 .panel-title {
-  font-weight: var(--ui-font-weight-bold);
-  font-size: var(--ui-font-size-sm);
+  font-weight: var(--ui-font-weight-medium);
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   line-height: var(--panel-title-line-height);
-  color: var(--text-interactive-active, var(--accent-primary));
+  color: var(--text-muted);
 }
 
 .panel-subtitle {

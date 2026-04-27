@@ -38,6 +38,8 @@
 
 <script setup>
 import { useFileStore } from '../stores/file'
+import { getPathFileName as getFileName } from '../utils/pathUtils'
+import { RENDERER_EVENTS, emitRendererEvent } from '../utils/rendererEvents'
 import FileNode from './FileNode.vue'
 
 const fileStore = useFileStore()
@@ -61,11 +63,7 @@ async function refresh() {
 
 function handleOpenFile(filePath) {
   // 由父组件处理
-  window.dispatchEvent(new CustomEvent('open-file', { detail: filePath }))
-}
-
-function getFileName(path) {
-  return path.split(/[\\/]/).pop() || path
+  emitRendererEvent(RENDERER_EVENTS.OPEN_FILE, filePath)
 }
 </script>
 

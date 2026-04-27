@@ -92,6 +92,8 @@
         <div class="menu-item ui-menu-item" @click="handleAction('closeAll')">关闭所有</div>
         <div class="menu-item ui-menu-item" @click="handleAction('closeRight')">关闭右侧</div>
         <div class="menu-separator ui-menu-separator"></div>
+        <div class="menu-item ui-menu-item" @click="handleAction('openPinWindow')">在悬浮窗口打开</div>
+        <div class="menu-separator ui-menu-separator"></div>
         <div class="menu-item ui-menu-item" @click="handleAction('togglePin')">
           {{ pinMenuLabel }}
         </div>
@@ -124,6 +126,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useSettingsStore } from '../stores/settings'
+import { RENDERER_EVENTS, emitRendererEvent } from '../utils/rendererEvents'
 import FileIcon from './FileIcon.vue'
 import ModalDialog from './ModalDialog.vue'
 
@@ -248,6 +251,13 @@ function handleAction(action) {
     case 'closeRight':
       editorStore.closeTabsToRight(tabId)
       break
+    case 'openPinWindow': {
+      const tab = editorStore.tabs.find(t => t.id === tabId)
+      if (tab) {
+        window.electronAPI.createPinWindow(tab.content, settingsStore.settings.theme, tab.language)
+      }
+      break
+    }
     case 'togglePin':
       editorStore.togglePin(tabId)
       break
@@ -352,7 +362,7 @@ function unpinSelectedTabs() {
 function saveSelectedTabs() {
   const dirtyIds = selectedTabs.value.filter(tab => tab.isDirty).map(tab => tab.id)
   if (dirtyIds.length === 0) return
-  window.dispatchEvent(new CustomEvent('save-tabs', { detail: { tabIds: dirtyIds } }))
+  emitRendererEvent(RENDERER_EVENTS.SAVE_TABS, { tabIds: dirtyIds })
 }
 
 function onTabDragStart(tabId) {
@@ -431,9 +441,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3) 0;
+  padding: 6px 8px;
   min-width: 0;
   background: color-mix(in srgb, var(--bg-secondary) 82%, rgba(var(--accent-primary-rgb), 0.03));
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .pinned-tabs-label {
@@ -453,53 +464,62 @@ onUnmounted(() => {
 
 .tab-bar {
   display: flex;
-  align-items: flex-start;
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  align-items: center;
+  padding: 4px 8px; /* Extremely minimal inner padding */
   margin-top: 0;
-  gap: var(--space-2);
+  margin-bottom: 0; /* Rely on MainEditor.vue's gap: 8px to space out from editor */
+  gap: 8px;
   position: relative;
-  background: color-mix(in srgb, var(--glass-bg) 96%, transparent);
+  background: transparent;
+  border-bottom: none;
+  z-index: 10;
 }
 
 .tabs {
   display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  flex-wrap: nowrap; /* Prevent wrap to match VS Code sliding tabs */
+  align-items: center; /* Pill style */
   flex: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   gap: var(--space-1);
-  max-height: calc(28px * 2 + var(--space-1));
-  padding-right: var(--space-1);
+  padding-right: var(--space-4); /* Add some right padding so the last tab doesn't hit the wall */
+  padding-bottom: 2px; /* Small breathing room for scrollbar */
+  margin-bottom: 0; /* Remove negative shift */
+  z-index: 2;
 }
 
 .tabs::-webkit-scrollbar {
-  width: 0;
+  height: 4px;
 }
 
 .tabs::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
+  background: transparent;
   border-radius: 4px;
 }
 
-.tabs.scrollable:hover::-webkit-scrollbar {
-  width: 6px;
+.tabs:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+}
+
+.tabs:hover::-webkit-scrollbar {
+  height: 6px;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 6px 0 8px;
-  height: 28px;
-  background: var(--btn-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
+  gap: 4px; /* Reduced gap between icon and text */
+  padding: 0 8px 0 8px; /* Reduced side padding */
+  height: 30px; /* Slight height tweak for pill */
+  background: transparent; /* Clean invisible background */
+  border: 1px solid transparent;
+  border-radius: 6px; /* Fully rounded elegant pill */
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: var(--transition-fast);
+  transition: all var(--transition-fast) ease-out;
   color: var(--text-muted);
   font-size: var(--ui-font-size-sm);
   font-weight: var(--ui-font-weight-medium);
@@ -508,41 +528,41 @@ onUnmounted(() => {
   min-width: 0;
   flex: 0 1 auto;
   position: relative;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .tab-bar-container.density-compact .tab {
-  height: 24px;
+  height: 26px;
   font-size: var(--ui-font-size-xs);
+  gap: 3px;
+  padding: 0 6px 0 6px;
   max-width: 180px;
 }
 
 .tab-bar-container.density-compact .tabs {
-  max-height: calc(24px * 2 + var(--space-1));
+  /* Dynamic height container */
 }
 
 .tab.pinned {
   min-width: 0;
-  background: rgba(var(--accent-primary-rgb), 0.08);
-  border-color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.05); /* Subtle pin hint */
 }
 
 .tab:hover {
-  background: color-mix(in srgb, var(--interactive-hover-bg-strong, var(--interactive-hover-bg)) 88%, var(--btn-bg));
-  border-color: var(--interactive-hover-border);
+  background: var(--btn-bg); /* Soft button hover */
   color: var(--text-interactive-hover, var(--text-main));
-  box-shadow: var(--interactive-hover-ring), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .tab.active {
-  background: color-mix(in srgb, var(--interactive-selected-bg-strong, rgba(var(--accent-primary-rgb), 0.2)) 90%, var(--bg-primary));
-  border-color: var(--interactive-selected-border-strong, var(--accent-primary));
-  color: var(--text-interactive-active, var(--accent-primary));
-  box-shadow:
-    var(--interactive-active-shadow),
-    inset 0 1px 0 rgba(var(--accent-primary-rgb), 0.2),
-    inset 0 0 0 1px color-mix(in srgb, var(--interactive-selected-border-strong, rgba(var(--accent-primary-rgb), 0.34)) 82%, transparent);
+  background: var(--bg-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, var(--glass-border));
+  color: var(--accent-primary);
   font-weight: var(--ui-font-weight-semibold);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); /* Very faint shadow */
+  z-index: 2;
+}
+
+.tab.active .tab-title {
+  color: var(--accent-primary);
 }
 
 .tab.selected:not(.active) {
@@ -575,7 +595,7 @@ onUnmounted(() => {
 }
 
 .tab-icon-component {
-  margin-right: 1px;
+  margin-right: -2px; /* Pull the title closer to the icon since the icon box has its own transparent padding in SVG */
   opacity: 0.96;
   transform: translateY(0.2px);
   flex-shrink: 0;
@@ -611,7 +631,6 @@ onUnmounted(() => {
 .tab.active .pin-icon {
   color: var(--text-interactive-active, var(--accent-primary));
   opacity: 1;
-  background: rgba(var(--accent-primary-rgb), 0.16);
 }
 
 .tab-title {
@@ -643,13 +662,13 @@ onUnmounted(() => {
 .tab-close {
   background: none;
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   padding: 0;
   border-radius: var(--icon-button-radius);
   width: 0;
-  height: var(--icon-button-size-sm);
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -661,14 +680,14 @@ onUnmounted(() => {
 }
 
 .tab:hover .tab-close {
-  width: var(--icon-button-size-sm);
+  width: 20px;
   margin-left: 2px;
   opacity: 1;
   pointer-events: auto;
 }
 
 .tab.active .tab-close {
-  color: var(--text-interactive-active, var(--accent-primary));
+  color: var(--text-main);
 }
 
 .tab-close:hover {

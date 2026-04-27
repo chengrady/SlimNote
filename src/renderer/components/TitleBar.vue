@@ -24,42 +24,6 @@
     <div class="title-drag-spacer" aria-hidden="true"></div>
 
     <div class="window-controls">
-      <button
-        type="button"
-        class="control-button settings-btn"
-        :title="t('titleBar.settings')"
-        :aria-label="t('titleBar.settings')"
-        @click="$emit('open-settings')"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-      </button>
-
-      <button
-        type="button"
-        class="control-button theme-toggle"
-        :title="t('titleBar.toggleTheme')"
-        :aria-label="t('titleBar.toggleTheme')"
-        @click="toggleTheme"
-      >
-        <svg v-if="isDark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-      </button>
-
       <button type="button" class="control-button minimize" :aria-label="t('window.minimize')" @click="minimize">
         <svg width="12" height="12" viewBox="0 0 12 12">
           <path d="M1 6h10" stroke="currentColor" stroke-width="1" />
@@ -118,15 +82,11 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '../stores/settings'
 import logo from '../assets/logo.svg'
 
 const emit = defineEmits(['open-settings', 'menu-action'])
 
 const { t, locale } = useI18n()
-const settingsStore = useSettingsStore()
-
-const isDark = computed(() => settingsStore.settings.theme === 'dark')
 const isMaximized = ref(false)
 const titleBarRef = ref(null)
 const menuPanelRef = ref(null)
@@ -140,23 +100,24 @@ const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
 const isDev = import.meta.env.DEV
 
 const shortcutMap = computed(() => ({
-  newFile: isMac ? 'Cmd N' : 'Ctrl N',
-  openFile: isMac ? 'Cmd O' : 'Ctrl O',
-  openFolder: isMac ? 'Cmd Shift O' : 'Ctrl Shift O',
-  save: isMac ? 'Cmd S' : 'Ctrl S',
-  saveAs: isMac ? 'Cmd Shift S' : 'Ctrl Shift S',
-  settings: isMac ? 'Cmd ,' : 'Ctrl ,',
-  undo: isMac ? 'Cmd Z' : 'Ctrl Z',
-  redo: isMac ? 'Cmd Shift Z' : 'Ctrl Y',
-  find: isMac ? 'Cmd F' : 'Ctrl F',
-  replace: isMac ? 'Cmd H' : 'Ctrl H',
-  globalSearch: isMac ? 'Cmd Shift F' : 'Ctrl Shift F',
-  selectAll: isMac ? 'Cmd A' : 'Ctrl A',
-  toggleSidebar: isMac ? 'Cmd B' : 'Ctrl B',
-  toggleFullscreen: isMac ? 'Ctrl Cmd F' : 'F11',
-  reload: isMac ? 'Cmd R' : 'Ctrl R',
-  forceReload: isMac ? 'Cmd Shift R' : 'Ctrl Shift R',
-  toggleDevTools: isMac ? 'Alt Cmd I' : 'Ctrl Shift I'
+  newFile: isMac ? 'Cmd+N' : 'Ctrl+N',
+  openFile: isMac ? 'Cmd+O' : 'Ctrl+O',
+  openFolder: isMac ? 'Cmd+Shift+O' : 'Ctrl+Shift+O',
+  save: isMac ? 'Cmd+S' : 'Ctrl+S',
+  saveAs: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
+  settings: isMac ? 'Cmd+,' : 'Ctrl+,',
+  undo: isMac ? 'Cmd+Z' : 'Ctrl+Z',
+  redo: isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y',
+  find: isMac ? 'Cmd+F' : 'Ctrl+F',
+  replace: isMac ? 'Cmd+H' : 'Ctrl+H',
+  globalSearch: isMac ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
+  selectAll: isMac ? 'Cmd+A' : 'Ctrl+A',
+  toggleSidebar: isMac ? 'Cmd+B' : 'Ctrl+B',
+  toggleFullscreen: isMac ? 'Ctrl+Cmd+F' : 'F11',
+  togglePresentationMode: isMac ? '⇧+⌘+P' : 'Shift+F5',
+  reload: isMac ? 'Cmd+R' : 'Ctrl+R',
+  forceReload: isMac ? 'Cmd+Shift+R' : 'Ctrl+Shift+R',
+  toggleDevTools: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I'
 }))
 
 const menus = computed(() => {
@@ -207,9 +168,10 @@ const menus = computed(() => {
       label: t('menu.view'),
       sections: [
         [
-          { action: 'toggle-sidebar', label: menuLabel('menu.toggleSidebar', '\u5207\u6362\u5de5\u4f5c\u533a', 'Toggle Sidebar'), shortcut: shortcuts.toggleSidebar },
-          { action: 'toggle-theme', label: t('menu.toggleTheme') },
-          { action: 'toggle-fullscreen', label: t('menu.toggleFullscreen'), shortcut: shortcuts.toggleFullscreen }
+          { action: 'toggle-sidebar', label: menuLabel('menu.toggleSidebar', '切换侧边栏', 'Toggle Sidebar'), shortcut: shortcuts.toggleSidebar },
+          { action: 'toggle-theme', label: menuLabel('menu.toggleTheme', '切换主题', 'Toggle Theme') },
+          { action: 'toggle-fullscreen', label: menuLabel('menu.toggleFullscreen', '全屏模式', 'Toggle Fullscreen'), shortcut: shortcuts.toggleFullscreen },
+          { action: 'toggle-presentation-mode', label: menuLabel('menu.togglePresentationMode', '演示模式', 'Presentation Mode'), shortcut: shortcuts.togglePresentationMode }
         ],
         ...(isDev
           ? [[
@@ -239,10 +201,6 @@ function menuLabel(key, zhFallback, enFallback) {
   const value = t(key)
   if (value !== key) return value
   return locale.value === 'zh-CN' ? zhFallback : enFallback
-}
-
-function toggleTheme() {
-  settingsStore.toggleTheme()
 }
 
 function minimize() {
@@ -354,7 +312,8 @@ onUnmounted(() => {
 .title-bar {
   position: relative;
   height: var(--titlebar-height);
-  background: var(--glass-bg);
+  background: var(--bg-primary); /* Flat background vs glass */
+  /* Title bar spans across with a bottom line */
   border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
@@ -362,7 +321,6 @@ onUnmounted(() => {
   z-index: 1000;
   padding: 0 var(--space-2) 0 0;
   gap: var(--space-2);
-  backdrop-filter: blur(var(--backdrop-blur));
   -webkit-app-region: no-drag;
 }
 
@@ -372,8 +330,8 @@ onUnmounted(() => {
   flex-shrink: 0;
   min-width: 0;
   height: 100%;
-  padding-left: var(--space-4);
-  gap: var(--space-2);
+  padding-left: 0; /* Remove padding to align with Activity Bar exactly */
+  gap: 0; /* Let the menu start right after the logo box */
   -webkit-app-region: no-drag;
 }
 
@@ -394,7 +352,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding-right: var(--space-1);
+  width: 48px; /* Force to exactly match Activity Bar width */
+  min-width: 48px;
+  padding: 0;
 }
 
 .app-logo {
@@ -414,7 +374,8 @@ onUnmounted(() => {
 .menu-bar {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 2px;
+  margin-left: -6px;
   height: 100%;
   flex-shrink: 0;
   position: relative;
@@ -430,7 +391,7 @@ onUnmounted(() => {
 }
 
 .menu-trigger {
-  padding: 0 var(--space-3);
+  padding: 0 8px; /* 进一步压实距离 */
   height: 28px;
   margin: auto 0;
   display: inline-flex;

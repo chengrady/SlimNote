@@ -8,6 +8,46 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 格式参考 Keep a Changelog，并尽量按照语义化版本的方式维护。
 
+## [1.4.0] - 2026-04-27
+
+### Added / 新增
+
+- Added external file change detection with a reload prompt to avoid silently showing stale editor content when files are modified by other apps.
+- 新增外部文件变更检测与重载提示，避免文件被其他程序修改后编辑器继续显示旧内容。
+
+- Added Presentation Mode for focused reading and demos, with menu and keyboard shortcuts.
+- 新增演示模式，支持通过菜单和快捷键进入，更适合沉浸阅读与展示。
+
+- Added an Activity Bar for quick switching between Explorer and Recent views.
+- 新增活动栏，可在资源管理器和最近视图之间快速切换。
+
+### Changed / 调整
+
+- Improved workspace layout, sidebar interactions, editor spacing, and desktop UI readability.
+- 优化工作区布局、侧栏交互、编辑区间距和桌面端界面可读性。
+
+- Improved tab organization by keeping pinned tabs ordered before regular tabs and restoring pinned state across sessions.
+- 优化标签组织方式，让固定标签始终排列在普通标签前，并支持跨会话恢复固定状态。
+
+- Refined title bar shortcuts and view-menu actions to include Presentation Mode.
+- 统一标题栏快捷键展示，并在视图菜单中补充演示模式入口。
+
+- Standardized Windows build artifact names for installer and portable packages.
+- 统一 Windows 安装包和便携版产物文件名。
+
+### Fixed / 修复
+
+- Improved Markdown editing by automatically continuing list items after pressing Enter.
+- 改进 Markdown 编辑体验，支持按回车后自动续写列表项。
+
+- Improved file path handling for recent files, recent folders, saved files, and jump-to-location events.
+- 优化最近文件、最近文件夹、另存文件和跳转定位事件中的文件路径处理。
+
+### Docs / 文档
+
+- Updated `README.md` for `1.4.0` features, shortcuts, and build artifact names.
+- 更新 `README.md` 中的 `1.4.0` 功能说明、快捷键和构建产物文件名。
+
 ## [1.3.1] - 2026-04-08
 
 ### Added / 新增

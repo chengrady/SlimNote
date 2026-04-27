@@ -37,13 +37,14 @@ import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css' // Or another style
 import { useSettingsStore } from '../stores/settings'
+import { resolveRelativeFilePath } from '../utils/fileUrlUtils'
 import { buildStructuredPlainText, decorateListPrefixes, stripDecoratedListPrefixes } from '../utils/markdownListFormat'
 import { buildMarkdownFragmentClipboardPayload } from '../utils/markdownPdf'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
-const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll', 'copy-error'])
+const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll', 'copy-error', 'open-file'])
 
 const props = defineProps({
   content: {
@@ -111,12 +112,43 @@ function getSelectionFragment(selection) {
 }
 
 function slugifyHeading(text) {
-  return text
+  const normalized = String(text)
     .toLowerCase()
     .trim()
     .replace(/<[^>]+>/g, '')
-    .replace(/[\s\W-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'section'
+    .replace(/[^\p{Letter}\p{Number}\s-]+/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return normalized || 'section'
+}
+
+function normalizeHashFragment(fragment = '') {
+  const raw = String(fragment || '').replace(/^#/, '').trim()
+  if (!raw) return ''
+
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
+function findHeadingIdByFragment(fragment = '') {
+  const normalizedFragment = normalizeHashFragment(fragment)
+  if (!normalizedFragment || !previewContainer.value) return ''
+
+  const exactMatch = previewContainer.value.querySelector(`[data-heading-id="${CSS.escape(normalizedFragment)}"]`)
+  if (exactMatch) {
+    return exactMatch.getAttribute('data-heading-id') || ''
+  }
+
+  const slugMatch = slugifyHeading(normalizedFragment)
+  if (!slugMatch) return ''
+
+  const slugElement = previewContainer.value.querySelector(`[data-heading-id="${CSS.escape(slugMatch)}"]`)
+  return slugElement?.getAttribute('data-heading-id') || ''
 }
 
 function getHeadingElements() {
@@ -202,6 +234,33 @@ function handleScroll() {
 function handleClick(event) {
   if (contextMenu.value.visible) {
     closeContextMenu()
+  }
+
+  const link = event.target instanceof HTMLElement ? event.target.closest('a[href]') : null
+  const href = link?.getAttribute('href') || ''
+  if (link && href) {
+    if (href.startsWith('#')) {
+      event.preventDefault()
+      const headingId = findHeadingIdByFragment(href)
+      if (headingId) {
+        scrollToHeading(headingId)
+        emit('heading-click', headingId)
+      }
+      return
+    }
+
+    const localFilePath = resolveRelativeFilePath(href, props.sourcePath)
+    if (localFilePath) {
+      event.preventDefault()
+      emit('open-file', localFilePath)
+      return
+    }
+
+    if (/^(https?:|mailto:)/i.test(href)) {
+      event.preventDefault()
+      window.electronAPI?.openExternal?.(href)
+      return
+    }
   }
 
   const heading = event.target instanceof HTMLElement ? event.target.closest('[data-heading-id]') : null

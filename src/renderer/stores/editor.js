@@ -19,7 +19,8 @@ export const useEditorStore = defineStore('editor', () => {
       files: tabs.value.filter(t => t.filePath).map(t => ({
         path: t.filePath,
         fontSize: t.fontSize,
-        sqlDialect: t.sqlDialect || 'mysql'
+        sqlDialect: t.sqlDialect || 'mysql',
+        pinned: Boolean(t.pinned)
       })),
       activeFile: getActiveTab()?.filePath || null
     }
@@ -54,7 +55,7 @@ export const useEditorStore = defineStore('editor', () => {
       encoding: 'utf-8',
       language,
       fontSize: fontSize || settingsStore.settings.fontSize,
-      pinned: false,
+      pinned: Boolean(options.pinned),
       sqlDialect: options.sqlDialect || 'mysql'
     }
     
@@ -134,6 +135,7 @@ export const useEditorStore = defineStore('editor', () => {
     const tab = tabs.value.find(t => t.id === tabId)
     if (tab) {
       tab.pinned = !tab.pinned
+      reorderTabsByPinnedState()
     }
   }
 
@@ -141,21 +143,24 @@ export const useEditorStore = defineStore('editor', () => {
     const targetIds = new Set(tabIds)
     if (targetIds.size === 0) return
 
-    const selectedTabs = tabs.value.filter(tab => targetIds.has(tab.id))
-    if (selectedTabs.length === 0) return
+    let hasMatchedTab = false
+    let hasChanged = false
 
-    if (pinned) {
-      const existingPinned = tabs.value.filter(tab => tab.pinned && !targetIds.has(tab.id))
-      const remainingUnpinned = tabs.value.filter(tab => !tab.pinned && !targetIds.has(tab.id))
-      const pinnedTabs = selectedTabs.map(tab => ({ ...tab, pinned: true }))
-      tabs.value = [...existingPinned, ...pinnedTabs, ...remainingUnpinned]
+    tabs.value.forEach((tab) => {
+      if (!targetIds.has(tab.id)) return
+      hasMatchedTab = true
+      if (tab.pinned === pinned) return
+      tab.pinned = pinned
+      hasChanged = true
+    })
+
+    if (!hasMatchedTab) {
       return
     }
 
-    const remainingPinned = tabs.value.filter(tab => tab.pinned && !targetIds.has(tab.id))
-    const existingUnpinned = tabs.value.filter(tab => !tab.pinned && !targetIds.has(tab.id))
-    const unpinnedTabs = selectedTabs.map(tab => ({ ...tab, pinned: false }))
-    tabs.value = [...remainingPinned, ...unpinnedTabs, ...existingUnpinned]
+    if (hasChanged) {
+      reorderTabsByPinnedState()
+    }
   }
 
   function moveTab(tabId, targetTabId) {
@@ -196,6 +201,12 @@ export const useEditorStore = defineStore('editor', () => {
     tabs.value = targetTab.pinned
       ? [...destinationList, ...sourceList]
       : [...sourceList, ...destinationList]
+  }
+
+  function reorderTabsByPinnedState() {
+    const pinnedTabs = tabs.value.filter(tab => tab.pinned)
+    const unpinnedTabs = tabs.value.filter(tab => !tab.pinned)
+    tabs.value = [...pinnedTabs, ...unpinnedTabs]
   }
 
   // 更新标签页内容
@@ -323,6 +334,7 @@ export const useEditorStore = defineStore('editor', () => {
     closeTabsToRight,
     togglePin,
     setTabsPinned,
-    moveTab
+    moveTab,
+    reorderTabsByPinnedState
   }
 })

@@ -49,8 +49,8 @@ defineEmits(['pin'])
   justify-content: space-between;
   gap: 12px;
   flex-shrink: 0;
-  background: color-mix(in srgb, var(--glass-bg) 88%, rgba(var(--accent-primary-rgb), 0.08));
-  border-bottom-color: rgba(var(--accent-primary-rgb), 0.12);
+  background: var(--bg-primary); /* Blend with main editor background */
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .editor-view-toolbar-label {

@@ -1,12 +1,13 @@
 <template>
   <div class="window-container">
     <TitleBar
+      v-show="!isPresentationMode"
       @open-settings="showSettingsDialog = true"
       @menu-action="handleTitleBarMenuAction"
     />
-    <div class="main-editor" :class="{ resizing: isResizing, 'sidebar-collapsed': isSidebarCollapsed }">
+    <div class="main-editor" :class="{ resizing: isResizing, 'sidebar-collapsed': isSidebarCollapsed, 'presentation-mode': isPresentationMode }">
       <div
-        v-if="isResizing && !isSidebarCollapsed"
+        v-if="isResizing && !isSidebarCollapsed && !isPresentationMode"
         class="sidebar-collapse-guide"
         :class="{ active: isNearAutoCollapseThreshold }"
         :style="autoCollapseGuideStyle"
@@ -14,16 +15,19 @@
       >
         <span class="sidebar-collapse-guide-label">拖到这里会自动折叠</span>
       </div>
-      <div class="sidebar" :class="{ collapsed: isSidebarCollapsed }" :style="sidebarStyle">
-        <WorkspaceSidebar :collapsed="isSidebarCollapsed" @toggle-collapse="toggleSidebar" />
+      <div v-show="!isPresentationMode" class="sidebar" :class="{ collapsed: isSidebarCollapsed }" :style="sidebarStyle">
+        <ActivityBar :active-view="activeSidebarView" :collapsed="isSidebarCollapsed" @select-view="handleSidebarViewSelect" @toggle-collapse="toggleSidebar" @open-settings="showSettingsDialog = true" />
+        <div v-if="!isSidebarCollapsed" class="sidebar-pane">
+          <WorkspaceSidebar :mode="activeSidebarView" :collapsed="isSidebarCollapsed" @toggle-collapse="toggleSidebar" @change-mode="handleSidebarViewSelect" />
+        </div>
       </div>
-      <div v-if="!isSidebarCollapsed" class="resizer" @mousedown="startResize"></div>
+      <div v-if="!isSidebarCollapsed && !isPresentationMode" class="resizer" @mousedown="startResize"></div>
       <div class="editor-area" :class="{ 'no-tabs': !hasTabs }">
-        <TabBar v-if="hasTabs" />
-        <EditorPanel />
+        <TabBar v-if="hasTabs && !isPresentationMode" />
+        <EditorPanel :is-presentation-mode="isPresentationMode" />
       </div>
     </div>
-    <StatusBar />
+    <StatusBar v-show="!isPresentationMode" />
     
     <ModalDialog 
       :show="showErrorDialog" 
@@ -73,6 +77,25 @@
       @close="showGlobalSearchDialog = false"
       @open-result="handleOpenSearchResult"
     />
+
+    <ModalDialog
+      :show="!!currentExternalChange"
+      title="文件在外部被修改"
+      @close="dismissExternalChange"
+    >
+      <template #body>
+        <div class="update-dialog-message">
+          文件 <strong>{{ currentExternalChange?.filename }}</strong> 已在外部被修改。是否要重新加载？<br>
+          <small v-if="editorStore.tabs.find(t => t.id === currentExternalChange?.tabId)?.isDirty" style="color: var(--error-color, #ef4444); margin-top: 8px; display: block;">
+            注意：重新加载将丢失此文件中未保存的更改。
+          </small>
+        </div>
+      </template>
+      <template #footer>
+        <button type="button" class="modal-btn" @click="dismissExternalChange">取消</button>
+        <button type="button" class="modal-btn primary" @click="reloadExternalFile">重新加载</button>
+      </template>
+    </ModalDialog>
   </div>
 </template>
 
@@ -80,6 +103,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import TitleBar from '../components/TitleBar.vue'
+import ActivityBar from '../components/ActivityBar.vue'
 import WorkspaceSidebar from '../components/WorkspaceSidebar.vue'
 import TabBar from '../components/TabBar.vue'
 import EditorPanel from '../components/EditorPanel.vue'
@@ -92,6 +116,8 @@ import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import { useSettingsStore } from '../stores/settings'
 import { getFileExtension } from '../utils/fileSupport'
+import { getDirectoryPath, getPathFileName } from '../utils/pathUtils'
+import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/rendererEvents'
 import packageJson from '../../../package.json'
 
 const editorStore = useEditorStore()
@@ -109,6 +135,7 @@ const APP_VERSION = String(packageJson.version || '1.0.0')
 
 const sidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
 const lastExpandedSidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
+const activeSidebarView = ref('explorer')
 const isResizing = ref(false)
 const resizePointerX = ref(0)
 const showErrorDialog = ref(false)
@@ -117,18 +144,25 @@ const showSettingsDialog = ref(false)
 const showAboutDialog = ref(false)
 const showGlobalSearchDialog = ref(false)
 const errorMessage = ref('')
+const externalChangeQueue = ref([])
+const currentExternalChange = computed(() => externalChangeQueue.value[0] || null)
 const isCheckingUpdates = ref(false)
 const updateDialogTitle = ref('')
 const updateDialogSubtitle = ref('')
 const updateDialogMessage = ref('')
 const updateDialogActionUrl = ref('')
 const updateDialogActionText = ref('')
+const isPresentationMode = ref(false)
 const cleanups = []
+const watchedFilePaths = new Set()
+let watchedFilesSyncQueue = Promise.resolve()
+let watchedFilesSyncRequestId = 0
+let isMainEditorDisposed = false
 
 const isSidebarCollapsed = computed(() => settingsStore.settings.sidebarCollapsed)
 const hasTabs = computed(() => editorStore.tabs.length > 0)
 const sidebarStyle = computed(() => ({
-  width: isSidebarCollapsed.value ? '56px' : `${sidebarWidth.value}px`
+  width: isSidebarCollapsed.value ? '48px' : `${sidebarWidth.value}px`
 }))
 const autoCollapseGuideStyle = computed(() => ({
   left: `${SIDEBAR_AUTO_COLLAPSE_THRESHOLD}px`
@@ -219,7 +253,7 @@ const handleOpenGlobalSearchEvent = () => {
 }
 
 function dispatchEditorEvent(eventName, detail) {
-  window.dispatchEvent(new CustomEvent(eventName, detail ? { detail } : undefined))
+  emitRendererEvent(eventName, detail)
 }
 
 function localizeText(zhText, enText) {
@@ -265,6 +299,122 @@ function formatReleaseDate(value) {
 
 function closeUpdateDialog() {
   showUpdateDialog.value = false
+}
+
+function jumpToEditorLocation(lineNumber, column = 1) {
+  if (!lineNumber) return
+
+  requestAnimationFrame(() => {
+    emitRendererEvent(RENDERER_EVENTS.JUMP_TO_LOCATION, {
+      lineNumber,
+      column
+    })
+  })
+}
+
+function rememberFilePath(filePath) {
+  if (!filePath) return
+
+  fileStore.addRecentFile(filePath)
+  const directoryPath = getDirectoryPath(filePath)
+  if (directoryPath) {
+    fileStore.addRecentFolder(directoryPath)
+  }
+}
+
+function applySavedFilePath(tab, filePath) {
+  tab.filePath = filePath
+  tab.title = getPathFileName(filePath) || tab.title
+  editorStore.saveTab(tab.id)
+  rememberFilePath(filePath)
+}
+
+const handleExternalFileChange = async (filePath) => {
+  const tab = editorStore.findTabByPath(filePath)
+  if (!tab) return
+  if (externalChangeQueue.value.some(q => q.filePath === filePath)) return
+
+  try {
+    const result = await window.electronAPI.readFile(filePath)
+    const latestTab = editorStore.findTabByPath(filePath)
+    if (!latestTab) return
+    if (result.content === latestTab.content && result.encoding === latestTab.encoding) return
+
+    externalChangeQueue.value.push({
+      filePath,
+      filename: getPathFileName(filePath),
+      tabId: latestTab.id,
+      content: result.content,
+      encoding: result.encoding
+    })
+  } catch (err) {
+    console.error('Failed to read changed file:', err)
+  }
+}
+
+const reloadExternalFile = () => {
+  const change = currentExternalChange.value
+  if (!change) return
+  const tab = editorStore.tabs.find(item => item.id === change.tabId)
+  if (!tab) {
+    dismissExternalChange()
+    return
+  }
+
+  tab.encoding = change.encoding || tab.encoding
+  editorStore.updateTabContent(change.tabId, change.content)
+  editorStore.saveTab(change.tabId)
+
+  dismissExternalChange()
+}
+
+const dismissExternalChange = () => {
+  externalChangeQueue.value.shift()
+}
+
+async function syncWatchedFiles(filePaths = [], requestId) {
+  if (!window.electronAPI?.watchFile || !window.electronAPI?.unwatchFile) return
+  if (isMainEditorDisposed || requestId !== watchedFilesSyncRequestId) return
+
+  const desiredPaths = new Set(filePaths.filter(Boolean))
+  const stalePaths = [...watchedFilePaths].filter((filePath) => !desiredPaths.has(filePath))
+
+  for (const filePath of stalePaths) {
+    if (isMainEditorDisposed || requestId !== watchedFilesSyncRequestId) return
+    try {
+      await window.electronAPI.unwatchFile(filePath)
+    } catch (error) {
+      console.error('Failed to unwatch file:', filePath, error)
+    } finally {
+      watchedFilePaths.delete(filePath)
+      externalChangeQueue.value = externalChangeQueue.value.filter((change) => change.filePath !== filePath)
+    }
+  }
+
+  const nextPaths = [...desiredPaths].filter((filePath) => !watchedFilePaths.has(filePath))
+
+  for (const filePath of nextPaths) {
+    if (isMainEditorDisposed || requestId !== watchedFilesSyncRequestId) return
+    try {
+      await window.electronAPI.watchFile(filePath)
+      if (isMainEditorDisposed || requestId !== watchedFilesSyncRequestId) {
+        await window.electronAPI.unwatchFile(filePath)
+        return
+      }
+      watchedFilePaths.add(filePath)
+    } catch (error) {
+      console.error('Failed to watch file:', filePath, error)
+    }
+  }
+}
+
+function enqueueWatchedFilesSync(filePaths = []) {
+  const requestId = ++watchedFilesSyncRequestId
+  const nextFilePaths = [...new Set(filePaths.filter(Boolean))]
+
+  watchedFilesSyncQueue = watchedFilesSyncQueue
+    .catch(() => {})
+    .then(() => syncWatchedFiles(nextFilePaths, requestId))
 }
 
 function openUpdateActionUrl() {
@@ -447,22 +597,22 @@ async function handleTitleBarMenuAction(action) {
       window.electronAPI.close()
       break
     case 'undo':
-      dispatchEditorEvent('editor-undo')
+      dispatchEditorEvent(RENDERER_EVENTS.UNDO)
       break
     case 'redo':
-      dispatchEditorEvent('editor-redo')
+      dispatchEditorEvent(RENDERER_EVENTS.REDO)
       break
     case 'find':
-      dispatchEditorEvent('editor-find')
+      dispatchEditorEvent(RENDERER_EVENTS.FIND)
       break
     case 'replace':
-      dispatchEditorEvent('editor-replace')
+      dispatchEditorEvent(RENDERER_EVENTS.REPLACE)
       break
     case 'global-search':
       showGlobalSearchDialog.value = true
       break
     case 'select-all':
-      dispatchEditorEvent('editor-select-all')
+      dispatchEditorEvent(RENDERER_EVENTS.SELECT_ALL)
       break
     case 'toggle-sidebar':
       toggleSidebar()
@@ -472,6 +622,9 @@ async function handleTitleBarMenuAction(action) {
       break
     case 'toggle-fullscreen':
       window.electronAPI.toggleFullScreen?.()
+      break
+    case 'toggle-presentation-mode':
+      togglePresentationMode()
       break
     case 'reload':
       window.electronAPI.reloadWindow?.()
@@ -546,6 +699,23 @@ function toggleSidebar() {
   collapseSidebar()
 }
 
+function handleSidebarViewSelect(view) {
+  activeSidebarView.value = view || 'explorer'
+
+  if (isSidebarCollapsed.value) {
+    expandSidebar()
+  }
+}
+
+function togglePresentationMode() {
+  isPresentationMode.value = !isPresentationMode.value
+  if (isPresentationMode.value) {
+    if (!isSidebarCollapsed.value) {
+      collapseSidebar()
+    }
+  }
+}
+
 watch(sidebarWidth, (newWidth) => {
   if (!isSidebarCollapsed.value) {
     lastExpandedSidebarWidth.value = newWidth
@@ -563,7 +733,23 @@ watch(() => settingsStore.settings.sidebarWidth, (newWidth) => {
   }
 })
 
+watch(
+  () => editorStore.tabs.map((tab) => tab.filePath).filter(Boolean),
+  (filePaths) => {
+    enqueueWatchedFilesSync(filePaths)
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
+  isMainEditorDisposed = false
+  // 监听文件更改事件
+  if (window.electronAPI.onFileChanged) {
+    cleanups.push(window.electronAPI.onFileChanged((filePath) => {
+      handleExternalFileChange(filePath)
+    }))
+  }
+
   // 监听菜单事件
   cleanups.push(window.electronAPI.onMenuNewFile(() => {
     editorStore.createTab()
@@ -586,11 +772,11 @@ onMounted(() => {
   }))
 
   cleanups.push(window.electronAPI.onMenuUndo(() => {
-    dispatchEditorEvent('editor-undo')
+    dispatchEditorEvent(RENDERER_EVENTS.UNDO)
   }))
 
   cleanups.push(window.electronAPI.onMenuRedo(() => {
-    dispatchEditorEvent('editor-redo')
+    dispatchEditorEvent(RENDERER_EVENTS.REDO)
   }))
 
   cleanups.push(window.electronAPI.onMenuOpenSettings(() => {
@@ -609,16 +795,35 @@ onMounted(() => {
     settingsStore.toggleTheme()
   }))
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape' && isPresentationMode.value) {
+      togglePresentationMode()
+    }
+    // Also bind Shift+F5 (Windows) / Cmd+Shift+P (Mac) to toggle presentation mode
+    if ((e.key === 'F5' && e.shiftKey) || (e.key === 'P' && e.shiftKey && (e.metaKey || e.ctrlKey))) {
+      e.preventDefault()
+      togglePresentationMode()
+    }
+  }
+  document.addEventListener('keydown', handleKeyDown)
+  cleanups.push(() => {
+    document.removeEventListener('keydown', handleKeyDown)
+  })
+
   cleanups.push(window.electronAPI.onMenuFind(() => {
-    dispatchEditorEvent('editor-find')
+    dispatchEditorEvent(RENDERER_EVENTS.FIND)
   }))
 
   cleanups.push(window.electronAPI.onMenuReplace(() => {
-    dispatchEditorEvent('editor-replace')
+    dispatchEditorEvent(RENDERER_EVENTS.REPLACE)
   }))
 
   cleanups.push(window.electronAPI.onMenuGlobalSearch(() => {
     showGlobalSearchDialog.value = true
+  }))
+
+  cleanups.push(window.electronAPI.onMenuTogglePresentationMode?.(() => {
+    togglePresentationMode()
   }))
 
   cleanups.push(window.electronAPI.onMenuToggleSidebar(() => {
@@ -631,9 +836,9 @@ onMounted(() => {
 
   window.electronAPI.notifyRendererReady()
 
-  window.addEventListener('open-global-search', handleOpenGlobalSearchEvent)
-  window.addEventListener('open-file', handleOpenFileEvent)
-  window.addEventListener('save-tabs', handleSaveTabsEvent)
+  cleanups.push(onRendererEvent(RENDERER_EVENTS.OPEN_GLOBAL_SEARCH, handleOpenGlobalSearchEvent))
+  cleanups.push(onRendererEvent(RENDERER_EVENTS.OPEN_FILE, handleOpenFileEvent))
+  cleanups.push(onRendererEvent(RENDERER_EVENTS.SAVE_TABS, handleSaveTabsEvent))
 
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', stopResize)
@@ -651,14 +856,17 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  isMainEditorDisposed = true
+  watchedFilesSyncRequestId += 1
   cleanups.forEach(cleanup => {
     if (typeof cleanup === 'function') {
       cleanup()
     }
   })
-  window.removeEventListener('open-global-search', handleOpenGlobalSearchEvent)
-  window.removeEventListener('open-file', handleOpenFileEvent)
-  window.removeEventListener('save-tabs', handleSaveTabsEvent)
+  watchedFilePaths.forEach((filePath) => {
+    window.electronAPI?.unwatchFile?.(filePath)
+  })
+  watchedFilePaths.clear()
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseup', stopResize)
 })
@@ -669,12 +877,15 @@ async function restoreLastSession() {
     return false
   }
 
-  await Promise.all(session.files.map(file => {
+  for (const file of session.files) {
     if (typeof file === 'string') {
-      return openFile(file)
+      await openFile(file)
+      continue
     }
-    return openFile(file.path, { fontSize: file.fontSize, sqlDialect: file.sqlDialect })
-  }))
+    await openFile(file.path, { fontSize: file.fontSize, sqlDialect: file.sqlDialect, pinned: file.pinned })
+  }
+
+  editorStore.reorderTabsByPinnedState()
 
   if (session.activeFile) {
     const tab = editorStore.findTabByPath(session.activeFile)
@@ -689,7 +900,7 @@ async function restoreLastSession() {
 // 打开文件
 async function openFile(filePath, options = {}) {
   try {
-    const filename = filePath.split(/[\\/]/).pop() || 'Untitled'
+    const filename = getPathFileName(filePath) || 'Untitled'
 
     // 检查文件类型
     if (!editorStore.isSupportedFile(filename) || editorStore.isBinaryFile(filename)) {
@@ -708,38 +919,21 @@ async function openFile(filePath, options = {}) {
       if (options.sqlDialect) {
         editorStore.updateTabSqlDialect(existingTab.id, options.sqlDialect)
       }
-      if (options.lineNumber) {
-        requestAnimationFrame(() => {
-          window.dispatchEvent(new CustomEvent('editor-jump-to-location', {
-            detail: {
-              lineNumber: options.lineNumber,
-              column: options.column || 1
-            }
-          }))
-        })
+      if (typeof options.pinned === 'boolean' && existingTab.pinned !== options.pinned) {
+        editorStore.setTabsPinned([existingTab.id], options.pinned)
       }
+      jumpToEditorLocation(options.lineNumber, options.column || 1)
       return
     }
 
     const result = await window.electronAPI.readFile(filePath)
     
-    const tab = editorStore.createTab(filename, filePath, result.content, options.fontSize, { sqlDialect: options.sqlDialect })
+    const tab = editorStore.createTab(filename, filePath, result.content, options.fontSize, { sqlDialect: options.sqlDialect, pinned: options.pinned })
     tab.encoding = result.encoding
     
-    fileStore.addRecentFile(filePath)
-        fileStore.addRecentFolder(filePath.replace(/[\\/][^\\/]+$/, ''))
-    window.electronAPI.watchFile(filePath)
+    rememberFilePath(filePath)
 
-    if (options.lineNumber) {
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent('editor-jump-to-location', {
-          detail: {
-            lineNumber: options.lineNumber,
-            column: options.column || 1
-          }
-        }))
-      })
-    }
+    jumpToEditorLocation(options.lineNumber, options.column || 1)
   } catch (error) {
     console.error('Failed to open file:', error)
     errorMessage.value = '打开文件失败: ' + error.message
@@ -779,10 +973,7 @@ async function saveTabById(tabId) {
       }
 
       await window.electronAPI.writeFile(result.filePath, tab.content, tab.encoding)
-      tab.filePath = result.filePath
-      tab.title = result.filePath.split(/[\\/]/).pop() || tab.title
-      editorStore.saveTab(tab.id)
-      fileStore.addRecentFile(result.filePath)
+      applySavedFilePath(tab, result.filePath)
     }
     return true
   } catch (error) {
@@ -814,10 +1005,7 @@ async function saveCurrentFileAs() {
     const result = await showSaveDialogForTab(tab)
     if (!result.canceled && result.filePath) {
       await window.electronAPI.writeFile(result.filePath, tab.content, tab.encoding)
-      tab.filePath = result.filePath
-      tab.title = result.filePath.split(/[\\/]/).pop() || tab.title
-      editorStore.saveTab(tab.id)
-      fileStore.addRecentFile(result.filePath)
+      applySavedFilePath(tab, result.filePath)
     }
   } catch (error) {
     console.error('Failed to save file:', error)
@@ -846,10 +1034,12 @@ async function saveCurrentFileAs() {
   width: 100%;
   flex: 1;
   overflow: hidden;
-  padding: var(--panel-gap) var(--panel-gap) 0;
+  padding: 0; /* Remove padding here so sidebar touches top and bottom */
   gap: 0;
   min-height: 0;
+  background: var(--bg-secondary); /* Ensure background acts as the canvas for the separated panes */
   position: relative;
+  /* Removed border-top since TitleBar already has border-bottom, avoiding double thick lines */
 }
 
 .main-editor.resizing {
@@ -911,62 +1101,62 @@ async function saveCurrentFileAs() {
 }
 
 .sidebar {
+  display: flex;
   height: 100%;
   background: transparent;
   overflow: hidden;
   flex-shrink: 0;
   box-sizing: border-box;
-  min-width: 220px;
+  min-width: 48px;
   max-width: 420px;
-  transition: width var(--transition-smooth);
+  border-right: none;
+  background: color-mix(in srgb, var(--bg-primary) 96%, rgba(0, 0, 0, 0.02));
+  box-shadow: none;
+}
+
+.main-editor:not(.resizing) .sidebar {
+  transition: width var(--transition-smooth), min-width var(--transition-smooth), max-width var(--transition-smooth);
 }
 
 .sidebar.collapsed {
-  min-width: 56px;
-  max-width: 56px;
+  min-width: 48px;
+  max-width: 48px;
   padding: 0;
 }
 
+.sidebar-pane {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .resizer {
-  width: 12px;
+  position: relative;
+  width: 6px;
+  margin-left: -3px;
+  margin-right: -3px;
   cursor: col-resize;
   background: transparent;
-  transition: var(--transition-fast);
+  z-index: 100;
   flex-shrink: 0;
-  position: relative;
 }
 
 .resizer::before {
   content: '';
   position: absolute;
-  top: 12px;
-  bottom: 12px;
+  top: 0;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 1px;
-  background: var(--glass-border);
-  transition: var(--transition-fast);
-}
-
-.resizer::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 4px;
-  height: 30px;
-  border-radius: 999px;
-  transform: translate(-50%, -50%);
-  background: var(--resizer-handle-bg);
-  box-shadow: var(--interactive-hover-ring);
-  transition: var(--transition-fast);
+  width: 2px;
+  background: transparent;
+  transition: background var(--transition-fast) 0.2s;
 }
 
 .resizer:hover::before,
-.resizer:hover::after,
-.main-editor.resizing .resizer::before,
-.main-editor.resizing .resizer::after {
-  background: var(--resizer-active-bg);
+.main-editor.resizing .resizer::before {
+  background: var(--accent-primary);
+  transition-delay: 0.1s;
 }
 
 .editor-area {
@@ -975,7 +1165,12 @@ async function saveCurrentFileAs() {
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
-  gap: var(--panel-gap);
+  gap: 8px; /* Restoring exactly 8px gap between TabBar and Editor body */
+  margin: 8px; /* Restoring margin around the editor area */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .editor-area.no-tabs {
@@ -998,7 +1193,9 @@ async function saveCurrentFileAs() {
   }
 
   .resizer {
-    width: 8px;
+    width: 6px;
+    margin-left: -3px;
+    margin-right: -3px;
   }
 }
 
@@ -1013,12 +1210,19 @@ async function saveCurrentFileAs() {
   }
 
   .main-editor.sidebar-collapsed .sidebar {
-    min-width: 56px;
-    max-width: 56px;
+    min-width: 48px;
+    max-width: 48px;
   }
 
   .resizer {
     width: 6px;
   }
+}
+.main-editor.presentation-mode :deep(.markdown-mode-toolbar),
+.main-editor.presentation-mode :deep(.markdown-format-toolbar),
+.main-editor.presentation-mode :deep(.json-toolbar),
+.main-editor.presentation-mode :deep(.sql-toolbar),
+.main-editor.presentation-mode :deep(.log-toolbar) {
+  display: none !important;
 }
 </style>

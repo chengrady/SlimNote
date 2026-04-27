@@ -302,6 +302,11 @@ function createMenu() {
           accelerator: fullscreenAccelerator,
           click: toggleMainWindowFullscreen
         },
+        {
+          label: localizedLabel('menu.togglePresentationMode', '演示模式', 'Presentation Mode'),
+          accelerator: isMac ? 'Cmd+Shift+P' : 'Shift+F5',
+          click: () => sendToRenderer('menu-toggle-presentation-mode')
+        },
         ...devSubmenu
       ]
     }

@@ -7,7 +7,7 @@
 **A Modern Cross-Platform Text & Code Editor**  
 **一个现代化的跨平台文本与代码编辑器**
 
-[![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)](https://github.com/chengrady/SlimNote)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/chengrady/SlimNote)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-28-47848f?logo=electron)](https://www.electronjs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.4-42b883?logo=vue.js)](https://vuejs.org/)
@@ -48,6 +48,7 @@ SlimNote is a lightweight yet powerful text and code editor built with **Electro
 - File tree explorer
 - Auto encoding detection
 - Recent files list
+- External file change detection with reload prompt
 - Auto-save support
 
 #### Built-in Tool Panels
@@ -60,16 +61,18 @@ SlimNote is a lightweight yet powerful text and code editor built with **Electro
 - File, edit, and view menus in the custom title bar
 - Enlarged settings dialog with About section and GitHub entry
 - Resizable sidebar and improved workspace layout
+- Activity bar with Explorer and Recent views
+- Presentation mode for focused reading and demos
 - Pin floating window (always on top)
 - Status bar with file info
 
-### What's New in 1.3.1
+### What's New in 1.4.0
 
-- Reworked Settings into a VS Code-style layout with global search, direct font-size input, and Help/About entry
-- Added a lightweight GitHub-based update check in the Help menu
-- Improved dark-mode readability and selection clarity across menus, tabs, lists, and side panels
-- Improved Markdown preview copy and PDF export, including Word/WeChat copy and Mermaid pagination
-- Improved JSON tree wrapping and unified font/language pickers in the status bar
+- Added external file change detection with a reload prompt to avoid silently showing stale content
+- Added Presentation Mode and an Activity Bar for faster switching between Explorer and Recent views
+- Improved workspace layout, sidebar interactions, tab organization, and pinned-tab persistence
+- Improved Markdown editing with automatic list continuation on Enter
+- Refined title bar shortcuts and refreshed multiple desktop UI details for better readability and consistency
 
 ### Installation
 
@@ -112,8 +115,8 @@ Build artifacts are generated in the `release/` directory.
 
 Typical Windows outputs:
 
-- `release/SlimNote Setup 1.3.1.exe`
-- `release/SlimNote 1.3.1.exe`
+- `release/SlimNote-Setup-1.4.0.exe`
+- `release/SlimNote-1.4.0.exe`
 - `release/latest.yml`
 
 ### Supported File Formats
@@ -139,6 +142,7 @@ Typical Windows outputs:
 | Replace | Ctrl+H | Cmd+H |
 | Global Search | Ctrl+Shift+F | Cmd+Shift+F |
 | Toggle Fullscreen | F11 | Ctrl+Cmd+F |
+| Presentation Mode | Shift+F5 | Shift+Cmd+P |
 
 ### Contributing
 
@@ -187,6 +191,7 @@ SlimNote 是一个基于 **Electron**、**Vue 3**、**Monaco Editor** 和 **Milk
 - 文件树浏览器
 - 自动检测文件编码
 - 最近打开文件列表
+- 外部文件变更检测与重载提示
 - 自动保存支持
 
 #### 内置工具面板
@@ -199,16 +204,18 @@ SlimNote 是一个基于 **Electron**、**Vue 3**、**Monaco Editor** 和 **Milk
 - 在自定义标题栏中提供文件、编辑、视图菜单
 - 放大设置弹框，并新增 About 与 GitHub 入口
 - 优化工作区侧栏和整体桌面布局
+- 新增活动栏，可在资源管理器和最近视图之间快速切换
+- 新增演示模式，便于沉浸阅读和展示
 - 支持 Pin 浮动窗口（始终置顶）
 - 状态栏显示文件信息
 
-### 1.3.1 更新内容
+### 1.4.0 更新内容
 
-- 将设置页改为更接近 VS Code 的布局，支持全局搜索、直接输入字号，并将 About 收纳到帮助入口
-- 在帮助菜单中新增轻量版 GitHub 检查更新
-- 提升深色模式下菜单、标签、列表和侧栏的可读性与选中态清晰度
-- 改进 Markdown 预览复制和 PDF 导出，增强 Word/微信复制与 Mermaid 分页稳定性
-- 优化 JSON 树长文本换行，并统一状态栏中的字体与语言选择体验
+- 新增外部文件变更检测，在文件被其他程序修改后弹出是否重载的提示，避免编辑器继续显示旧内容
+- 新增演示模式与活动栏，可在资源管理器和最近视图之间快速切换
+- 优化工作区布局、侧栏交互、标签组织方式以及固定标签的会话恢复
+- 改进 Markdown 编辑体验，支持回车自动续写列表项
+- 统一标题栏快捷键展示，并继续打磨多处桌面端界面细节与可读性
 
 ### 安装
 
@@ -251,8 +258,8 @@ npm run build
 
 常见 Windows 产物：
 
-- `release/SlimNote Setup 1.3.1.exe`
-- `release/SlimNote 1.3.1.exe`
+- `release/SlimNote-Setup-1.4.0.exe`
+- `release/SlimNote-1.4.0.exe`
 - `release/latest.yml`
 
 ### 支持的文件格式
@@ -278,6 +285,7 @@ npm run build
 | 替换 | Ctrl+H | Cmd+H |
 | 全局搜索 | Ctrl+Shift+F | Cmd+Shift+F |
 | 切换全屏 | F11 | Ctrl+Cmd+F |
+| 演示模式 | Shift+F5 | Shift+Cmd+P |
 
 ### 开发路线
 

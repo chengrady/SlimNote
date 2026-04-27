@@ -70,20 +70,18 @@ defineEmits(['toggle-collapse'])
 
 <style scoped>
 .context-sidebar {
-  width: 320px;
-  flex: 0 0 320px;
+  flex: 0 0 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  background: var(--bg-primary);
   border-left: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 96%, rgba(var(--accent-primary-rgb), 0.03));
-  transition: width var(--transition-smooth), flex-basis var(--transition-smooth);
 }
 
 .context-sidebar.collapsed {
-  width: 52px;
-  flex-basis: 52px;
+  width: 48px !important; /* Ensure collapsed state overrides inline style */
+  flex-basis: 48px !important;
 }
 
 .context-sidebar-header {

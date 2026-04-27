@@ -2,6 +2,7 @@ import { marked } from 'marked'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import { DEFAULT_LIST_PREFIX_CLASS, buildStructuredPlainText, decorateListPrefixes, getListDepth, stripDecoratedListPrefixes } from './markdownListFormat'
+import { getDirectoryFileUrl } from './fileUrlUtils'
 
 function escapeHtml(value = '') {
 	return String(value)
@@ -9,22 +10,6 @@ function escapeHtml(value = '') {
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;')
-}
-
-function getDirectoryFileUrl(filePath = '') {
-	if (!filePath) return ''
-
-	const normalized = filePath.replace(/\\/g, '/')
-	const lastSlashIndex = normalized.lastIndexOf('/')
-	const directoryPath = lastSlashIndex >= 0 ? normalized.slice(0, lastSlashIndex + 1) : normalized
-
-	if (!directoryPath) return ''
-
-	if (/^[a-zA-Z]:\//.test(directoryPath)) {
-		return encodeURI(`file:///${directoryPath}`)
-	}
-
-	return encodeURI(`file://${directoryPath.startsWith('/') ? '' : '/'}${directoryPath}`)
 }
 
 function configureMarked() {

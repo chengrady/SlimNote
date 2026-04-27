@@ -14,9 +14,8 @@
       @create-from-clipboard="createFromClipboard"
     />
     <div v-else class="editor-container">
-      <EditorViewToolbar :file-type="activeTab.language?.toUpperCase?.() || 'TEXT'" @pin="openPinWindow" />
       <MarkdownModeToolbar
-        v-if="activeTab.language === 'markdown'"
+        v-if="!isPresentationMode && activeTab.language === 'markdown'"
         :view-mode="markdownViewMode"
         :split-focus="markdownSplitFocus"
         @set-mode="setMarkdownViewMode"
@@ -26,7 +25,7 @@
         @export-pdf="exportMarkdownAsPdf"
       />
       <JsonToolbar
-        v-if="activeTab.language === 'json'"
+        v-if="!isPresentationMode && activeTab.language === 'json'"
         :show-tree="showJsonTree"
         @format="formatJson"
         @minify="minifyJson"
@@ -41,7 +40,7 @@
         @toggle-tree="toggleJsonTree"
       />
       <SqlToolbar
-        v-if="activeTab.language === 'sql'"
+        v-if="!isPresentationMode && activeTab.language === 'sql'"
         :dialect-label="currentSqlDialectLabel"
         @snippet="insertSqlSnippet"
         @format="formatActiveSql"
@@ -51,7 +50,7 @@
         @copy="copyActiveContent('SQL')"
       />
       <LogToolbar
-        v-if="activeTab.language === 'log'"
+        v-if="!isPresentationMode && activeTab.language === 'log'"
         :filter-mode="logFilterMode"
         :wrap-enabled="logWrapEnabled"
         @set-filter="setLogFilterMode"
@@ -61,7 +60,7 @@
         @copy="copyActiveContent('日志')"
       />
       <LogFilterPanel
-        v-if="activeTab.language === 'log' && logFilterMode !== 'all'"
+        v-if="!isPresentationMode && activeTab.language === 'log' && logFilterMode !== 'all'"
         :entries="filteredLogEntries"
         :summary="logFilterSummary"
         @reset="setLogFilterMode('all')"
@@ -70,7 +69,7 @@
         @export="exportFilteredLogResults"
       />
       <MarkdownFormatToolbar
-        v-if="activeTab.language === 'markdown' && editorMode === 'source'"
+        v-if="!isPresentationMode && activeTab.language === 'markdown' && editorMode === 'source'"
         @bold="mdBold"
         @italic="mdItalic"
         @heading="mdHeading"
@@ -166,6 +165,7 @@
                 @active-heading-change="handleActiveHeadingChange"
                 @heading-click="handlePreviewHeadingClick"
                 @copy-error="handleMarkdownPreviewCopyError"
+                @open-file="handlePreviewOpenFile"
               />
             </div>
           </div>
@@ -235,6 +235,7 @@
               @active-heading-change="handleActiveHeadingChange"
               @heading-click="handlePreviewHeadingClick"
               @copy-error="handleMarkdownPreviewCopyError"
+              @open-file="handlePreviewOpenFile"
             />
           </div>
 
@@ -357,7 +358,6 @@ import MarkdownPreview from './MarkdownPreview.vue'
 import MarkdownModeToolbar from './MarkdownModeToolbar.vue'
 import MarkdownOutlinePanel from './MarkdownOutlinePanel.vue'
 import MilkdownEditor from './MilkdownEditor.vue'
-import EditorViewToolbar from './EditorViewToolbar.vue'
 import LogFilterPanel from './LogFilterPanel.vue'
 import ModalDialog from './ModalDialog.vue'
 import SqlToolbar from './SqlToolbar.vue'
@@ -371,7 +371,16 @@ import { repairAndFormat } from '../utils/jsonRepair'
 import { exportCodeToImage, downloadImage } from '../utils/exportImage'
 import { buildMarkdownClipboardPayload, buildMarkdownPdfDocument } from '../utils/markdownPdf'
 import { detectLanguageFromContent, getLanguageDisplayName } from '../utils/contentTypeDetection'
+import { getPathFileName as getFileName } from '../utils/pathUtils'
+import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/rendererEvents'
 import { formatSql, minifySql, transformSqlKeywords } from '../utils/sqlFormatter'
+
+const props = defineProps({
+  isPresentationMode: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const { t, te } = useI18n()
 
@@ -428,9 +437,10 @@ const contentTypeSuggestion = ref({
   reason: ''
 })
 const handledContentTypeSuggestionTabs = new Set()
+const rendererEventCleanups = []
 
 function triggerEditorEvent(name, detail) {
-  window.dispatchEvent(new CustomEvent(name, { detail }))
+  emitRendererEvent(name, detail)
 }
 
 function getEditorLanguageLabel(language) {
@@ -727,7 +737,9 @@ const splitPreviewPaneStyle = computed(() => {
   if (markdownSplitFocus.value === 'preview') {
     return {
       width: '100%',
-      flex: '1 1 100%'
+      flex: '1 1 100%',
+      borderLeft: 'none',
+      boxShadow: 'none'
     }
   }
 
@@ -857,20 +869,23 @@ function saveContextSidebarWidth(type = currentContextType.value, width = contex
   localStorage.setItem(getContextSidebarStorageKey(type), String(clampContextSidebarWidth(width, type)))
 }
 
+const contextResizeStartX = ref(0)
+const contextResizeStartWidth = ref(0)
+
 function startContextResize(e) {
   if (!showContextSidebar.value || isContextSidebarCollapsed.value || !editorWorkspaceRef.value) return
 
   isContextSidebarResizing.value = true
+  contextResizeStartX.value = e.clientX
+  contextResizeStartWidth.value = contextSidebarWidth.value
   e.preventDefault()
 }
 
 function handleContextSidebarMouseMove(e) {
   if (!isContextSidebarResizing.value || !editorWorkspaceRef.value) return
 
-  const bounds = editorWorkspaceRef.value.getBoundingClientRect()
-  if (bounds.width <= 0) return
-
-  const nextWidth = bounds.right - e.clientX
+  const deltaX = contextResizeStartX.value - e.clientX
+  const nextWidth = contextResizeStartWidth.value + deltaX
   contextSidebarWidth.value = clampContextSidebarWidth(nextWidth)
 }
 
@@ -945,11 +960,6 @@ function jumpToMarkdownHeading(heading) {
   expandHeadingAncestors(heading.id)
   monacoEditorRef.value?.jumpToLine(heading.line)
   markdownPreviewRef.value?.scrollToHeading(heading.id)
-}
-
-async function openPinWindow() {
-  if (!activeTab.value) return
-  await window.electronAPI.createPinWindow(activeTab.value.content, settingsStore.settings.theme, activeTab.value.language)
 }
 
 // JSON Toolbar Actions
@@ -1227,6 +1237,11 @@ function handleMarkdownPreviewCopyError(message) {
   showErrorDialog.value = true
 }
 
+function handlePreviewOpenFile(filePath) {
+  if (!filePath) return
+  emitRendererEvent(RENDERER_EVENTS.OPEN_FILE, filePath)
+}
+
 function formatActiveSql() {
   if (!activeTab.value || activeTab.value.language !== 'sql') return
   transformActiveContent((content) => formatSql(content))
@@ -1367,24 +1382,24 @@ function handleKeydown(e) {
   if (e.ctrlKey || e.metaKey) {
     if (e.shiftKey && e.key.toLowerCase() === 'f') {
       e.preventDefault()
-      triggerEditorEvent('open-global-search')
+      triggerEditorEvent(RENDERER_EVENTS.OPEN_GLOBAL_SEARCH)
       return
     }
 
     if (activeTab.value && e.key.toLowerCase() === 'f') {
       e.preventDefault()
-      triggerEditorEvent('editor-find')
+      triggerEditorEvent(RENDERER_EVENTS.FIND)
       return
     }
 
     if (activeTab.value && e.key.toLowerCase() === 'h') {
       e.preventDefault()
-      triggerEditorEvent('editor-replace')
+      triggerEditorEvent(RENDERER_EVENTS.REPLACE)
       return
     }
 
     if (activeTab.value && e.key.toLowerCase() === 'a') {
-      triggerEditorEvent('editor-select-all')
+      triggerEditorEvent(RENDERER_EVENTS.SELECT_ALL)
     }
 
     if (!activeTab.value) return
@@ -1461,7 +1476,7 @@ onMounted(() => {
   contextSidebarWidth.value = loadContextSidebarWidth(currentContextType.value)
 
   window.addEventListener('keydown', handleKeydown)
-  window.addEventListener('editor-jump-to-location', handleJumpToLocation)
+  rendererEventCleanups.push(onRendererEvent(RENDERER_EVENTS.JUMP_TO_LOCATION, handleJumpToLocation))
   document.addEventListener('mousemove', handleSplitMouseMove)
   document.addEventListener('mouseup', stopSplitResize)
   document.addEventListener('mousemove', handleContextSidebarMouseMove)
@@ -1470,7 +1485,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('editor-jump-to-location', handleJumpToLocation)
+  rendererEventCleanups.splice(0).forEach((cleanup) => cleanup())
   document.removeEventListener('mousemove', handleSplitMouseMove)
   document.removeEventListener('mouseup', stopSplitResize)
   document.removeEventListener('mousemove', handleContextSidebarMouseMove)
@@ -1612,7 +1627,7 @@ function newFile() {
 }
 
 function openRecentFile(filePath) {
-  window.dispatchEvent(new CustomEvent('open-file', { detail: filePath }))
+  emitRendererEvent(RENDERER_EVENTS.OPEN_FILE, filePath)
 }
 
 async function restoreLastFolder() {
@@ -1655,14 +1670,10 @@ async function createFromClipboard(type) {
   }
 }
 
-function getFileName(path) {
-  return path.split(/[\\/]/).pop() || path
-}
-
 async function openFile() {
   const result = await window.electronAPI.openFileDialog()
   if (!result.canceled && result.filePaths.length > 0) {
-    window.dispatchEvent(new CustomEvent('open-file', { detail: result.filePaths[0] }))
+    emitRendererEvent(RENDERER_EVENTS.OPEN_FILE, result.filePaths[0])
   }
 }
 
@@ -1680,12 +1691,11 @@ async function openFolder() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--backdrop-blur));
+  background: var(--bg-primary); /* Use primary color to match layout */
   margin: 0;
-  border-radius: var(--radius-md);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--panel-card-shadow);
+  border-radius: 8px; /* Restoring rounded corners */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .editor-pane {
@@ -1703,6 +1713,10 @@ async function openFolder() {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+}
+
+.editor-workspace:not(.context-resizing) :deep(.context-sidebar) {
+  transition: width var(--transition-smooth), flex-basis var(--transition-smooth);
 }
 
 .editor-workspace.split-resizing,
@@ -1724,7 +1738,7 @@ async function openFolder() {
   align-items: center;
   padding: 0 var(--panel-header-padding-x);
   border-bottom: 1px solid var(--glass-border);
-  background: var(--glass-bg);
+  background: var(--bg-primary); /* Flat integration */
   gap: 4px;
   overflow-x: auto;
 }
@@ -1852,6 +1866,7 @@ async function openFolder() {
   flex-direction: column;
   position: relative;
   min-height: 0;
+  background: var(--bg-primary); /* Blend seamlessly */
 }
 
 .document-workspace {
@@ -2011,43 +2026,30 @@ async function openFolder() {
 
 .context-resizer {
   position: relative;
-  flex: 0 0 12px;
+  flex: 0 0 6px; /* Give it a wider invisible hit area */
+  margin-left: -3px;
+  margin-right: -3px;
   cursor: col-resize;
   background: transparent;
-  z-index: 1;
+  z-index: 10;
 }
 
 .context-resizer::before {
   content: '';
   position: absolute;
-  top: 10px;
-  bottom: 10px;
+  top: 0;
+  bottom: 0;
   left: 50%;
-  width: 1px;
   transform: translateX(-50%);
-  background: var(--glass-border);
-  transition: var(--transition-fast);
-}
-
-.context-resizer::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 4px;
-  height: 30px;
-  border-radius: 999px;
-  transform: translate(-50%, -50%);
-  background: var(--resizer-handle-bg);
-  box-shadow: var(--interactive-hover-ring);
-  transition: var(--transition-fast);
+  width: 2px;
+  background: transparent;
+  transition: background var(--transition-fast) 0.2s;
 }
 
 .context-resizer:hover::before,
-.context-resizer:hover::after,
-.editor-workspace.context-resizing .context-resizer::before,
-.editor-workspace.context-resizing .context-resizer::after {
-  background: var(--resizer-active-bg);
+.editor-workspace.context-resizing .context-resizer::before {
+  background: var(--accent-primary);
+  transition-delay: 0.1s;
 }
 
 .context-tab-group {

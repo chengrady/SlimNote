@@ -133,14 +133,14 @@ function nodeMatchesSearch(node, searchQuery) {
   min-height: 24px;
   padding: 2px 8px;
   cursor: pointer;
-  margin: 0;
+  margin: 1px 4px;
   border: none;
-  border-radius: 0;
+  border-radius: 4px;
   transition: var(--transition-fast);
   color: var(--text-main);
   line-height: 1.2;
   gap: 4px;
-  width: 100%;
+  width: calc(100% - 8px);
   box-sizing: border-box;
 }
 

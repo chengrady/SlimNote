@@ -6,6 +6,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 import { useSettingsStore } from '../stores/settings'
+import { RENDERER_EVENTS, onRendererEvent } from '../utils/rendererEvents'
 import { defineCustomThemes, applyTheme, getDefaultEditorTheme } from '../utils/monacoThemes'
 import { isMonospaceFontFamily } from '../utils/fontFamilies'
 
@@ -38,6 +39,77 @@ const settingsStore = useSettingsStore()
 const editorContainer = ref()
 let editor = null
 let isSyncingScroll = false
+const rendererEventCleanups = []
+
+function buildMarkdownListContinuation(lineContent, column) {
+  const safeColumn = Math.max(1, Number(column) || 1)
+  const beforeCursor = lineContent.slice(0, safeColumn - 1)
+  const afterCursor = lineContent.slice(safeColumn - 1)
+
+  if (afterCursor.trim().length > 0) {
+    return null
+  }
+
+  const orderedEmptyMatch = beforeCursor.match(/^(\s*)(\d+)([.)])\s*$/)
+  if (orderedEmptyMatch) {
+    return '\n'
+  }
+
+  const orderedMatch = beforeCursor.match(/^(\s*)(\d+)([.)])\s+(.+)$/)
+  if (orderedMatch) {
+    const nextIndex = Number(orderedMatch[2]) + 1
+    return `\n${orderedMatch[1]}${nextIndex}${orderedMatch[3]} `
+  }
+
+  const taskEmptyMatch = beforeCursor.match(/^(\s*)([-+*])\s\[(?: |x|X)\]\s*$/)
+  if (taskEmptyMatch) {
+    return '\n'
+  }
+
+  const taskMatch = beforeCursor.match(/^(\s*)([-+*])\s\[(?: |x|X)\]\s+(.+)$/)
+  if (taskMatch) {
+    return `\n${taskMatch[1]}${taskMatch[2]} [ ] `
+  }
+
+  const bulletEmptyMatch = beforeCursor.match(/^(\s*)([-+*])\s*$/)
+  if (bulletEmptyMatch) {
+    return '\n'
+  }
+
+  const bulletMatch = beforeCursor.match(/^(\s*)([-+*])\s+(.+)$/)
+  if (bulletMatch) {
+    return `\n${bulletMatch[1]}${bulletMatch[2]} `
+  }
+
+  return null
+}
+
+function handleMarkdownEnter() {
+  if (!editor || props.language !== 'markdown') return false
+
+  const selection = editor.getSelection()
+  const model = editor.getModel()
+  if (!selection || !model || !selection.isEmpty()) return false
+
+  const lineNumber = selection.startLineNumber
+  const column = selection.startColumn
+  const lineContent = model.getLineContent(lineNumber)
+  const continuationText = buildMarkdownListContinuation(lineContent, column)
+
+  if (continuationText === null) {
+    return false
+  }
+
+  editor.pushUndoStop()
+  editor.executeEdits('markdown-list-auto-continue', [{
+    range: selection,
+    text: continuationText,
+    forceMoveMarkers: true
+  }])
+  editor.pushUndoStop()
+  editor.focus()
+  return true
+}
 
 const MONOSPACE_FALLBACK = 'Consolas, "Cascadia Mono", "Courier New", monospace'
 
@@ -138,11 +210,13 @@ const handleWheel = (e) => {
 onMounted(() => {
   if (!editorContainer.value) return
 
-  window.addEventListener('editor-undo', handleUndo)
-  window.addEventListener('editor-redo', handleRedo)
-  window.addEventListener('editor-find', handleFind)
-  window.addEventListener('editor-replace', handleReplace)
-  window.addEventListener('editor-select-all', handleSelectAll)
+  rendererEventCleanups.push(
+    onRendererEvent(RENDERER_EVENTS.UNDO, handleUndo),
+    onRendererEvent(RENDERER_EVENTS.REDO, handleRedo),
+    onRendererEvent(RENDERER_EVENTS.FIND, handleFind),
+    onRendererEvent(RENDERER_EVENTS.REPLACE, handleReplace),
+    onRendererEvent(RENDERER_EVENTS.SELECT_ALL, handleSelectAll)
+  )
   // Use capture phase to intercept the event before Monaco consumes it
   editorContainer.value.addEventListener('wheel', handleWheel, { passive: false, capture: true })
 
@@ -234,6 +308,9 @@ onMounted(() => {
     formatOnPaste: true,
     formatOnType: true,
     mouseWheelZoom: false,
+    quickSuggestions: false,
+    suggestOnTriggerCharacters: false,
+    wordBasedSuggestions: 'off',
     unicodeHighlight: getUnicodeHighlightOptions(settingsStore.settings.unicodeHighlight),
     bracketPairColorization: {
       enabled: props.language === 'json'
@@ -243,6 +320,14 @@ onMounted(() => {
       indentation: true,
       highlightActiveIndentation: true
     }
+  })
+
+  editor.addCommand(monaco.KeyCode.Enter, () => {
+    if (handleMarkdownEnter()) {
+      return
+    }
+
+    editor.trigger('keyboard', 'type', { text: '\n' })
   })
 
   applyIndentationOptions(editor, settingsStore.settings.tabSize)
@@ -343,11 +428,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('editor-undo', handleUndo)
-  window.removeEventListener('editor-redo', handleRedo)
-  window.removeEventListener('editor-find', handleFind)
-  window.removeEventListener('editor-replace', handleReplace)
-  window.removeEventListener('editor-select-all', handleSelectAll)
+  rendererEventCleanups.splice(0).forEach((cleanup) => cleanup())
   if (editorContainer.value) {
     editorContainer.value.removeEventListener('wheel', handleWheel)
   }
@@ -541,11 +622,7 @@ onUnmounted(() => {
   if (editor) {
     editor.dispose()
   }
-  window.removeEventListener('editor-undo', handleUndo)
-  window.removeEventListener('editor-redo', handleRedo)
-  window.removeEventListener('editor-find', handleFind)
-  window.removeEventListener('editor-replace', handleReplace)
-  window.removeEventListener('editor-select-all', handleSelectAll)
+  rendererEventCleanups.splice(0).forEach((cleanup) => cleanup())
 })
 </script>
 

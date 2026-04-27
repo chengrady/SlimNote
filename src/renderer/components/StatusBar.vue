@@ -323,8 +323,7 @@ async function showInFolder() {
   justify-content: space-between;
   align-items: center;
   height: var(--statusbar-height);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--backdrop-blur));
+  background: var(--bg-primary); /* Flat solid matching app background */
   border-top: 1px solid var(--glass-border);
   color: var(--text-muted);
   font-size: var(--ui-font-size-sm);
@@ -411,7 +410,7 @@ async function showInFolder() {
 .language-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .popup-menu {
