@@ -1,0 +1,329 @@
+[
+  {
+    "id": "file.newFile",
+    "action": "new-file",
+    "channel": "menu-new-file",
+    "labelKey": "menu.newFile",
+    "fallbackZh": "新建文件",
+    "fallbackEn": "New File",
+    "category": "file",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+N"
+  },
+  {
+    "id": "file.openFile",
+    "action": "open-file",
+    "channel": "menu-open-file",
+    "labelKey": "menu.openFile",
+    "fallbackZh": "打开文件",
+    "fallbackEn": "Open File",
+    "category": "file",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+O"
+  },
+  {
+    "id": "file.openFolder",
+    "action": "open-folder",
+    "channel": "menu-open-folder",
+    "labelKey": "menu.openFolder",
+    "fallbackZh": "打开文件夹",
+    "fallbackEn": "Open Folder",
+    "category": "file",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+Shift+O"
+  },
+  {
+    "id": "file.save",
+    "action": "save",
+    "channel": "menu-save",
+    "labelKey": "menu.save",
+    "fallbackZh": "保存",
+    "fallbackEn": "Save",
+    "category": "file",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+S"
+  },
+  {
+    "id": "file.saveAs",
+    "action": "save-as",
+    "channel": "menu-save-as",
+    "labelKey": "menu.saveAs",
+    "fallbackZh": "另存为",
+    "fallbackEn": "Save As",
+    "category": "file",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+Shift+S"
+  },
+  {
+    "id": "file.settings",
+    "action": "open-settings",
+    "channel": "menu-open-settings",
+    "labelKey": "menu.settings",
+    "fallbackZh": "设置",
+    "fallbackEn": "Settings",
+    "category": "file",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+,"
+  },
+  {
+    "id": "edit.undo",
+    "action": "undo",
+    "channel": "menu-undo",
+    "labelKey": "menu.undo",
+    "fallbackZh": "撤销",
+    "fallbackEn": "Undo",
+    "category": "edit",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+Z"
+  },
+  {
+    "id": "edit.redo",
+    "action": "redo",
+    "channel": "menu-redo",
+    "labelKey": "menu.redo",
+    "fallbackZh": "重做",
+    "fallbackEn": "Redo",
+    "category": "edit",
+    "scope": "global",
+    "accelerator": {
+      "darwin": "Cmd+Shift+Z",
+      "default": "Ctrl+Y"
+    }
+  },
+  {
+    "id": "edit.cut",
+    "action": "cut",
+    "labelKey": "menu.cut",
+    "fallbackZh": "剪切",
+    "fallbackEn": "Cut",
+    "category": "edit",
+    "scope": "native",
+    "accelerator": "CmdOrCtrl+X"
+  },
+  {
+    "id": "edit.copy",
+    "action": "copy",
+    "labelKey": "menu.copy",
+    "fallbackZh": "复制",
+    "fallbackEn": "Copy",
+    "category": "edit",
+    "scope": "native",
+    "accelerator": "CmdOrCtrl+C"
+  },
+  {
+    "id": "edit.paste",
+    "action": "paste",
+    "labelKey": "menu.paste",
+    "fallbackZh": "粘贴",
+    "fallbackEn": "Paste",
+    "category": "edit",
+    "scope": "native",
+    "accelerator": "CmdOrCtrl+V"
+  },
+  {
+    "id": "edit.selectAll",
+    "action": "select-all",
+    "labelKey": "menu.selectAll",
+    "fallbackZh": "全选",
+    "fallbackEn": "Select All",
+    "category": "edit",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+A"
+  },
+  {
+    "id": "edit.find",
+    "action": "find",
+    "channel": "menu-find",
+    "labelKey": "menu.find",
+    "fallbackZh": "查找",
+    "fallbackEn": "Find",
+    "category": "edit",
+    "scope": "editor",
+    "accelerator": "CmdOrCtrl+F"
+  },
+  {
+    "id": "edit.replace",
+    "action": "replace",
+    "channel": "menu-replace",
+    "labelKey": "menu.replace",
+    "fallbackZh": "替换",
+    "fallbackEn": "Replace",
+    "category": "edit",
+    "scope": "editor",
+    "accelerator": "CmdOrCtrl+H"
+  },
+  {
+    "id": "edit.globalSearch",
+    "action": "global-search",
+    "channel": "menu-global-search",
+    "labelKey": "menu.globalSearch",
+    "fallbackZh": "全局搜索",
+    "fallbackEn": "Global Search",
+    "category": "edit",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+Shift+F"
+  },
+  {
+    "id": "view.toggleSidebar",
+    "action": "toggle-sidebar",
+    "channel": "menu-toggle-sidebar",
+    "labelKey": "menu.toggleSidebar",
+    "fallbackZh": "切换侧边栏",
+    "fallbackEn": "Toggle Sidebar",
+    "category": "view",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+B"
+  },
+  {
+    "id": "view.toggleFullscreen",
+    "action": "toggle-fullscreen",
+    "labelKey": "menu.toggleFullscreen",
+    "fallbackZh": "全屏模式",
+    "fallbackEn": "Toggle Fullscreen",
+    "category": "view",
+    "scope": "global",
+    "accelerator": {
+      "darwin": "Ctrl+Cmd+F",
+      "default": "F11"
+    }
+  },
+  {
+    "id": "view.togglePresentationMode",
+    "action": "toggle-presentation-mode",
+    "channel": "menu-toggle-presentation-mode",
+    "labelKey": "menu.togglePresentationMode",
+    "fallbackZh": "演示模式",
+    "fallbackEn": "Presentation Mode",
+    "category": "view",
+    "scope": "global",
+    "accelerator": {
+      "darwin": "Cmd+Shift+P",
+      "default": "Shift+F5"
+    }
+  },
+  {
+    "id": "dev.reload",
+    "action": "reload",
+    "labelKey": "menu.reload",
+    "fallbackZh": "重新加载",
+    "fallbackEn": "Reload",
+    "category": "developer",
+    "scope": "developer",
+    "accelerator": "CmdOrCtrl+R",
+    "devOnly": true
+  },
+  {
+    "id": "dev.forceReload",
+    "action": "force-reload",
+    "labelKey": "menu.forceReload",
+    "fallbackZh": "强制重新加载",
+    "fallbackEn": "Force Reload",
+    "category": "developer",
+    "scope": "developer",
+    "devOnly": true
+  },
+  {
+    "id": "dev.toggleDevTools",
+    "action": "toggle-devtools",
+    "labelKey": "menu.toggleDevTools",
+    "fallbackZh": "切换开发者工具",
+    "fallbackEn": "Toggle Developer Tools",
+    "category": "developer",
+    "scope": "developer",
+    "accelerator": {
+      "darwin": "Alt+Cmd+I",
+      "default": "Ctrl+Shift+I"
+    },
+    "devOnly": true
+  },
+  {
+    "id": "json.format",
+    "labelKey": "jsonToolbar.format",
+    "fallbackZh": "格式化 JSON",
+    "fallbackEn": "Format JSON",
+    "category": "json",
+    "scope": "json",
+    "accelerator": "CmdOrCtrl+Alt+F"
+  },
+  {
+    "id": "json.minify",
+    "labelKey": "jsonToolbar.minify",
+    "fallbackZh": "压缩 JSON",
+    "fallbackEn": "Minify JSON",
+    "category": "json",
+    "scope": "json",
+    "accelerator": "CmdOrCtrl+Shift+M"
+  },
+  {
+    "id": "json.repair",
+    "labelKey": "jsonToolbar.repair",
+    "fallbackZh": "修复 JSON",
+    "fallbackEn": "Repair JSON",
+    "category": "json",
+    "scope": "json",
+    "accelerator": "CmdOrCtrl+Shift+R"
+  },
+  {
+    "id": "json.toggleTree",
+    "labelKey": "jsonToolbar.toggleTree",
+    "fallbackZh": "切换 JSON 树",
+    "fallbackEn": "Toggle JSON Tree",
+    "category": "json",
+    "scope": "json",
+    "accelerator": "CmdOrCtrl+Shift+T"
+  },
+  {
+    "id": "sql.format",
+    "labelKey": "sqlToolbar.format",
+    "fallbackZh": "格式化 SQL",
+    "fallbackEn": "Format SQL",
+    "category": "sql",
+    "scope": "sql",
+    "accelerator": "CmdOrCtrl+Alt+F"
+  },
+  {
+    "id": "sql.minify",
+    "labelKey": "sqlToolbar.minify",
+    "fallbackZh": "压缩 SQL",
+    "fallbackEn": "Minify SQL",
+    "category": "sql",
+    "scope": "sql",
+    "accelerator": "CmdOrCtrl+Shift+M"
+  },
+  {
+    "id": "sql.comment",
+    "labelKey": "sqlToolbar.comment",
+    "fallbackZh": "切换 SQL 注释",
+    "fallbackEn": "Toggle SQL Comment",
+    "category": "sql",
+    "scope": "sql",
+    "accelerator": "CmdOrCtrl+/"
+  },
+  {
+    "id": "sql.upperKeywords",
+    "labelKey": "sqlToolbar.upperKeywords",
+    "fallbackZh": "SQL 关键字大写",
+    "fallbackEn": "Uppercase SQL Keywords",
+    "category": "sql",
+    "scope": "sql",
+    "accelerator": "CmdOrCtrl+Shift+U"
+  },
+  {
+    "id": "sql.lowerKeywords",
+    "labelKey": "sqlToolbar.lowerKeywords",
+    "fallbackZh": "SQL 关键字小写",
+    "fallbackEn": "Lowercase SQL Keywords",
+    "category": "sql",
+    "scope": "sql",
+    "accelerator": "CmdOrCtrl+Shift+L"
+  },
+  {
+    "id": "log.toggleWrap",
+    "labelKey": "logToolbar.toggleWrap",
+    "fallbackZh": "切换日志换行",
+    "fallbackEn": "Toggle Log Wrap",
+    "category": "log",
+    "scope": "log",
+    "accelerator": "CmdOrCtrl+Shift+W"
+  }
+]

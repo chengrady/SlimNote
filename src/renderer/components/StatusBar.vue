@@ -98,11 +98,12 @@
           <div v-if="showLanguagePicker" class="popup-menu language-popup">
             <div class="popup-header">{{ t('statusBar.selectLanguage') }}</div>
             <div class="popup-list">
-              <div 
-                v-for="lang in languages" 
+              <div
+                v-for="lang in languagePickerOptions"
                 :key="lang.value" 
                 class="popup-option"
-                :class="{ active: activeTab.language === lang.value }"
+                :class="{ active: !lang.isAuto && activeTab.language === lang.value, 'auto-language-option': lang.isAuto }"
+                :title="lang.title"
                 @click="changeLanguage(lang.value)"
               >
                 <FileIcon :filename="lang.iconFilename" :size="LANGUAGE_ICON_SIZE" class="language-option-icon" />
@@ -127,6 +128,8 @@ import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useSettingsStore } from '../stores/settings'
 import { FONT_FAMILIES, findFontFamilyOption, getFontOptionStyle } from '../utils/fontFamilies'
+import { detectLanguageFromContent } from '../utils/contentTypeDetection'
+import { RENDERER_EVENTS, emitRendererEvent } from '../utils/rendererEvents'
 import FileIcon from './FileIcon.vue'
 
 const { t, te } = useI18n()
@@ -148,6 +151,7 @@ const activeTab = computed(() => editorStore.getActiveTab())
 
 const fontSizes = [8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 24, 28, 32, 36, 48, 72]
 const LANGUAGE_ICON_SIZE = 21
+const AUTO_LANGUAGE_VALUE = '__auto__'
 const languageLabelSorter = new Intl.Collator('en', { sensitivity: 'base' })
 const LANGUAGE_OPTIONS = [
   { label: 'C', value: 'c', iconFilename: 'source.c' },
@@ -155,6 +159,7 @@ const LANGUAGE_OPTIONS = [
   { label: 'C++', value: 'cpp', iconFilename: 'source.cpp' },
   { label: 'CSS', value: 'css', iconFilename: 'source.css' },
   { label: 'HTML', value: 'html', iconFilename: 'source.html' },
+  { label: 'INI / Config', value: 'ini', iconFilename: 'nginx.conf' },
   { label: 'Java', value: 'java', iconFilename: 'source.java' },
   { label: 'JavaScript', value: 'javascript', iconFilename: 'source.js' },
   { label: 'JSON', value: 'json', iconFilename: 'data.json' },
@@ -165,6 +170,8 @@ const LANGUAGE_OPTIONS = [
   { label: 'SCSS', value: 'scss', iconFilename: 'source.scss' },
   { label: 'SQL', value: 'sql', iconFilename: 'query.sql' },
   { label: 'TypeScript', value: 'typescript', iconFilename: 'source.ts' },
+  { label: 'YAML', value: 'yaml', iconFilename: 'config.yaml' },
+  { label: 'TOML', value: 'toml', iconFilename: 'config.toml' },
   { label: 'XML', value: 'xml', iconFilename: 'document.xml' }
 ].sort((left, right) => languageLabelSorter.compare(left.label, right.label))
 
@@ -202,6 +209,16 @@ const currentSqlDialectLabel = computed(() => {
 })
 
 const languages = computed(() => LANGUAGE_OPTIONS)
+const languagePickerOptions = computed(() => [
+  {
+    label: t('statusBar.autoDetectLanguage'),
+    value: AUTO_LANGUAGE_VALUE,
+    iconFilename: activeTab.value?.filePath || activeTab.value?.title || 'notes.txt',
+    title: t('statusBar.autoDetectLanguageHint'),
+    isAuto: true
+  },
+  ...languages.value
+])
 
 function getLanguageOption(langValue) {
   return languages.value.find(language => language.value === langValue) || null
@@ -246,16 +263,30 @@ function toggleSqlDialectPicker() {
   showFontFamilyPicker.value = false
 }
 
+function detectAutomaticLanguage(tab) {
+  if (!tab) return 'plaintext'
+
+  const contentDetection = detectLanguageFromContent(tab.content, tab.language)
+  if (contentDetection.language) {
+    return contentDetection.language
+  }
+
+  return editorStore.detectLanguage(tab.filePath || tab.title || '')
+}
+
 function changeLanguage(newLang) {
   if (activeTab.value) {
-    editorStore.updateTabLanguage(activeTab.value.id, newLang)
+    const targetLanguage = newLang === AUTO_LANGUAGE_VALUE ? detectAutomaticLanguage(activeTab.value) : newLang
+    editorStore.updateTabLanguage(activeTab.value.id, targetLanguage)
     showLanguagePicker.value = false
   }
 }
 
 function changeFontSize(size) {
   if (activeTab.value) {
+    const previousSize = Number(activeTab.value.fontSize) || Number(settingsStore.settings.fontSize) || size
     editorStore.updateTabFontSize(activeTab.value.id, size)
+    emitRendererEvent(RENDERER_EVENTS.FONT_SIZE_CHANGED, { tabId: activeTab.value.id, size, previousSize })
   } else {
     settingsStore.updateSettings({ fontSize: size })
   }
@@ -318,13 +349,14 @@ async function showInFolder() {
   --status-popup-item-min-height: 38px;
   --status-popup-item-padding-y: 8px;
   --status-popup-item-padding-x: 12px;
-  --status-popup-max-height: min(50vh, calc(100vh - var(--statusbar-height) - 20px));
+  --status-popup-max-height: calc(100vh - var(--statusbar-height) - 20px);
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: var(--statusbar-height);
-  background: var(--bg-primary); /* Flat solid matching app background */
+  background: var(--surface-panel-strong);
   border-top: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-subtle);
   color: var(--text-muted);
   font-size: var(--ui-font-size-sm);
   padding: 0 var(--space-4);
@@ -362,7 +394,7 @@ async function showInFolder() {
   align-items: center;
   gap: 6px;
   cursor: default;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   position: relative;
 }
 
@@ -419,7 +451,7 @@ async function showInFolder() {
   right: 0;
   width: 200px;
   max-height: var(--status-popup-max-height);
-  background: color-mix(in srgb, var(--glass-bg) 92%, var(--bg-deep));
+  background: var(--surface-popover);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   box-shadow: var(--menu-card-shadow);
@@ -429,6 +461,8 @@ async function showInFolder() {
   margin-bottom: 8px;
   z-index: 1000;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: popoverIn var(--transition-popover);
 }
 
 .font-size-popup {
@@ -436,9 +470,32 @@ async function showInFolder() {
 }
 
 .language-popup {
-  width: max-content;
-  min-width: 168px;
-  max-width: min(220px, calc(100vw - 24px));
+  width: min(460px, calc(100vw - 24px));
+  min-width: min(360px, calc(100vw - 24px));
+}
+
+.language-popup .popup-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(118px, 1fr));
+  gap: 4px;
+  overflow-y: visible;
+  padding: 6px;
+}
+
+.language-popup .popup-option {
+  min-height: 34px;
+  padding: 6px 9px;
+  gap: 8px;
+}
+
+.language-popup .auto-language-option {
+  grid-column: 1 / -1;
+  min-height: 36px;
+  border-bottom: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  margin-bottom: 2px;
+  color: var(--text-main);
+  background: var(--surface-toolbar);
 }
 
 .sql-dialect-popup {
@@ -454,7 +511,7 @@ async function showInFolder() {
   font-weight: var(--ui-font-weight-semibold);
   border-bottom: 1px solid var(--glass-border);
   color: var(--text-main);
-  background: color-mix(in srgb, var(--glass-bg) 88%, rgba(var(--accent-primary-rgb), 0.04));
+  background: var(--surface-toolbar);
 }
 
 .popup-list {
@@ -473,7 +530,7 @@ async function showInFolder() {
   cursor: pointer;
   border-radius: var(--radius-sm);
   color: var(--text-interactive, var(--text-muted));
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   line-height: 1.35;
 }
 
@@ -482,7 +539,7 @@ async function showInFolder() {
 }
 
 .popup-option:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
 }
 
@@ -520,6 +577,18 @@ async function showInFolder() {
 
   .status-path {
     max-width: 24vw;
+  }
+}
+
+@media (max-width: 560px) {
+  .language-popup .popup-list {
+    grid-template-columns: repeat(2, minmax(118px, 1fr));
+  }
+}
+
+@media (max-height: 420px) {
+  .language-popup .popup-list {
+    overflow-y: auto;
   }
 }
 </style>

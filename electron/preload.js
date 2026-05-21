@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-min'),
   maximize: () => ipcRenderer.send('window-max'),
   close: () => ipcRenderer.send('window-close'),
+  confirmAppClose: () => ipcRenderer.send('confirm-app-close'),
+  cancelAppClose: () => ipcRenderer.send('cancel-app-close'),
   toggleFullScreen: () => ipcRenderer.send('window-toggle-fullscreen'),
   reloadWindow: () => ipcRenderer.send('window-reload'),
   forceReloadWindow: () => ipcRenderer.send('window-force-reload'),
@@ -53,6 +55,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   openFileAssociationSettings: () => ipcRenderer.invoke('open-file-association-settings'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  consumePendingOpenFiles: () => ipcRenderer.invoke('consume-pending-open-files'),
+
+  // Shortcuts
+  getShortcuts: () => ipcRenderer.invoke('get-shortcuts'),
+  updateShortcut: (payload) => ipcRenderer.invoke('update-shortcut', payload),
+  resetShortcut: (id) => ipcRenderer.invoke('reset-shortcut', id),
+  resetShortcuts: () => ipcRenderer.invoke('reset-shortcuts'),
+  onShortcutsChanged: (callback) => onIpc('shortcuts-changed', callback),
 
   // Pin Window
   createPinWindow: (content, theme, language) => ipcRenderer.invoke('create-pin-window', { content, theme, language }),
@@ -77,6 +87,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuReplace: (callback) => onIpc('menu-replace', callback),
   onMenuGlobalSearch: (callback) => onIpc('menu-global-search', callback),
   onMenuToggleSidebar: (callback) => onIpc('menu-toggle-sidebar', callback),
+  onMenuTogglePresentationMode: (callback) => onIpc('menu-toggle-presentation-mode', callback),
+  onAppBeforeClose: (callback) => onIpc('app-before-close', callback),
   onAppOpenFile: (callback) => onIpc('app-open-file', callback),
   notifyRendererReady: () => ipcRenderer.send('renderer-ready'),
 

@@ -305,6 +305,8 @@ async function runSearch() {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-subtle);
 }
 
 .result-group-header {
@@ -313,7 +315,7 @@ async function runSearch() {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: rgba(var(--accent-primary-rgb), 0.06);
+  background: var(--surface-toolbar);
   border-bottom: 1px solid var(--glass-border);
 }
 
@@ -349,11 +351,11 @@ async function runSearch() {
   gap: 12px;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .result-item:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   box-shadow: var(--interactive-hover-ring);
 }
 

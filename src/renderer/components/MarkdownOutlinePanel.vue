@@ -82,15 +82,15 @@ defineEmits(['jump', 'toggle-heading'])
   padding: 7px 10px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   margin-bottom: 2px;
 }
 
 .outline-item:hover {
-  background: var(--interactive-hover-bg-strong, var(--btn-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
 }
 
@@ -112,8 +112,8 @@ defineEmits(['jump', 'toggle-heading'])
   justify-content: center;
   color: var(--text-shortcut, var(--text-muted));
   flex-shrink: 0;
-  border-radius: 4px;
-  transition: var(--transition-fast);
+  border-radius: var(--toolbar-button-radius);
+  transition: var(--transition-interactive);
 }
 
 .outline-toggle svg {

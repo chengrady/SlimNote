@@ -111,7 +111,8 @@ function toggleTheme() {
   align-items: center;
   padding: 6px 0;
   border-right: 1px solid var(--glass-border);
-  background: var(--bg-primary); /* Flatter background for the activity bar */
+  background: var(--surface-panel-strong);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--glass-border) 62%, transparent);
 }
 
 .activity-bar-top,
@@ -136,21 +137,25 @@ function toggleTheme() {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .activity-button:hover {
-  color: var(--text-main);
-  background: var(--interactive-hover-bg);
+  color: var(--text-interactive-hover, var(--text-main));
+  background: var(--surface-hover);
+  box-shadow: var(--interactive-hover-ring);
+  transform: translateY(-1px);
 }
 
 .activity-button:not(:disabled):active {
-  transform: scale(0.92);
+  box-shadow: var(--shadow-press);
+  transform: translateY(0);
 }
 
 .activity-button.active {
-  color: var(--text-main);
-  background: color-mix(in srgb, var(--interactive-selected-bg-strong) 82%, transparent);
+  color: var(--text-interactive-active, var(--accent-primary));
+  background: var(--surface-active);
+  box-shadow: inset 0 0 0 1px var(--interactive-selected-border);
 }
 
 .activity-button.utility {
@@ -162,10 +167,10 @@ function toggleTheme() {
   left: 0;
   top: 8px;
   bottom: 8px;
-  width: 2px;
+  width: 3px;
   border-radius: 999px;
   background: transparent;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .activity-button.active .activity-indicator {
@@ -186,7 +191,7 @@ function toggleTheme() {
   position: absolute;
   top: 0;
   left: 0;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity var(--motion-emphasized) var(--ease-emphasized), transform var(--motion-emphasized) var(--ease-emphasized);
 }
 
 .moon-icon {
@@ -217,6 +222,7 @@ function toggleTheme() {
 .activity-button:focus-visible {
   outline: none;
   color: var(--text-main);
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
+  box-shadow: var(--field-focus-ring);
 }
 </style>

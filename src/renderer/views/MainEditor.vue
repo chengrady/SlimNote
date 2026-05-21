@@ -2,7 +2,7 @@
   <div class="window-container">
     <TitleBar
       v-show="!isPresentationMode"
-      @open-settings="showSettingsDialog = true"
+      @open-settings="openSettingsDialog"
       @menu-action="handleTitleBarMenuAction"
     />
     <div class="main-editor" :class="{ resizing: isResizing, 'sidebar-collapsed': isSidebarCollapsed, 'presentation-mode': isPresentationMode }">
@@ -16,7 +16,7 @@
         <span class="sidebar-collapse-guide-label">拖到这里会自动折叠</span>
       </div>
       <div v-show="!isPresentationMode" class="sidebar" :class="{ collapsed: isSidebarCollapsed }" :style="sidebarStyle">
-        <ActivityBar :active-view="activeSidebarView" :collapsed="isSidebarCollapsed" @select-view="handleSidebarViewSelect" @toggle-collapse="toggleSidebar" @open-settings="showSettingsDialog = true" />
+        <ActivityBar :active-view="activeSidebarView" :collapsed="isSidebarCollapsed" @select-view="handleSidebarViewSelect" @toggle-collapse="toggleSidebar" @open-settings="openSettingsDialog" />
         <div v-if="!isSidebarCollapsed" class="sidebar-pane">
           <WorkspaceSidebar :mode="activeSidebarView" :collapsed="isSidebarCollapsed" @toggle-collapse="toggleSidebar" @change-mode="handleSidebarViewSelect" />
         </div>
@@ -61,9 +61,25 @@
       </template>
     </ModalDialog>
 
-    <SettingsDialog 
+    <ModalDialog
+      :show="showAppCloseConfirmDialog"
+      :title="appCloseConfirmTitle"
+      @close="cancelAppClose"
+      @confirm="confirmAppClose"
+    >
+      <template #body>
+        <div class="update-dialog-message">{{ appCloseConfirmMessage }}</div>
+      </template>
+      <template #footer>
+        <button type="button" class="modal-btn" @click="cancelAppClose">{{ localizeText('取消', 'Cancel') }}</button>
+        <button type="button" class="modal-btn primary" @click="confirmAppClose">{{ localizeText('退出', 'Exit') }}</button>
+      </template>
+    </ModalDialog>
+
+    <SettingsDialog
+      :key="settingsDialogKey"
       :show="showSettingsDialog"
-      @close="showSettingsDialog = false"
+      @close="closeSettingsDialog"
     />
 
     <AboutDialog
@@ -115,14 +131,18 @@ import GlobalSearchDialog from '../components/GlobalSearchDialog.vue'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import { useSettingsStore } from '../stores/settings'
+import { useShortcutsStore } from '../stores/shortcuts'
 import { getFileExtension } from '../utils/fileSupport'
 import { getDirectoryPath, getPathFileName } from '../utils/pathUtils'
 import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/rendererEvents'
+import { isShortcutEvent } from '../utils/shortcuts'
 import packageJson from '../../../package.json'
 
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
 const settingsStore = useSettingsStore()
+const shortcutsStore = useShortcutsStore()
+shortcutsStore.loadShortcuts()
 const { locale } = useI18n()
 
 const SIDEBAR_MIN_WIDTH = 220
@@ -140,7 +160,9 @@ const isResizing = ref(false)
 const resizePointerX = ref(0)
 const showErrorDialog = ref(false)
 const showUpdateDialog = ref(false)
+const showAppCloseConfirmDialog = ref(false)
 const showSettingsDialog = ref(false)
+const settingsDialogKey = ref(0)
 const showAboutDialog = ref(false)
 const showGlobalSearchDialog = ref(false)
 const errorMessage = ref('')
@@ -176,6 +198,18 @@ const updateDialogCloseText = computed(() => (
     ? localizeText('稍后', 'Later')
     : localizeText('知道了', 'OK')
 ))
+const unsavedTabCount = computed(() => editorStore.tabs.filter(tab => tab.isDirty).length)
+const appCloseConfirmTitle = computed(() => localizeText('退出 SlimNote', 'Exit SlimNote'))
+const appCloseConfirmMessage = computed(() => {
+  if (unsavedTabCount.value > 0) {
+    return localizeText(
+      `还有 ${unsavedTabCount.value} 个标签页包含未保存内容。SlimNote 会在下次启动时尝试恢复这些内容，确定要退出吗？`,
+      `${unsavedTabCount.value} tab(s) contain unsaved changes. SlimNote will try to restore them on next launch. Exit anyway?`
+    )
+  }
+
+  return localizeText('确定要退出 SlimNote 吗？', 'Are you sure you want to exit SlimNote?')
+})
 
 const LANGUAGE_DEFAULT_EXTENSIONS = {
   plaintext: ['txt'],
@@ -250,6 +284,20 @@ const handleSaveTabsEvent = (e) => {
 
 const handleOpenGlobalSearchEvent = () => {
   showGlobalSearchDialog.value = true
+}
+
+function handleAppBeforeClose() {
+  showAppCloseConfirmDialog.value = true
+}
+
+function cancelAppClose() {
+  showAppCloseConfirmDialog.value = false
+  window.electronAPI?.cancelAppClose?.()
+}
+
+function confirmAppClose() {
+  showAppCloseConfirmDialog.value = false
+  window.electronAPI?.confirmAppClose?.()
 }
 
 function dispatchEditorEvent(eventName, detail) {
@@ -570,6 +618,64 @@ async function openFolderFromDialog() {
   }
 }
 
+function filePathKey(filePath) {
+  return String(filePath || '').replace(/\//g, '\\').toLowerCase()
+}
+
+function createFilePathKeySet(filePaths = []) {
+  return new Set(filePaths.map(filePathKey).filter(Boolean))
+}
+
+async function takePendingOpenFiles() {
+  if (typeof window.electronAPI.consumePendingOpenFiles !== 'function') {
+    window.electronAPI.notifyRendererReady()
+    return []
+  }
+
+  const filePaths = await window.electronAPI.consumePendingOpenFiles()
+  return Array.isArray(filePaths) ? filePaths.filter(Boolean) : []
+}
+
+async function openFilePaths(filePaths = []) {
+  for (const filePath of filePaths) {
+    if (isMainEditorDisposed) return
+    await openFile(filePath)
+  }
+}
+
+async function openLaunchFilesThenRestoreSession() {
+  let launchFilePaths = []
+
+  try {
+    launchFilePaths = await takePendingOpenFiles()
+    await openFilePaths(launchFilePaths)
+  } catch (error) {
+    console.warn('Failed to consume launch files:', error)
+  }
+
+  if (isMainEditorDisposed) return
+
+  try {
+    await restoreLastSession({ skipFilePathKeys: createFilePathKeySet(launchFilePaths) })
+  } catch (error) {
+    console.warn('Failed to restore last session:', error)
+  }
+
+  if (isMainEditorDisposed) return
+
+  const activeLaunchFilePath = launchFilePaths[launchFilePaths.length - 1]
+  const activeLaunchTab = activeLaunchFilePath ? editorStore.findTabByPath(activeLaunchFilePath) : null
+  if (activeLaunchTab) {
+    editorStore.setActiveTab(activeLaunchTab.id)
+  }
+
+  try {
+    await openFilePaths(await takePendingOpenFiles())
+  } catch (error) {
+    console.warn('Failed to consume pending open files:', error)
+  }
+}
+
 async function handleTitleBarMenuAction(action) {
   switch (action) {
     case 'new-file':
@@ -639,6 +745,15 @@ async function handleTitleBarMenuAction(action) {
 }
 
 // 窗口大小调整
+function openSettingsDialog() {
+  settingsDialogKey.value += 1
+  showSettingsDialog.value = true
+}
+
+function closeSettingsDialog() {
+  showSettingsDialog.value = false
+}
+
 function startResize(e) {
   if (isSidebarCollapsed.value) return
   isResizing.value = true
@@ -780,7 +895,7 @@ onMounted(() => {
   }))
 
   cleanups.push(window.electronAPI.onMenuOpenSettings(() => {
-    showSettingsDialog.value = true
+    openSettingsDialog()
   }))
 
   cleanups.push(window.electronAPI.onMenuCheckForUpdates(async () => {
@@ -799,8 +914,7 @@ onMounted(() => {
     if (e.key === 'Escape' && isPresentationMode.value) {
       togglePresentationMode()
     }
-    // Also bind Shift+F5 (Windows) / Cmd+Shift+P (Mac) to toggle presentation mode
-    if ((e.key === 'F5' && e.shiftKey) || (e.key === 'P' && e.shiftKey && (e.metaKey || e.ctrlKey))) {
+    if (isShortcutEvent(e, 'view.togglePresentationMode', undefined, shortcutsStore.shortcutOverrides)) {
       e.preventDefault()
       togglePresentationMode()
     }
@@ -830,11 +944,11 @@ onMounted(() => {
     toggleSidebar()
   }))
 
+  cleanups.push(window.electronAPI.onAppBeforeClose?.(handleAppBeforeClose))
+
   cleanups.push(window.electronAPI.onAppOpenFile((filePath) => {
     openFile(filePath)
   }))
-
-  window.electronAPI.notifyRendererReady()
 
   cleanups.push(onRendererEvent(RENDERER_EVENTS.OPEN_GLOBAL_SEARCH, handleOpenGlobalSearchEvent))
   cleanups.push(onRendererEvent(RENDERER_EVENTS.OPEN_FILE, handleOpenFileEvent))
@@ -843,16 +957,13 @@ onMounted(() => {
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', stopResize)
 
-  // 恢复上次打开的目录
+  // 恢复上次打开的文件夹
   fileStore.loadLastOpenedFolder().catch((error) => {
     console.warn('Failed to restore last folder:', error)
   })
 
-  // 恢复上次打开的文件
-  restoreLastSession().then((restored) => {
-    if (restored) return
-  })
-
+  // 先处理启动文件，再恢复会话，避免双击打开被慢会话恢复挡住。
+  openLaunchFilesThenRestoreSession()
 })
 
 onUnmounted(() => {
@@ -871,17 +982,75 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', stopResize)
 })
 
-async function restoreLastSession() {
+async function restoreLastSession(options = {}) {
   const session = editorStore.loadSession()
+  const sessionTabs = Array.isArray(session?.tabs) ? session.tabs : []
+  const skipFilePathKeys = options.skipFilePathKeys || new Set()
+
+  if (sessionTabs.length > 0) {
+    const restoredTabs = []
+
+    for (const snapshot of sessionTabs) {
+      if (!snapshot) continue
+
+      if (snapshot.filePath && skipFilePathKeys.has(filePathKey(snapshot.filePath))) {
+        const tab = editorStore.findTabByPath(snapshot.filePath)
+        if (tab) {
+          restoredTabs.push({ previousId: snapshot.id, tab })
+        }
+        continue
+      }
+
+      const title = snapshot.title || (snapshot.filePath ? getPathFileName(snapshot.filePath) : 'Untitled')
+      const shouldRestoreSnapshot = !snapshot.filePath || snapshot.isDirty
+
+      if (shouldRestoreSnapshot) {
+        const tab = editorStore.createTab(title, snapshot.filePath || null, snapshot.content || '', snapshot.fontSize, {
+          sqlDialect: snapshot.sqlDialect,
+          pinned: snapshot.pinned,
+          language: snapshot.language,
+          encoding: snapshot.encoding,
+          originalContent: Object.prototype.hasOwnProperty.call(snapshot, 'originalContent') ? snapshot.originalContent : snapshot.content || '',
+          isDirty: snapshot.isDirty
+        })
+        if (snapshot.filePath) {
+          rememberFilePath(snapshot.filePath)
+        }
+        restoredTabs.push({ previousId: snapshot.id, tab })
+        continue
+      }
+
+      await openFile(snapshot.filePath, { fontSize: snapshot.fontSize, sqlDialect: snapshot.sqlDialect, pinned: snapshot.pinned })
+      const tab = editorStore.findTabByPath(snapshot.filePath)
+      if (tab) {
+        restoredTabs.push({ previousId: snapshot.id, tab })
+      }
+    }
+
+    editorStore.reorderTabsByPinnedState()
+
+    const activeById = restoredTabs.find(item => item.previousId && item.previousId === session.activeTabId)?.tab
+    const activeByIndex = restoredTabs[session.activeTabIndex]?.tab
+    const activeByFile = session.activeFile ? editorStore.findTabByPath(session.activeFile) : null
+    const activeTab = activeById || activeByFile || activeByIndex
+    if (activeTab) {
+      editorStore.setActiveTab(activeTab.id)
+    }
+
+    return restoredTabs.length > 0
+  }
+
   if (!session?.files?.length) {
     return false
   }
 
   for (const file of session.files) {
     if (typeof file === 'string') {
+      if (skipFilePathKeys.has(filePathKey(file))) continue
       await openFile(file)
       continue
     }
+    if (skipFilePathKeys.has(filePathKey(file.path))) continue
     await openFile(file.path, { fontSize: file.fontSize, sqlDialect: file.sqlDialect, pinned: file.pinned })
   }
 
@@ -1037,7 +1206,7 @@ async function saveCurrentFileAs() {
   padding: 0; /* Remove padding here so sidebar touches top and bottom */
   gap: 0;
   min-height: 0;
-  background: var(--bg-secondary); /* Ensure background acts as the canvas for the separated panes */
+  background: color-mix(in srgb, var(--bg-secondary) 94%, var(--bg-deep));
   position: relative;
   /* Removed border-top since TitleBar already has border-bottom, avoiding double thick lines */
 }
@@ -1083,7 +1252,7 @@ async function saveCurrentFileAs() {
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
-  box-shadow: var(--interactive-hover-ring);
+  box-shadow: var(--shadow-popover);
   transform: translateX(0);
   transition: var(--transition-fast);
 }
@@ -1110,7 +1279,7 @@ async function saveCurrentFileAs() {
   min-width: 48px;
   max-width: 420px;
   border-right: none;
-  background: color-mix(in srgb, var(--bg-primary) 96%, rgba(0, 0, 0, 0.02));
+  background: var(--surface-panel-strong);
   box-shadow: none;
 }
 

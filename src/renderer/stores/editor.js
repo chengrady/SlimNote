@@ -14,17 +14,48 @@ export const useEditorStore = defineStore('editor', () => {
     saveSession()
   }, { deep: true })
 
+  function createSessionTabSnapshot(tab) {
+    const shouldPersistContent = !tab.filePath || tab.isDirty
+    const snapshot = {
+      id: tab.id,
+      title: tab.title,
+      filePath: tab.filePath,
+      isDirty: Boolean(tab.isDirty),
+      encoding: tab.encoding || 'utf-8',
+      language: tab.language,
+      fontSize: tab.fontSize,
+      sqlDialect: tab.sqlDialect || 'mysql',
+      pinned: Boolean(tab.pinned)
+    }
+
+    if (shouldPersistContent) {
+      snapshot.content = tab.content
+      snapshot.originalContent = tab.originalContent
+    }
+
+    return snapshot
+  }
+
   function saveSession() {
     const session = {
+      version: 2,
+      tabs: tabs.value.map(createSessionTabSnapshot),
       files: tabs.value.filter(t => t.filePath).map(t => ({
         path: t.filePath,
         fontSize: t.fontSize,
         sqlDialect: t.sqlDialect || 'mysql',
         pinned: Boolean(t.pinned)
       })),
+      activeTabId: activeTabId.value,
+      activeTabIndex: Math.max(0, tabs.value.findIndex(t => t.id === activeTabId.value)),
       activeFile: getActiveTab()?.filePath || null
     }
-    localStorage.setItem('editorSession', JSON.stringify(session))
+
+    try {
+      localStorage.setItem('editorSession', JSON.stringify(session))
+    } catch (error) {
+      console.error('Failed to save session', error)
+    }
   }
 
   function loadSession() {
@@ -42,17 +73,18 @@ export const useEditorStore = defineStore('editor', () => {
   // 创建新标签页
   function createTab(title = 'Untitled', filePath = null, content = '', fontSize = null, options = {}) {
     const id = `tab-${nextTabId.value++}`
-    const language = detectLanguage(filePath || title)
+    const language = options.language || detectLanguage(filePath || title)
     const settingsStore = useSettingsStore()
+    const originalContent = Object.prototype.hasOwnProperty.call(options, 'originalContent') ? options.originalContent : content
     
     const tab = {
       id,
       title,
       filePath,
       content,
-      originalContent: content,
-      isDirty: false,
-      encoding: 'utf-8',
+      originalContent,
+      isDirty: Object.prototype.hasOwnProperty.call(options, 'isDirty') ? Boolean(options.isDirty) : content !== originalContent,
+      encoding: options.encoding || 'utf-8',
       language,
       fontSize: fontSize || settingsStore.settings.fontSize,
       pinned: Boolean(options.pinned),
@@ -103,6 +135,11 @@ export const useEditorStore = defineStore('editor', () => {
 
   // 关闭所有标签页
   function closeAllTabs() {
+    tabs.value = []
+    activeTabId.value = null
+  }
+
+  function closeUnpinnedTabs() {
     tabs.value = tabs.value.filter(t => t.pinned)
     if (tabs.value.length > 0) {
       activeTabId.value = tabs.value[tabs.value.length - 1].id
@@ -283,11 +320,23 @@ export const useEditorStore = defineStore('editor', () => {
       'jsx': 'javascript',
       'tsx': 'typescript',
       'json': 'json',
+      'jsonc': 'json',
       'md': 'markdown',
+      'markdown': 'markdown',
+      'mdx': 'markdown',
       'html': 'html',
+      'htm': 'html',
       'css': 'css',
       'scss': 'scss',
+      'sass': 'scss',
       'xml': 'xml',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'toml': 'toml',
+      'ini': 'ini',
+      'conf': 'ini',
+      'config': 'ini',
+      'properties': 'ini',
       'py': 'python',
       'java': 'java',
       'c': 'c',
@@ -331,6 +380,7 @@ export const useEditorStore = defineStore('editor', () => {
     loadSession,
     closeOtherTabs,
     closeAllTabs,
+    closeUnpinnedTabs,
     closeTabsToRight,
     togglePin,
     setTabsPinned,

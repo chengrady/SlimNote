@@ -7,7 +7,8 @@ export const RENDERER_EVENTS = Object.freeze({
   REDO: 'editor-redo',
   FIND: 'editor-find',
   REPLACE: 'editor-replace',
-  SELECT_ALL: 'editor-select-all'
+  SELECT_ALL: 'editor-select-all',
+  FONT_SIZE_CHANGED: 'editor-font-size-changed'
 })
 
 export function emitRendererEvent(eventName, detail) {

@@ -12,17 +12,20 @@
       <span class="sql-toolbar-text">{{ t('sqlToolbar.updateSnippet') }}</span>
     </button>
     <div class="sql-toolbar-separator"></div>
-    <button class="sql-toolbar-button" type="button" @click="$emit('format')" :title="`${t('sqlToolbar.format')} SQL (Ctrl+Shift+F)`">
+    <button class="sql-toolbar-button" type="button" @click="$emit('format')" :title="`${t('sqlToolbar.format')} SQL (${shortcut('sql.format')})`">
       <span class="sql-toolbar-text">{{ t('sqlToolbar.format') }}</span>
     </button>
-    <button class="sql-toolbar-button" type="button" @click="$emit('minify')" :title="`${t('sqlToolbar.minify')} SQL (Ctrl+Shift+M)`">
+    <button class="sql-toolbar-button" type="button" @click="$emit('minify')" :title="`${t('sqlToolbar.minify')} SQL (${shortcut('sql.minify')})`">
       <span class="sql-toolbar-text">{{ t('sqlToolbar.minify') }}</span>
     </button>
+    <button class="sql-toolbar-button" type="button" @click="$emit('comment')" :title="`${t('sqlToolbar.comment')} (${shortcut('sql.comment')})`">
+      <span class="sql-toolbar-text">{{ t('sqlToolbar.comment') }}</span>
+    </button>
     <div class="sql-toolbar-separator"></div>
-    <button class="sql-toolbar-button" type="button" @click="$emit('upper-keywords')" :title="`${t('sqlToolbar.upperKeywords')} (Ctrl+Shift+U)`">
+    <button class="sql-toolbar-button" type="button" @click="$emit('upper-keywords')" :title="`${t('sqlToolbar.upperKeywords')} (${shortcut('sql.upperKeywords')})`">
       <span class="sql-toolbar-text">{{ t('sqlToolbar.upperKeywords') }}</span>
     </button>
-    <button class="sql-toolbar-button" type="button" @click="$emit('lower-keywords')" :title="`${t('sqlToolbar.lowerKeywords')} (Ctrl+Shift+L)`">
+    <button class="sql-toolbar-button" type="button" @click="$emit('lower-keywords')" :title="`${t('sqlToolbar.lowerKeywords')} (${shortcut('sql.lowerKeywords')})`">
       <span class="sql-toolbar-text">{{ t('sqlToolbar.lowerKeywords') }}</span>
     </button>
     <div class="sql-toolbar-separator"></div>
@@ -34,8 +37,16 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
+import { useShortcutsStore } from '../stores/shortcuts'
+import { shortcutDisplayById } from '../utils/shortcuts'
 
 const { t } = useI18n()
+const shortcutsStore = useShortcutsStore()
+shortcutsStore.loadShortcuts()
+
+function shortcut(id) {
+  return shortcutDisplayById(id, undefined, shortcutsStore.shortcutOverrides)
+}
 
 defineProps({
   dialectLabel: {
@@ -44,7 +55,7 @@ defineProps({
   }
 })
 
-defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 'copy'])
+defineEmits(['snippet', 'format', 'minify', 'comment', 'upper-keywords', 'lower-keywords', 'copy'])
 </script>
 
 <style scoped>
@@ -54,7 +65,7 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
   align-items: center;
   padding: 0 10px;
   border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-toolbar);
   gap: 6px;
   overflow-x: auto;
 }
@@ -77,7 +88,7 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
   min-height: 24px;
   padding: 0 8px;
   border-radius: 999px;
-  background: rgba(var(--accent-primary-rgb), 0.06);
+  background: var(--surface-active);
   color: var(--text-shortcut, var(--text-muted));
   font-size: 11px;
   white-space: nowrap;
@@ -87,7 +98,7 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-interactive, var(--text-muted));
-  border-radius: 4px;
+  border-radius: var(--toolbar-button-radius);
   cursor: pointer;
   font-size: 12px;
   display: inline-flex;
@@ -97,13 +108,13 @@ defineEmits(['snippet', 'format', 'minify', 'upper-keywords', 'lower-keywords', 
   padding: 4px 10px;
   min-width: auto;
   height: 28px;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .sql-toolbar-button:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);

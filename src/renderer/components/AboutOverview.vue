@@ -117,7 +117,7 @@ function openRepository() {
   align-items: flex-start;
   background:
     linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.12), transparent 54%),
-    color-mix(in srgb, var(--bg-primary) 94%, rgba(var(--accent-primary-rgb), 0.04));
+    var(--surface-panel);
 }
 
 .about-hero-copy {
@@ -196,17 +196,17 @@ function openRepository() {
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--glass-border) 88%, rgba(var(--accent-primary-rgb), 0.1));
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--bg-secondary) 88%, rgba(var(--accent-primary-rgb), 0.04));
+  background: var(--surface-toolbar);
   color: var(--accent-primary);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   word-break: break-all;
 }
 
 .about-link:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }

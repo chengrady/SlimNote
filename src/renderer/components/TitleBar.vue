@@ -83,10 +83,14 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import logo from '../assets/logo.svg'
+import { useShortcutsStore } from '../stores/shortcuts'
+import { shortcutDisplayByAction } from '../utils/shortcuts'
 
 const emit = defineEmits(['open-settings', 'menu-action'])
 
 const { t, locale } = useI18n()
+const shortcutsStore = useShortcutsStore()
+shortcutsStore.loadShortcuts()
 const isMaximized = ref(false)
 const titleBarRef = ref(null)
 const menuPanelRef = ref(null)
@@ -99,46 +103,23 @@ const menuPanelStyle = ref({
 const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
 const isDev = import.meta.env.DEV
 
-const shortcutMap = computed(() => ({
-  newFile: isMac ? 'Cmd+N' : 'Ctrl+N',
-  openFile: isMac ? 'Cmd+O' : 'Ctrl+O',
-  openFolder: isMac ? 'Cmd+Shift+O' : 'Ctrl+Shift+O',
-  save: isMac ? 'Cmd+S' : 'Ctrl+S',
-  saveAs: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
-  settings: isMac ? 'Cmd+,' : 'Ctrl+,',
-  undo: isMac ? 'Cmd+Z' : 'Ctrl+Z',
-  redo: isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y',
-  find: isMac ? 'Cmd+F' : 'Ctrl+F',
-  replace: isMac ? 'Cmd+H' : 'Ctrl+H',
-  globalSearch: isMac ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
-  selectAll: isMac ? 'Cmd+A' : 'Ctrl+A',
-  toggleSidebar: isMac ? 'Cmd+B' : 'Ctrl+B',
-  toggleFullscreen: isMac ? 'Ctrl+Cmd+F' : 'F11',
-  togglePresentationMode: isMac ? '⇧+⌘+P' : 'Shift+F5',
-  reload: isMac ? 'Cmd+R' : 'Ctrl+R',
-  forceReload: isMac ? 'Cmd+Shift+R' : 'Ctrl+Shift+R',
-  toggleDevTools: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I'
-}))
-
 const menus = computed(() => {
-  const shortcuts = shortcutMap.value
-
   return [
     {
       key: 'file',
       label: t('menu.file'),
       sections: [
         [
-          { action: 'new-file', label: t('menu.newFile'), shortcut: shortcuts.newFile },
-          { action: 'open-file', label: t('menu.openFile'), shortcut: shortcuts.openFile },
-          { action: 'open-folder', label: t('menu.openFolder'), shortcut: shortcuts.openFolder }
+          { action: 'new-file', label: t('menu.newFile'), shortcut: shortcut('new-file') },
+          { action: 'open-file', label: t('menu.openFile'), shortcut: shortcut('open-file') },
+          { action: 'open-folder', label: t('menu.openFolder'), shortcut: shortcut('open-folder') }
         ],
         [
-          { action: 'save', label: t('menu.save'), shortcut: shortcuts.save },
-          { action: 'save-as', label: t('menu.saveAs'), shortcut: shortcuts.saveAs }
+          { action: 'save', label: t('menu.save'), shortcut: shortcut('save') },
+          { action: 'save-as', label: t('menu.saveAs'), shortcut: shortcut('save-as') }
         ],
         [
-          { action: 'open-settings', label: t('menu.settings'), shortcut: shortcuts.settings }
+          { action: 'open-settings', label: t('menu.settings'), shortcut: shortcut('open-settings') }
         ],
         [
           { action: 'exit', label: t('menu.exit'), danger: true }
@@ -150,16 +131,16 @@ const menus = computed(() => {
       label: t('menu.edit'),
       sections: [
         [
-          { action: 'undo', label: t('menu.undo'), shortcut: shortcuts.undo },
-          { action: 'redo', label: t('menu.redo'), shortcut: shortcuts.redo }
+          { action: 'undo', label: t('menu.undo'), shortcut: shortcut('undo') },
+          { action: 'redo', label: t('menu.redo'), shortcut: shortcut('redo') }
         ],
         [
-          { action: 'find', label: t('menu.find'), shortcut: shortcuts.find },
-          { action: 'replace', label: t('menu.replace'), shortcut: shortcuts.replace },
-          { action: 'global-search', label: t('menu.globalSearch'), shortcut: shortcuts.globalSearch }
+          { action: 'find', label: t('menu.find'), shortcut: shortcut('find') },
+          { action: 'replace', label: t('menu.replace'), shortcut: shortcut('replace') },
+          { action: 'global-search', label: t('menu.globalSearch'), shortcut: shortcut('global-search') }
         ],
         [
-          { action: 'select-all', label: t('menu.selectAll'), shortcut: shortcuts.selectAll }
+          { action: 'select-all', label: t('menu.selectAll'), shortcut: shortcut('select-all') }
         ]
       ]
     },
@@ -168,16 +149,16 @@ const menus = computed(() => {
       label: t('menu.view'),
       sections: [
         [
-          { action: 'toggle-sidebar', label: menuLabel('menu.toggleSidebar', '切换侧边栏', 'Toggle Sidebar'), shortcut: shortcuts.toggleSidebar },
+          { action: 'toggle-sidebar', label: menuLabel('menu.toggleSidebar', '切换侧边栏', 'Toggle Sidebar'), shortcut: shortcut('toggle-sidebar') },
           { action: 'toggle-theme', label: menuLabel('menu.toggleTheme', '切换主题', 'Toggle Theme') },
-          { action: 'toggle-fullscreen', label: menuLabel('menu.toggleFullscreen', '全屏模式', 'Toggle Fullscreen'), shortcut: shortcuts.toggleFullscreen },
-          { action: 'toggle-presentation-mode', label: menuLabel('menu.togglePresentationMode', '演示模式', 'Presentation Mode'), shortcut: shortcuts.togglePresentationMode }
+          { action: 'toggle-fullscreen', label: menuLabel('menu.toggleFullscreen', '全屏模式', 'Toggle Fullscreen'), shortcut: shortcut('toggle-fullscreen') },
+          { action: 'toggle-presentation-mode', label: menuLabel('menu.togglePresentationMode', '演示模式', 'Presentation Mode'), shortcut: shortcut('toggle-presentation-mode') }
         ],
         ...(isDev
           ? [[
-              { action: 'reload', label: t('menu.reload'), shortcut: shortcuts.reload },
-              { action: 'force-reload', label: t('menu.forceReload'), shortcut: shortcuts.forceReload },
-              { action: 'toggle-devtools', label: t('menu.toggleDevTools'), shortcut: shortcuts.toggleDevTools }
+              { action: 'reload', label: t('menu.reload'), shortcut: shortcut('reload') },
+              { action: 'force-reload', label: t('menu.forceReload'), shortcut: shortcut('force-reload') },
+              { action: 'toggle-devtools', label: t('menu.toggleDevTools'), shortcut: shortcut('toggle-devtools') }
             ]]
           : [])
       ]
@@ -196,6 +177,10 @@ const menus = computed(() => {
 })
 
 const activeMenu = computed(() => menus.value.find(menu => menu.key === activeMenuKey.value) || null)
+
+function shortcut(action) {
+  return shortcutDisplayByAction(action, isMac, shortcutsStore.shortcutOverrides)
+}
 
 function menuLabel(key, zhFallback, enFallback) {
   const value = t(key)
@@ -312,9 +297,9 @@ onUnmounted(() => {
 .title-bar {
   position: relative;
   height: var(--titlebar-height);
-  background: var(--bg-primary); /* Flat background vs glass */
-  /* Title bar spans across with a bottom line */
+  background: var(--surface-panel-strong);
   border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-subtle);
   display: flex;
   align-items: center;
   user-select: none;
@@ -401,19 +386,19 @@ onUnmounted(() => {
   color: var(--text-interactive, var(--text-muted));
   cursor: pointer;
   border-radius: var(--icon-button-radius);
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .menu-trigger:hover,
 .menu-trigger.active {
-  background-color: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background-color: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }
 
 .menu-trigger.active {
   color: var(--text-interactive-active, var(--accent-primary));
-  background-color: var(--interactive-selected-bg-strong, var(--interactive-selected-bg));
+  background-color: var(--surface-active);
   box-shadow: var(--field-focus-ring);
 }
 
@@ -444,19 +429,21 @@ onUnmounted(() => {
   cursor: pointer;
   color: var(--color-text-secondary);
   border-radius: var(--icon-button-radius);
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .control-button:hover {
   background-color: var(--window-control-hover-bg);
   color: var(--window-control-hover-color);
   box-shadow: var(--interactive-hover-ring);
+  transform: translateY(-1px);
 }
 
 .control-button.close:hover {
   background-color: var(--window-close-hover-bg);
   color: var(--window-close-hover-color);
   box-shadow: none;
+  transform: none;
 }
 
 .title-menu-panel {

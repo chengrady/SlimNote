@@ -111,67 +111,14 @@
         </div>
 
         <div v-else-if="!isExplorerView" class="grouped-files">
-          <div v-if="showPinnedGroup" class="file-group pinned-group sidebar-section" :class="currentRootPath ? 'sidebar-section--muted' : 'sidebar-section--emphasis'">
+          <div v-if="showRecentFilesGroup" class="file-group recent-group sidebar-section" :class="currentRootPath ? 'sidebar-section--muted' : 'sidebar-section--primary'">
             <div class="group-header">
               <div class="group-heading">
-                <div class="group-title">{{ t('workspaceSidebar.pinnedItems') }}</div>
-                <div class="group-meta">{{ t('workspaceSidebar.itemCount', { count: filteredPinnedFiles.length }) }}</div>
+                <div class="group-title">{{ t('workspaceSidebar.recentOpened') }}</div>
+                <div class="group-meta">{{ t('workspaceSidebar.itemCount', { count: filteredEntries.length }) }}</div>
               </div>
               <div class="group-actions">
-                <button v-if="currentRootPath" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="togglePinnedExpansion" :title="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')" :aria-label="showPinnedSection ? t('workspaceSidebar.collapsePinned') : t('workspaceSidebar.expandPinned')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline v-if="showPinnedSection" points="18 15 12 9 6 15"/>
-                    <polyline v-else points="6 9 12 15 18 9"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div
-              v-if="showPinnedSection"
-              class="file-list"
-              :class="{ 'group-drop-active': recentDrag.dragPath && recentDrag.targetPinned === true && !recentDrag.targetPath }"
-              @dragover.prevent="onGroupDragOver(true)"
-              @drop.prevent="onGroupDrop(true)"
-            >
-              <div
-                v-for="file in filteredPinnedFiles"
-                :key="file.path"
-                class="recent-file pinned"
-                :class="{ active: file.path === activeFilePath, dragging: recentDrag.dragPath === file.path, 'drag-target': recentDrag.targetPath === file.path && recentDrag.dragPath !== file.path, 'drag-before': recentDrag.targetPath === file.path && recentDrag.position === 'before', 'drag-after': recentDrag.targetPath === file.path && recentDrag.position === 'after' }"
-                @click="handleOpenFile(file.path)"
-                @contextmenu.prevent="showContextMenu($event, file)"
-                tabindex="0"
-                @keydown.enter="handleOpenFile(file.path)"
-                @keydown.space.prevent="handleOpenFile(file.path)"
-                draggable="true"
-                @dragstart="onRecentDragStart(file.path)"
-                @dragover.prevent="onRecentDragOver($event, file.path, true)"
-                @drop.prevent="onRecentDrop(file.path, true)"
-                @dragend="onRecentDragEnd"
-              >
-                <FileIcon :filename="file.path" :size="30" class="recent-file-icon" />
-                <div class="file-info">
-                  <span class="file-name" :title="file.path">{{ getFileName(file.path) }}</span>
-                  <span class="file-path" :title="file.path">{{ file.path }}</span>
-                </div>
-                <span v-if="file.path === activeFilePath" class="file-badge ui-chip">{{ t('workspaceSidebar.openInProgress') }}</span>
-                <button type="button" class="pin-btn active ui-icon-btn ui-icon-btn--sm" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.unpin')" :aria-label="t('workspaceSidebar.unpin')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
-                </button>
-                <button type="button" class="remove-btn ui-icon-btn ui-icon-btn--sm" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
-              </div>
-              <div v-if="filteredPinnedFiles.length === 0" class="drop-placeholder">{{ t('workspaceSidebar.dropToPin') }}</div>
-            </div>
-          </div>
-
-          <div v-if="showUnpinnedGroup" class="file-group recent-group sidebar-section" :class="currentRootPath ? 'sidebar-section--muted' : 'sidebar-section--primary'">
-            <div class="group-header">
-              <div class="group-heading">
-                <div class="group-title">文档</div>
-                <div class="group-meta">{{ t('workspaceSidebar.itemCount', { count: filteredUnpinnedFiles.length }) }}</div>
-              </div>
-              <div class="group-actions">
-                <button v-if="unpinnedRecentFiles.length > 0" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="clearRecent" :title="t('workspaceSidebar.clearRecentFiles')" :aria-label="t('workspaceSidebar.clearRecentFiles')">
+                <button v-if="filteredEntries.length > 0" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="clearRecent" :title="t('workspaceSidebar.clearRecentFiles')" :aria-label="t('workspaceSidebar.clearRecentFiles')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
                 <button v-if="currentRootPath" type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click="toggleRecentFilesExpansion" :title="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')" :aria-label="showRecentFilesSection ? t('workspaceSidebar.collapseRecentFiles') : t('workspaceSidebar.expandRecentFiles')">
@@ -185,12 +132,12 @@
             <div
               v-if="showRecentFilesSection"
               class="file-list"
-              :class="{ 'group-drop-active': recentDrag.dragPath && recentDrag.targetPinned === false && !recentDrag.targetPath }"
-              @dragover.prevent="onGroupDragOver(false)"
-              @drop.prevent="onGroupDrop(false)"
+              :class="{ 'group-drop-active': recentDrag.dragPath && !recentDrag.targetPath }"
+              @dragover.prevent="onGroupDragOver"
+              @drop.prevent="onGroupDrop"
             >
               <div
-                v-for="file in filteredUnpinnedFiles"
+                v-for="file in filteredEntries"
                 :key="file.path"
                 class="recent-file"
                 :class="{ active: file.path === activeFilePath, dragging: recentDrag.dragPath === file.path, 'drag-target': recentDrag.targetPath === file.path && recentDrag.dragPath !== file.path, 'drag-before': recentDrag.targetPath === file.path && recentDrag.position === 'before', 'drag-after': recentDrag.targetPath === file.path && recentDrag.position === 'after' }"
@@ -201,8 +148,8 @@
                 @keydown.space.prevent="handleOpenFile(file.path)"
                 draggable="true"
                 @dragstart="onRecentDragStart(file.path)"
-                @dragover.prevent="onRecentDragOver($event, file.path, false)"
-                @drop.prevent="onRecentDrop(file.path, false)"
+                @dragover.prevent="onRecentDragOver($event, file.path)"
+                @drop.prevent="onRecentDrop(file.path)"
                 @dragend="onRecentDragEnd"
               >
                 <FileIcon :filename="file.path" :size="30" class="recent-file-icon" />
@@ -211,19 +158,16 @@
                   <span class="file-path" :title="file.path">{{ file.path }}</span>
                 </div>
                 <span v-if="file.path === activeFilePath" class="file-badge ui-chip">{{ t('workspaceSidebar.openInProgress') }}</span>
-                <button type="button" class="pin-btn ui-icon-btn ui-icon-btn--sm" @click.stop="togglePin(file.path)" :title="t('workspaceSidebar.pinTop')" :aria-label="t('workspaceSidebar.pinTop')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" /></svg>
-                </button>
                 <button type="button" class="remove-btn ui-icon-btn ui-icon-btn--sm" @click.stop="removeRecent(file.path)" :title="t('workspaceSidebar.remove')">×</button>
               </div>
-              <div v-if="filteredUnpinnedFiles.length === 0" class="drop-placeholder">{{ t('workspaceSidebar.dropToRecent') }}</div>
+              <div v-if="filteredEntries.length === 0" class="drop-placeholder">{{ t('workspaceSidebar.dropToRecent') }}</div>
             </div>
           </div>
 
           <div v-if="recentFolders.length > 0" class="file-group secondary-group sidebar-section" :class="currentRootPath ? 'sidebar-section--muted' : 'sidebar-section--secondary'">
             <div class="group-header">
               <div class="group-heading">
-                <div class="group-title">目录</div>
+                <div class="group-title">{{ t('workspaceSidebar.recentFolders') }}</div>
                 <div class="group-meta">{{ t('workspaceSidebar.folderCount', { count: recentFolders.length }) }}</div>
               </div>
               <div class="group-actions">
@@ -272,10 +216,9 @@
       >
         <template v-if="contextMenu.type === 'recent'">
           <div class="menu-item ui-menu-item" @click="handleContextAction('open')">{{ t('workspaceSidebar.menuOpen') }}</div>
-          <div class="menu-item ui-menu-item" @click="handleContextAction('togglePin')">{{ contextMenu.file?.pinned ? t('workspaceSidebar.unpin') : t('workspaceSidebar.pinTop') }}</div>
           <div class="menu-item ui-menu-item" @click="handleContextAction('remove')">{{ t('workspaceSidebar.remove') }}</div>
           <div class="menu-separator ui-menu-separator"></div>
-          <div class="menu-item ui-menu-item" @click="handleContextAction('clearUnpinned')">{{ t('workspaceSidebar.menuClearUnpinned') }}</div>
+          <div class="menu-item ui-menu-item" @click="handleContextAction('clearRecent')">{{ t('workspaceSidebar.clearRecentFiles') }}</div>
         </template>
         <template v-else-if="contextMenu.type === 'workspace'">
           <template v-if="contextMenu.node?.isRoot">
@@ -356,13 +299,12 @@ const emit = defineEmits(['toggle-collapse', 'change-mode'])
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
 
-const showPinnedSection = ref(true)
 const showRecentFilesSection = ref(true)
 const showRecentFoldersSection = ref(true)
 const isRefreshing = ref(false)
 const selectedWorkspacePath = ref('')
 const workspaceFilter = ref('')
-const recentDrag = ref({ dragPath: null, targetPath: null, targetPinned: null, position: 'before' })
+const recentDrag = ref({ dragPath: null, targetPath: null, position: 'before' })
 const contextMenu = ref({ visible: false, x: 0, y: 0, type: 'recent', file: null, node: null })
 const contextMenuRef = ref(null)
 const workspaceTreeShellRef = ref(null)
@@ -405,12 +347,8 @@ const sidebarSubtitle = computed(() => {
 })
 
 const filteredEntries = computed(() => fileStore.recentFiles)
-const filteredPinnedFiles = computed(() => filteredEntries.value.filter(file => file.pinned))
-const filteredUnpinnedFiles = computed(() => filteredEntries.value.filter(file => !file.pinned))
-const unpinnedRecentFiles = computed(() => fileStore.recentFiles.filter(file => !file.pinned))
 const collapsedRecentFiles = computed(() => fileStore.recentFiles.slice(0, 6))
-const showPinnedGroup = computed(() => !isExplorerView.value && filteredPinnedFiles.value.length > 0)
-const showUnpinnedGroup = computed(() => !isExplorerView.value && filteredUnpinnedFiles.value.length > 0)
+const showRecentFilesGroup = computed(() => !isExplorerView.value && filteredEntries.value.length > 0)
 const showEmptyState = computed(() => {
   if (isExplorerView.value) {
     return !currentRootPath.value
@@ -525,10 +463,6 @@ async function deleteWorkspaceNode(node) {
   await refreshWorkspace()
 }
 
-function togglePinnedExpansion() {
-  showPinnedSection.value = !showPinnedSection.value
-}
-
 function toggleRecentFilesExpansion() {
   showRecentFilesSection.value = !showRecentFilesSection.value
 }
@@ -636,13 +570,10 @@ function handleContextAction(action) {
       case 'open':
         handleOpenFile(file.path)
         break
-      case 'togglePin':
-        togglePin(file.path)
-        break
       case 'remove':
         removeRecent(file.path)
         break
-      case 'clearUnpinned':
+      case 'clearRecent':
         clearRecent()
         break
     }
@@ -708,45 +639,41 @@ function removeRecentFolder(folderPath) {
   fileStore.removeRecentFolder(folderPath)
 }
 
-function togglePin(filePath) {
-  fileStore.toggleRecentPin(filePath)
-}
-
 function onRecentDragStart(filePath) {
-  recentDrag.value = { dragPath: filePath, targetPath: null, targetPinned: null, position: 'before' }
+  recentDrag.value = { dragPath: filePath, targetPath: null, position: 'before' }
 }
 
-function onRecentDragOver(event, filePath, targetPinned) {
+function onRecentDragOver(event, filePath) {
   if (!recentDrag.value.dragPath || recentDrag.value.dragPath === filePath) return
   const rect = event.currentTarget.getBoundingClientRect()
   const offset = event.clientY - rect.top
   const position = offset > rect.height / 2 ? 'after' : 'before'
-  recentDrag.value = { ...recentDrag.value, targetPath: filePath, targetPinned, position }
+  recentDrag.value = { ...recentDrag.value, targetPath: filePath, position }
 }
 
-function onRecentDrop(filePath, targetPinned) {
+function onRecentDrop(filePath) {
   if (!recentDrag.value.dragPath || recentDrag.value.dragPath === filePath) {
     onRecentDragEnd()
     return
   }
 
-  fileStore.moveRecentFile(recentDrag.value.dragPath, filePath, targetPinned, recentDrag.value.position)
+  fileStore.moveRecentFile(recentDrag.value.dragPath, filePath, recentDrag.value.position)
   onRecentDragEnd()
 }
 
-function onGroupDragOver(targetPinned) {
+function onGroupDragOver() {
   if (!recentDrag.value.dragPath) return
-  recentDrag.value = { ...recentDrag.value, targetPath: null, targetPinned, position: 'before' }
+  recentDrag.value = { ...recentDrag.value, targetPath: null, position: 'before' }
 }
 
-function onGroupDrop(targetPinned) {
+function onGroupDrop() {
   if (!recentDrag.value.dragPath) return
-  fileStore.moveRecentFile(recentDrag.value.dragPath, null, targetPinned)
+  fileStore.moveRecentFile(recentDrag.value.dragPath)
   onRecentDragEnd()
 }
 
 function onRecentDragEnd() {
-  recentDrag.value = { dragPath: null, targetPath: null, targetPinned: null, position: 'before' }
+  recentDrag.value = { dragPath: null, targetPath: null, position: 'before' }
 }
 
 function clearRecent() {
@@ -967,7 +894,6 @@ onMounted(() => {
 
 watch(currentRootPath, (path) => {
   const hasWorkspace = Boolean(path)
-  showPinnedSection.value = !hasWorkspace
   showRecentFilesSection.value = true
   showRecentFoldersSection.value = !hasWorkspace
   selectedWorkspacePath.value = hasWorkspace ? path : ''
@@ -991,7 +917,7 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   min-width: 0;
-  background: var(--bg-primary); /* Remove glass effect from sidebar for flatter VS Code look */
+  background: var(--surface-panel-strong);
   backdrop-filter: none;
   border-right: 1px solid var(--glass-border);
   font-size: 13px;
@@ -1020,7 +946,7 @@ onUnmounted(() => {
   padding: var(--panel-header-padding-y) calc(var(--panel-header-padding-x) + 4px);
   gap: var(--space-3);
   border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 90%, rgba(var(--accent-primary-rgb), 0.06));
+  background: var(--surface-toolbar);
 }
 
 .workspace-sidebar.collapsed .panel-header {
@@ -1068,9 +994,8 @@ onUnmounted(() => {
 .collapsed-open-btn,
 .section-link,
 .folder-remove,
-.pin-btn,
 .remove-btn {
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .header-actions button {
@@ -1084,7 +1009,7 @@ onUnmounted(() => {
 .recent-file:hover,
 .section-link:hover {
   color: var(--text-interactive-hover, var(--text-main));
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }
@@ -1095,7 +1020,6 @@ onUnmounted(() => {
 .folder-item:focus-visible,
 .recent-file:focus-visible,
 .menu-item:focus-visible,
-.pin-btn:focus-visible,
 .remove-btn:focus-visible,
 .section-link:focus-visible {
   outline: none;
@@ -1212,7 +1136,7 @@ onUnmounted(() => {
   padding: 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-panel);
 }
 
 .section-card-header,
@@ -1372,15 +1296,6 @@ onUnmounted(() => {
   padding: 0;
 }
 
-.pinned-group .group-title {
-  color: color-mix(in srgb, var(--accent-primary) 82%, #ffffff 18%);
-}
-
-.pinned-group .file-list {
-  border-color: color-mix(in srgb, var(--glass-border) 78%, rgba(var(--accent-primary-rgb), 0.24));
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.05));
-}
-
 .recent-group .file-list {
   background: color-mix(in srgb, var(--glass-bg) 97%, rgba(var(--accent-primary-rgb), 0.015));
 }
@@ -1441,7 +1356,7 @@ onUnmounted(() => {
   padding: 0 12px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--glass-border) 92%, rgba(var(--accent-primary-rgb), 0.08));
-  background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.012));
+  background: var(--surface-panel-strong);
 }
 
 .workspace-filter:focus-within {
@@ -1553,7 +1468,7 @@ onUnmounted(() => {
   padding: 9px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid color-mix(in srgb, var(--glass-border) 96%, rgba(var(--accent-primary-rgb), 0.03));
-  background: color-mix(in srgb, var(--glass-bg) 99%, rgba(var(--accent-primary-rgb), 0.008));
+  background: color-mix(in srgb, var(--surface-panel-strong) 98%, rgba(var(--accent-primary-rgb), 0.02));
   color: var(--text-main);
   cursor: pointer;
 }
@@ -1667,7 +1582,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   color: var(--text-main);
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   border-bottom: 1px solid var(--glass-border);
   position: relative;
 }
@@ -1683,17 +1598,13 @@ onUnmounted(() => {
   margin-right: 2px;
 }
 
-.recent-file.pinned {
-  background: rgba(var(--accent-primary-rgb), 0.025);
-}
-
 .recent-file.active {
   background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.08) 82%, var(--glass-bg));
   box-shadow: inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.72);
 }
 
 .recent-file:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
 }
 
 .recent-file.active:hover {
@@ -1743,7 +1654,6 @@ onUnmounted(() => {
   color: var(--text-interactive-active, var(--accent-primary));
 }
 
-.pin-btn,
 .remove-btn {
   opacity: 0;
   background: none;
@@ -1759,18 +1669,9 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.pin-btn.active,
-.recent-file:hover .pin-btn,
 .recent-file:hover .remove-btn,
-.recent-file:focus-visible .pin-btn,
 .recent-file:focus-visible .remove-btn {
   opacity: 1;
-}
-
-.pin-btn:hover {
-  color: var(--icon-button-hover-color);
-  background: var(--icon-button-hover-bg);
-  box-shadow: var(--interactive-hover-ring);
 }
 
 .empty-state {
@@ -1964,7 +1865,6 @@ onUnmounted(() => {
     gap: 6px;
   }
 
-  .pin-btn,
   .remove-btn,
   .folder-remove {
     opacity: 1;
@@ -2028,15 +1928,15 @@ onUnmounted(() => {
   border-radius: 0;
   border: none;
   border-right: 1px solid var(--glass-border);
-  background: var(--bg-primary);
-  box-shadow: none;
+  background: var(--surface-panel-strong);
+  box-shadow: var(--shadow-subtle);
 }
 
 .panel-header {
   min-height: 35px;
   padding: 8px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: transparent;
+  background: var(--surface-toolbar);
 }
 
 .panel-content {
@@ -2115,12 +2015,12 @@ onUnmounted(() => {
   min-height: 32px;
   padding-top: 6px;
   padding-bottom: 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .recent-file.active,
 .folder-item:has(.folder-badge) {
-  background: var(--interactive-selected-bg-strong);
-  box-shadow: inset 0 0 0 1px var(--interactive-selected-border-strong);
+  background: var(--surface-active);
+  box-shadow: inset 0 0 0 1px var(--interactive-selected-border-strong), inset 2px 0 0 rgba(var(--accent-primary-rgb), 0.64);
 }
 </style>

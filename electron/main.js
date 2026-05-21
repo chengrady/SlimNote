@@ -1,16 +1,32 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } = require('electron')
-const { join, resolve } = require('path')
+const { dirname, join, resolve } = require('path')
 const fs = require('fs')
 const https = require('https')
 const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
+const shortcutRegistry = require('../src/shared/shortcutRegistry.json')
 
 let mainWindow = null
 let pinWindows = new Map()
 let fileWatchers = new Map()
+let localFileWriteSuppressions = new Map()
 let pendingOpenFiles = []
 let rendererReady = false
+let appCloseConfirmed = false
+let appClosePromptOpen = false
+let appCloseFallbackTimer = null
+let pendingOpenFilesFlushTimer = null
+let shortcutOverrides = {}
 
+const SELF_WRITE_CHANGE_SUPPRESSION_MS = 1000
+const SHORTCUTS_CONFIG_FILE = 'shortcuts.json'
+const PENDING_OPEN_FILES_FILE = 'pending-open-files.json'
+const OPEN_FILES_DEBUG_LOG_FILE = 'open-files-debug.log'
+const APP_CLOSE_FALLBACK_TIMEOUT_MS = 8000
+const PENDING_OPEN_FILES_LOAD_FLUSH_DELAY_MS = 120
+const EXTERNAL_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+const SHORTCUT_MODIFIERS = new Set(['alt', 'cmd', 'cmdorctrl', 'command', 'commandorcontrol', 'control', 'ctrl', 'meta', 'option', 'shift'])
+const SHORTCUT_KEYS = new Set(['+', ',', '-', '.', '/', '\\', '`', "'", '=', ';', '[', ']', 'backspace', 'delete', 'del', 'down', 'end', 'enter', 'esc', 'escape', 'home', 'insert', 'left', 'pagedown', 'pageup', 'plus', 'return', 'right', 'space', 'tab', 'up'])
 const SEARCH_EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'dist', 'dist-electron', 'release', 'release-debug'])
 const SEARCHABLE_FILE_EXTENSIONS = new Set([
   'txt', 'text', 'md', 'markdown', 'mdx',
@@ -30,7 +46,7 @@ const locales = {
       file: '文件',
       newFile: '新建文件',
       openFile: '打开文件',
-      openFolder: '打开目录',
+      openFolder: '打开文件夹',
       save: '保存',
       saveAs: '另存为',
       settings: '设置',
@@ -106,6 +122,277 @@ function menuLabel(key, zhFallback, enFallback) {
   const value = t(key)
   if (value !== key) return value
   return currentLocale === 'zh-CN' ? zhFallback : enFallback
+}
+
+function getShortcutById(id) {
+  return shortcutRegistry.find(shortcut => shortcut.id === id) || null
+}
+
+function shortcutAccelerator(id) {
+  const shortcut = getShortcutById(id)
+  if (!shortcut) return undefined
+  if (Object.prototype.hasOwnProperty.call(shortcutOverrides, id)) {
+    return shortcutOverrides[id] || undefined
+  }
+  const accelerator = shortcut.accelerator
+  if (!accelerator) return undefined
+  if (typeof accelerator === 'string') return accelerator
+  return accelerator[process.platform] || accelerator.default
+}
+
+function sendShortcutCommand(id) {
+  const channel = getShortcutById(id)?.channel
+  if (channel) mainWindow?.webContents.send(channel)
+}
+
+function getShortcutsConfigPath() {
+  return join(app.getPath('userData'), SHORTCUTS_CONFIG_FILE)
+}
+
+function getPendingOpenFilesPath() {
+  return join(app.getPath('userData'), PENDING_OPEN_FILES_FILE)
+}
+
+function getOpenFilesDebugLogPath() {
+  return join(app.getPath('userData'), OPEN_FILES_DEBUG_LOG_FILE)
+}
+
+function writeOpenFilesDebugLog(eventName, payload = {}) {
+  try {
+    const line = JSON.stringify({
+      time: new Date().toISOString(),
+      event: eventName,
+      payload
+    })
+    fs.appendFileSync(getOpenFilesDebugLogPath(), `${line}\n`, 'utf8')
+  } catch {
+    // Best-effort diagnostics only.
+  }
+}
+
+function loadShortcutOverrides() {
+  try {
+    const configPath = getShortcutsConfigPath()
+    if (!fs.existsSync(configPath)) {
+      shortcutOverrides = {}
+      return
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    shortcutOverrides = sanitizeShortcutOverrides(parsed?.overrides || {})
+  } catch (error) {
+    console.error('Failed to load shortcuts:', error)
+    shortcutOverrides = {}
+  }
+}
+
+function saveShortcutOverrides() {
+  const configPath = getShortcutsConfigPath()
+  fs.mkdirSync(dirname(configPath), { recursive: true })
+  fs.writeFileSync(configPath, JSON.stringify({ overrides: shortcutOverrides }, null, 2), 'utf8')
+}
+
+function sanitizeShortcutOverrides(overrides) {
+  const validIds = new Set(shortcutRegistry.map(shortcut => shortcut.id))
+  return Object.entries(overrides || {}).reduce((result, [id, accelerator]) => {
+    if (validIds.has(id) && typeof accelerator === 'string') {
+      if (isDeprecatedShortcutOverride(id, accelerator)) return result
+      result[id] = accelerator.trim()
+    }
+    return result
+  }, {})
+}
+
+function isDeprecatedShortcutOverride(id, accelerator) {
+  return id === 'dev.forceReload' && normalizeShortcutAccelerator(accelerator) === normalizeShortcutAccelerator('CmdOrCtrl+Shift+R')
+}
+
+function buildShortcutPayload() {
+  return {
+    ok: true,
+    overrides: { ...shortcutOverrides }
+  }
+}
+
+function notifyShortcutsChanged() {
+  createMenu()
+  mainWindow?.webContents.send('shortcuts-changed', buildShortcutPayload())
+}
+
+function resolveDefaultShortcutAccelerator(shortcut) {
+  const accelerator = shortcut?.accelerator
+  if (!accelerator) return ''
+  if (typeof accelerator === 'string') return accelerator
+  return accelerator[process.platform] || accelerator.default || ''
+}
+
+function resolveEffectiveShortcutAccelerator(shortcut, overrides = shortcutOverrides) {
+  if (shortcut?.id && Object.prototype.hasOwnProperty.call(overrides, shortcut.id)) {
+    return String(overrides[shortcut.id] || '').trim()
+  }
+  return resolveDefaultShortcutAccelerator(shortcut)
+}
+
+function normalizeShortcutAccelerator(accelerator) {
+  if (!accelerator) return ''
+  const parts = String(accelerator).split('+').map(part => normalizeShortcutPart(part)).filter(Boolean)
+  const modifierOrder = ['ctrl', 'cmd', 'alt', 'shift']
+  const modifiers = modifierOrder.filter(modifier => parts.includes(modifier))
+  const keys = parts.filter(part => !modifierOrder.includes(part))
+  return [...modifiers, ...keys].join('+')
+}
+
+function normalizeShortcutPart(part) {
+  const value = String(part || '').trim()
+  const normalized = value.toLowerCase()
+  if (['cmdorctrl', 'commandorcontrol'].includes(normalized)) return process.platform === 'darwin' ? 'cmd' : 'ctrl'
+  if (['command', 'cmd', 'meta'].includes(normalized)) return 'cmd'
+  if (['control', 'ctrl'].includes(normalized)) return 'ctrl'
+  if (['option', 'alt'].includes(normalized)) return 'alt'
+  if (normalized === 'shift') return 'shift'
+  return normalized
+}
+
+function shortcutScopesOverlap(left, right) {
+  const globalScopes = new Set(['global', 'native', 'developer'])
+  if (left.scope === right.scope) return true
+  return globalScopes.has(left.scope) || globalScopes.has(right.scope)
+}
+
+function findShortcutConflicts(targetId, accelerator, overrides = shortcutOverrides) {
+  const shortcut = getShortcutById(targetId)
+  const normalized = normalizeShortcutAccelerator(accelerator)
+  if (!shortcut || !normalized) return []
+
+  return shortcutRegistry.filter(candidate => {
+    if (candidate.id === targetId) return false
+    if (!shortcutScopesOverlap(shortcut, candidate)) return false
+    return normalizeShortcutAccelerator(resolveEffectiveShortcutAccelerator(candidate, overrides)) === normalized
+  })
+}
+
+function isValidShortcutAccelerator(accelerator) {
+  if (accelerator === '') return true
+  const parts = String(accelerator).split('+').map(part => part.trim()).filter(Boolean)
+  if (!parts.length) return false
+
+  const modifiers = new Set()
+  let keyCount = 0
+
+  for (const part of parts) {
+    const normalized = part.toLowerCase()
+    if (SHORTCUT_MODIFIERS.has(normalized)) {
+      if (modifiers.has(normalized)) return false
+      modifiers.add(normalized)
+      continue
+    }
+
+    if (!isValidShortcutKey(part)) return false
+    keyCount += 1
+    if (keyCount > 1) return false
+  }
+
+  return keyCount === 1
+}
+
+function isValidShortcutKey(key) {
+  const value = String(key || '').trim()
+  if (/^[A-Za-z0-9]$/.test(value)) return true
+  if (/^F([1-9]|1[0-9]|2[0-4])$/i.test(value)) return true
+  return SHORTCUT_KEYS.has(value.toLowerCase())
+}
+
+function normalizeExternalUrl(url) {
+  try {
+    const parsedUrl = new URL(String(url || '').trim())
+    return EXTERNAL_URL_PROTOCOLS.has(parsedUrl.protocol) ? parsedUrl.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
+function clearAppCloseFallbackTimer() {
+  if (!appCloseFallbackTimer) return
+  clearTimeout(appCloseFallbackTimer)
+  appCloseFallbackTimer = null
+}
+
+function resetAppClosePromptState() {
+  appClosePromptOpen = false
+  clearAppCloseFallbackTimer()
+}
+
+function clearPendingOpenFilesFlushTimer() {
+  if (!pendingOpenFilesFlushTimer) return
+  clearTimeout(pendingOpenFilesFlushTimer)
+  pendingOpenFilesFlushTimer = null
+}
+
+function confirmMainWindowClose() {
+  appCloseConfirmed = true
+  resetAppClosePromptState()
+  mainWindow?.close()
+}
+
+async function showAppCloseFallbackDialog(targetWindow) {
+  appCloseFallbackTimer = null
+  if (appCloseConfirmed || !targetWindow || targetWindow.isDestroyed()) return
+
+  const result = await dialog.showMessageBox(targetWindow, {
+    type: 'warning',
+    buttons: [
+      menuLabel('common.cancel', '取消', 'Cancel'),
+      menuLabel('menu.exit', '退出', 'Exit')
+    ],
+    defaultId: 0,
+    cancelId: 0,
+    title: menuLabel('app.closeFallbackTitle', '关闭 SlimNote', 'Close SlimNote'),
+    message: menuLabel('app.closeFallbackMessage', '关闭确认暂时没有响应。是否直接退出 SlimNote？', 'The close confirmation did not respond. Exit SlimNote anyway?'),
+    detail: menuLabel(
+      'app.closeFallbackDetail',
+      '如果当前窗口仍有未保存内容，请先取消并尝试保存。',
+      'If this window still has unsaved changes, cancel and try to save first.'
+    )
+  })
+
+  if (appCloseConfirmed || !targetWindow || targetWindow.isDestroyed()) return
+  if (result.response === 1) {
+    confirmMainWindowClose()
+    return
+  }
+
+  appClosePromptOpen = false
+}
+
+function armAppCloseFallback(targetWindow) {
+  clearAppCloseFallbackTimer()
+  appCloseFallbackTimer = setTimeout(() => {
+    showAppCloseFallbackDialog(targetWindow)
+  }, APP_CLOSE_FALLBACK_TIMEOUT_MS)
+  appCloseFallbackTimer.unref?.()
+}
+
+function markLocalFileWriteStarted(filePath) {
+  localFileWriteSuppressions.set(filePath, Number.POSITIVE_INFINITY)
+}
+
+function markLocalFileWriteFinished(filePath) {
+  const expiresAt = Date.now() + SELF_WRITE_CHANGE_SUPPRESSION_MS
+  localFileWriteSuppressions.set(filePath, expiresAt)
+  const timer = setTimeout(() => {
+    if (localFileWriteSuppressions.get(filePath) === expiresAt) {
+      localFileWriteSuppressions.delete(filePath)
+    }
+  }, SELF_WRITE_CHANGE_SUPPRESSION_MS + 50)
+  timer.unref?.()
+}
+
+function shouldSuppressLocalFileChange(filePath) {
+  const expiresAt = localFileWriteSuppressions.get(filePath)
+  if (expiresAt === undefined) return false
+  if (expiresAt === Number.POSITIVE_INFINITY || expiresAt > Date.now()) return true
+  localFileWriteSuppressions.delete(filePath)
+  return false
 }
 
 function normalizeVersionTag(version = '') {
@@ -194,13 +481,13 @@ fs.mkdirSync(sessionDataDir, { recursive: true })
 app.setPath('userData', userDataDir)
 app.setPath('sessionData', sessionDataDir)
 
-function normalizeCandidatePath(candidate) {
+function normalizeCandidatePath(candidate, baseDirectory = process.cwd()) {
   if (!candidate || typeof candidate !== 'string') return null
 
   const trimmed = candidate.trim().replace(/^"+|"+$/g, '')
   if (!trimmed || trimmed.startsWith('--')) return null
 
-  const resolvedPath = resolve(trimmed)
+  const resolvedPath = resolve(baseDirectory || process.cwd(), trimmed)
   if (!fs.existsSync(resolvedPath)) return null
 
   try {
@@ -211,10 +498,28 @@ function normalizeCandidatePath(candidate) {
   }
 }
 
-function extractOpenableFilesFromArgv(argv = []) {
+function extractOpenableFilesFromArgv(argv = [], baseDirectory = process.cwd()) {
   const startIndex = app.isPackaged ? 1 : 2
   const candidates = argv.slice(startIndex)
-  return Array.from(new Set(candidates.map(normalizeCandidatePath).filter(Boolean)))
+  const filePaths = Array.from(new Set(candidates.map(candidate => normalizeCandidatePath(candidate, baseDirectory)).filter(Boolean)))
+  writeOpenFilesDebugLog('extract-openable-files', {
+    argv,
+    baseDirectory,
+    isPackaged: app.isPackaged,
+    candidates,
+    filePaths
+  })
+  return filePaths
+}
+
+function collectOpenableFiles(...filePathGroups) {
+  return Array.from(new Set(filePathGroups.flat().filter(Boolean)))
+}
+
+function buildSingleInstanceData() {
+  return {
+    openFilePaths: extractOpenableFilesFromArgv(process.argv, process.cwd())
+  }
 }
 
 function getFileExtension(filePath = '') {
@@ -365,11 +670,73 @@ function focusMainWindow() {
   mainWindow.focus()
 }
 
+function readPersistedPendingOpenFiles() {
+  try {
+    const pendingPath = getPendingOpenFilesPath()
+    if (!fs.existsSync(pendingPath)) return []
+    const parsed = JSON.parse(fs.readFileSync(pendingPath, 'utf8'))
+    return Array.isArray(parsed?.filePaths) ? parsed.filePaths.map(filePath => normalizeCandidatePath(filePath)).filter(Boolean) : []
+  } catch (error) {
+    writeOpenFilesDebugLog('read-persisted-pending-open-files-failed', {
+      message: error?.message
+    })
+    return []
+  }
+}
+
+function writePersistedPendingOpenFiles() {
+  try {
+    const pendingPath = getPendingOpenFilesPath()
+    fs.mkdirSync(dirname(pendingPath), { recursive: true })
+    fs.writeFileSync(pendingPath, JSON.stringify({ filePaths: pendingOpenFiles }, null, 2), 'utf8')
+  } catch (error) {
+    writeOpenFilesDebugLog('write-persisted-pending-open-files-failed', {
+      message: error?.message,
+      pendingOpenFiles
+    })
+  }
+}
+
+function clearPersistedPendingOpenFiles() {
+  try {
+    const pendingPath = getPendingOpenFilesPath()
+    if (fs.existsSync(pendingPath)) {
+      fs.unlinkSync(pendingPath)
+    }
+  } catch (error) {
+    writeOpenFilesDebugLog('clear-persisted-pending-open-files-failed', {
+      message: error?.message
+    })
+  }
+}
+
 function queueOpenFiles(filePaths = []) {
   if (!Array.isArray(filePaths) || !filePaths.length) return
 
   pendingOpenFiles = Array.from(new Set([...pendingOpenFiles, ...filePaths]))
+  writePersistedPendingOpenFiles()
+  writeOpenFilesDebugLog('queue-open-files', {
+    filePaths,
+    pendingOpenFiles,
+    rendererReady,
+    hasMainWindow: Boolean(mainWindow && !mainWindow.isDestroyed())
+  })
   flushPendingOpenFiles()
+
+  if (pendingOpenFiles.length && mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
+    schedulePendingOpenFilesFlushAfterLoad()
+  }
+}
+
+function takePendingOpenFiles() {
+  const persistedOpenFiles = readPersistedPendingOpenFiles()
+  const nextFiles = Array.from(new Set([...pendingOpenFiles, ...persistedOpenFiles]))
+  pendingOpenFiles = []
+  clearPersistedPendingOpenFiles()
+  writeOpenFilesDebugLog('take-pending-open-files', {
+    nextFiles
+  })
+  return nextFiles
 }
 
 function flushPendingOpenFiles() {
@@ -377,12 +744,33 @@ function flushPendingOpenFiles() {
     return
   }
 
-  const nextFiles = pendingOpenFiles
-  pendingOpenFiles = []
+  clearPendingOpenFilesFlushTimer()
+  const nextFiles = takePendingOpenFiles()
 
   nextFiles.forEach((filePath) => {
     mainWindow.webContents.send('app-open-file', filePath)
   })
+  writeOpenFilesDebugLog('flush-pending-open-files', {
+    nextFiles
+  })
+}
+
+function schedulePendingOpenFilesFlushAfterLoad() {
+  clearPendingOpenFilesFlushTimer()
+  if (!mainWindow || mainWindow.isDestroyed() || !pendingOpenFiles.length) return
+
+  pendingOpenFilesFlushTimer = setTimeout(() => {
+    pendingOpenFilesFlushTimer = null
+    if (!mainWindow || mainWindow.isDestroyed() || !pendingOpenFiles.length) return
+
+    // 文件关联路径可能在渲染端挂载前到达，load 完成后补发一次，避免只能靠手动刷新消费 pending。
+    rendererReady = true
+    writeOpenFilesDebugLog('flush-pending-open-files-after-load', {
+      pendingOpenFiles
+    })
+    flushPendingOpenFiles()
+  }, PENDING_OPEN_FILES_LOAD_FLUSH_DELAY_MS)
+  pendingOpenFilesFlushTimer.unref?.()
 }
 
 async function openFileAssociationSettings() {
@@ -441,14 +829,23 @@ async function checkForUpdates() {
   }
 }
 
-const gotSingleInstanceLock = app.requestSingleInstanceLock()
+const gotSingleInstanceLock = app.requestSingleInstanceLock(buildSingleInstanceData())
 
 if (!gotSingleInstanceLock) {
   app.quit()
 }
 
-app.on('second-instance', (event, argv) => {
-  const filePaths = extractOpenableFilesFromArgv(argv)
+app.on('second-instance', (event, argv, workingDirectory, additionalData = {}) => {
+  const filePaths = collectOpenableFiles(
+    additionalData?.openFilePaths,
+    extractOpenableFilesFromArgv(argv, workingDirectory || process.cwd())
+  )
+  writeOpenFilesDebugLog('second-instance', {
+    argv,
+    workingDirectory,
+    additionalData,
+    filePaths
+  })
   focusMainWindow()
   queueOpenFiles(filePaths)
 })
@@ -457,6 +854,10 @@ app.on('open-file', (event, filePath) => {
   event.preventDefault()
   focusMainWindow()
   const normalizedPath = normalizeCandidatePath(filePath)
+  writeOpenFilesDebugLog('open-file-event', {
+    filePath,
+    normalizedPath
+  })
   if (normalizedPath) {
     queueOpenFiles([normalizedPath])
   }
@@ -553,6 +954,8 @@ async function exportMarkdownPdf({ html, defaultPath } = {}) {
 
 function createWindow() {
   rendererReady = false
+  appCloseConfirmed = false
+  appClosePromptOpen = false
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -576,6 +979,27 @@ function createWindow() {
     console.error(`[renderer:${level}] ${sourceId || 'unknown'}:${line || 0} ${message}`)
   })
 
+  mainWindow.webContents.on('did-start-loading', () => {
+    rendererReady = false
+    resetAppClosePromptState()
+    clearPendingOpenFilesFlushTimer()
+    writeOpenFilesDebugLog('did-start-loading')
+  })
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    writeOpenFilesDebugLog('did-finish-load', {
+      pendingOpenFiles
+    })
+    schedulePendingOpenFilesFlushAfterLoad()
+  })
+
+  mainWindow.webContents.on('render-process-gone', () => {
+    rendererReady = false
+    resetAppClosePromptState()
+    clearPendingOpenFilesFlushTimer()
+    writeOpenFilesDebugLog('render-process-gone')
+  })
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
   } else {
@@ -584,7 +1008,25 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     rendererReady = false
+    resetAppClosePromptState()
+    clearPendingOpenFilesFlushTimer()
     mainWindow = null
+  })
+
+  mainWindow.on('close', (event) => {
+    if (appCloseConfirmed || !mainWindow || mainWindow.isDestroyed()) return
+    if (!rendererReady || mainWindow.webContents.isDestroyed()) {
+      appCloseConfirmed = true
+      resetAppClosePromptState()
+      return
+    }
+
+    event.preventDefault()
+    if (appClosePromptOpen || mainWindow.webContents.isDestroyed()) return
+
+    appClosePromptOpen = true
+    mainWindow.webContents.send('app-before-close')
+    armAppCloseFallback(mainWindow)
   })
 
   mainWindow.on('maximize', () => {
@@ -617,35 +1059,35 @@ function createMenu() {
       submenu: [
         {
           label: t('menu.newFile'),
-          accelerator: 'CmdOrCtrl+N',
-          click: () => mainWindow?.webContents.send('menu-new-file')
+          accelerator: shortcutAccelerator('file.newFile'),
+          click: () => sendShortcutCommand('file.newFile')
         },
         {
           label: t('menu.openFile'),
-          accelerator: 'CmdOrCtrl+O',
-          click: () => mainWindow?.webContents.send('menu-open-file')
+          accelerator: shortcutAccelerator('file.openFile'),
+          click: () => sendShortcutCommand('file.openFile')
         },
         {
           label: t('menu.openFolder'),
-          accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => mainWindow?.webContents.send('menu-open-folder')
+          accelerator: shortcutAccelerator('file.openFolder'),
+          click: () => sendShortcutCommand('file.openFolder')
         },
         { type: 'separator' },
         {
           label: t('menu.save'),
-          accelerator: 'CmdOrCtrl+S',
-          click: () => mainWindow?.webContents.send('menu-save')
+          accelerator: shortcutAccelerator('file.save'),
+          click: () => sendShortcutCommand('file.save')
         },
         {
           label: t('menu.saveAs'),
-          accelerator: 'CmdOrCtrl+Shift+S',
-          click: () => mainWindow?.webContents.send('menu-save-as')
+          accelerator: shortcutAccelerator('file.saveAs'),
+          click: () => sendShortcutCommand('file.saveAs')
         },
         { type: 'separator' },
         {
           label: t('menu.settings'),
-          accelerator: 'CmdOrCtrl+,',
-          click: () => mainWindow?.webContents.send('menu-open-settings')
+          accelerator: shortcutAccelerator('file.settings'),
+          click: () => sendShortcutCommand('file.settings')
         },
         { type: 'separator' },
         { label: t('menu.exit'), role: 'quit' }
@@ -656,34 +1098,34 @@ function createMenu() {
       submenu: [
         {
           label: t('menu.undo'),
-          accelerator: 'CmdOrCtrl+Z',
-          click: () => mainWindow?.webContents.send('menu-undo')
+          accelerator: shortcutAccelerator('edit.undo'),
+          click: () => sendShortcutCommand('edit.undo')
         },
         {
           label: t('menu.redo'),
-          accelerator: process.platform === 'darwin' ? 'Cmd+Shift+Z' : 'Ctrl+Y',
-          click: () => mainWindow?.webContents.send('menu-redo')
+          accelerator: shortcutAccelerator('edit.redo'),
+          click: () => sendShortcutCommand('edit.redo')
         },
         { type: 'separator' },
-        { label: t('menu.cut'), role: 'cut', accelerator: 'CmdOrCtrl+X' },
-        { label: t('menu.copy'), role: 'copy', accelerator: 'CmdOrCtrl+C' },
-        { label: t('menu.paste'), role: 'paste', accelerator: 'CmdOrCtrl+V' },
-        { label: t('menu.selectAll'), role: 'selectAll', accelerator: 'CmdOrCtrl+A' },
+        { label: t('menu.cut'), role: 'cut', accelerator: shortcutAccelerator('edit.cut') },
+        { label: t('menu.copy'), role: 'copy', accelerator: shortcutAccelerator('edit.copy') },
+        { label: t('menu.paste'), role: 'paste', accelerator: shortcutAccelerator('edit.paste') },
+        { label: t('menu.selectAll'), role: 'selectAll', accelerator: shortcutAccelerator('edit.selectAll') },
         { type: 'separator' },
         {
           label: t('menu.find'),
-          accelerator: 'CmdOrCtrl+F',
-          click: () => mainWindow?.webContents.send('menu-find')
+          accelerator: shortcutAccelerator('edit.find'),
+          click: () => sendShortcutCommand('edit.find')
         },
         {
           label: t('menu.replace'),
-          accelerator: 'CmdOrCtrl+H',
-          click: () => mainWindow?.webContents.send('menu-replace')
+          accelerator: shortcutAccelerator('edit.replace'),
+          click: () => sendShortcutCommand('edit.replace')
         },
         {
           label: t('menu.globalSearch'),
-          accelerator: 'CmdOrCtrl+Shift+F',
-          click: () => mainWindow?.webContents.send('menu-global-search')
+          accelerator: shortcutAccelerator('edit.globalSearch'),
+          click: () => sendShortcutCommand('edit.globalSearch')
         }
       ]
     },
@@ -691,7 +1133,7 @@ function createMenu() {
       label: t('menu.view'),
       submenu: [
         { label: t('menu.reload'), role: 'reload' },
-        { label: t('menu.forceReload'), role: 'forceReload' },
+        { label: t('menu.forceReload'), click: () => mainWindow?.webContents.reloadIgnoringCache() },
         { label: t('menu.toggleDevTools'), role: 'toggleDevTools' },
         { type: 'separator' },
         { label: t('menu.resetZoom'), role: 'resetZoom' },
@@ -699,15 +1141,28 @@ function createMenu() {
         { label: t('menu.zoomOut'), role: 'zoomOut' },
         { type: 'separator' },
         {
-          label: 'Toggle Sidebar',
-          click: () => mainWindow?.webContents.send('menu-toggle-sidebar')
+          label: menuLabel('menu.toggleSidebar', '切换侧边栏', 'Toggle Sidebar'),
+          accelerator: shortcutAccelerator('view.toggleSidebar'),
+          click: () => sendShortcutCommand('view.toggleSidebar')
         },
         {
           label: t('menu.toggleTheme'),
           click: () => mainWindow?.webContents.send('menu-toggle-theme')
         },
         { type: 'separator' },
-        { label: t('menu.toggleFullscreen'), role: 'togglefullscreen' }
+        {
+          label: t('menu.toggleFullscreen'),
+          accelerator: shortcutAccelerator('view.toggleFullscreen'),
+          click: () => {
+            if (!mainWindow) return
+            mainWindow.setFullScreen(!mainWindow.isFullScreen())
+          }
+        },
+        {
+          label: menuLabel('menu.togglePresentationMode', '演示模式', 'Presentation Mode'),
+          accelerator: shortcutAccelerator('view.togglePresentationMode'),
+          click: () => sendShortcutCommand('view.togglePresentationMode')
+        }
       ]
     },
     {
@@ -746,6 +1201,64 @@ function registerIpcHandlers() {
     }
   })
 
+  ipcMain.handle('get-shortcuts', () => buildShortcutPayload())
+
+  ipcMain.handle('update-shortcut', (_event, payload = {}) => {
+    const id = String(payload.id || '')
+    const shortcut = getShortcutById(id)
+    if (!shortcut) {
+      return { ok: false, message: 'Shortcut not found' }
+    }
+
+    const accelerator = String(payload.accelerator ?? '').trim()
+    if (!isValidShortcutAccelerator(accelerator)) {
+      return { ok: false, message: 'Invalid shortcut accelerator' }
+    }
+
+    const nextOverrides = { ...shortcutOverrides }
+    const defaultAccelerator = resolveDefaultShortcutAccelerator(shortcut)
+    if (accelerator && normalizeShortcutAccelerator(accelerator) === normalizeShortcutAccelerator(defaultAccelerator)) {
+      delete nextOverrides[id]
+    } else {
+      nextOverrides[id] = accelerator
+    }
+
+    const conflicts = findShortcutConflicts(id, accelerator, nextOverrides)
+    if (conflicts.length) {
+      return {
+        ok: false,
+        message: 'Shortcut conflict',
+        conflictIds: conflicts.map(conflict => conflict.id)
+      }
+    }
+
+    shortcutOverrides = nextOverrides
+    saveShortcutOverrides()
+    notifyShortcutsChanged()
+    return buildShortcutPayload()
+  })
+
+  ipcMain.handle('reset-shortcut', (_event, id) => {
+    const shortcutId = String(id || '')
+    if (!getShortcutById(shortcutId)) {
+      return { ok: false, message: 'Shortcut not found' }
+    }
+
+    const nextOverrides = { ...shortcutOverrides }
+    delete nextOverrides[shortcutId]
+    shortcutOverrides = nextOverrides
+    saveShortcutOverrides()
+    notifyShortcutsChanged()
+    return buildShortcutPayload()
+  })
+
+  ipcMain.handle('reset-shortcuts', () => {
+    shortcutOverrides = {}
+    saveShortcutOverrides()
+    notifyShortcutsChanged()
+    return buildShortcutPayload()
+  })
+
   // Window Controls
   ipcMain.handle('is-maximized', () => mainWindow?.isMaximized())
   ipcMain.on('window-min', () => mainWindow?.minimize())
@@ -757,6 +1270,12 @@ function registerIpcHandlers() {
     }
   })
   ipcMain.on('window-close', () => mainWindow?.close())
+  ipcMain.on('confirm-app-close', () => {
+    confirmMainWindowClose()
+  })
+  ipcMain.on('cancel-app-close', () => {
+    resetAppClosePromptState()
+  })
   ipcMain.on('window-toggle-fullscreen', () => {
     if (!mainWindow) return
     mainWindow.setFullScreen(!mainWindow.isFullScreen())
@@ -770,7 +1289,9 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('open-external', async (_event, url) => {
-    await shell.openExternal(url)
+    const externalUrl = normalizeExternalUrl(url)
+    if (!externalUrl) return false
+    await shell.openExternal(externalUrl)
     return true
   })
 
@@ -791,6 +1312,7 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('write-file', async (event, { filePath, content, encoding }) => {
+    markLocalFileWriteStarted(filePath)
     try {
       const buffer = iconv.encode(content, encoding || 'utf8')
       await fs.promises.writeFile(filePath, buffer)
@@ -798,6 +1320,8 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error('Error writing file:', error)
       throw error
+    } finally {
+      markLocalFileWriteFinished(filePath)
     }
   })
 
@@ -870,6 +1394,7 @@ function registerIpcHandlers() {
 
     const watcher = watch(filePath)
     watcher.on('change', () => {
+      if (shouldSuppressLocalFileChange(filePath)) return
       mainWindow?.webContents.send('file-changed', filePath)
     })
 
@@ -915,8 +1440,18 @@ function registerIpcHandlers() {
     return await checkForUpdates()
   })
 
+  ipcMain.handle('consume-pending-open-files', () => {
+    rendererReady = true
+    const filePaths = takePendingOpenFiles()
+    writeOpenFilesDebugLog('consume-pending-open-files', {
+      filePaths
+    })
+    return filePaths
+  })
+
   ipcMain.on('renderer-ready', () => {
     rendererReady = true
+    writeOpenFilesDebugLog('renderer-ready')
     flushPendingOpenFiles()
   })
 
@@ -989,8 +1524,14 @@ function registerIpcHandlers() {
 
 if (gotSingleInstanceLock) {
   app.whenReady().then(() => {
-    createWindow()
+    writeOpenFilesDebugLog('app-ready', {
+      argv: process.argv,
+      cwd: process.cwd(),
+      isPackaged: app.isPackaged
+    })
+    loadShortcutOverrides()
     registerIpcHandlers()
+    createWindow()
     queueOpenFiles(extractOpenableFilesFromArgv(process.argv))
 
     app.on('activate', () => {

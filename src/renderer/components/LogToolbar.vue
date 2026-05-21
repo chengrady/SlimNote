@@ -14,7 +14,7 @@
       <span class="log-toolbar-text">{{ t('logToolbar.issues') }}</span>
     </button>
     <div class="log-toolbar-separator"></div>
-    <button class="log-toolbar-button" type="button" :class="{ active: wrapEnabled }" @click="$emit('toggle-wrap')" :title="`${t('logToolbar.toggleWrap')} (Ctrl+Shift+W)`">
+    <button class="log-toolbar-button" type="button" :class="{ active: wrapEnabled }" @click="$emit('toggle-wrap')" :title="`${t('logToolbar.toggleWrap')} (${shortcut('log.toggleWrap')})`">
       <span class="log-toolbar-text">{{ t('logToolbar.wrap') }}</span>
     </button>
     <button class="log-toolbar-button" type="button" @click="$emit('jump-level', 'ERROR')" :title="t('logToolbar.nextError')">
@@ -38,8 +38,16 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
+import { useShortcutsStore } from '../stores/shortcuts'
+import { shortcutDisplayById } from '../utils/shortcuts'
 
 const { t } = useI18n()
+const shortcutsStore = useShortcutsStore()
+shortcutsStore.loadShortcuts()
+
+function shortcut(id) {
+  return shortcutDisplayById(id, undefined, shortcutsStore.shortcutOverrides)
+}
 
 defineProps({
   filterMode: {
@@ -62,7 +70,7 @@ defineEmits(['set-filter', 'toggle-wrap', 'jump-level', 'scroll-bottom', 'copy']
   align-items: center;
   padding: 0 10px;
   border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-toolbar);
   gap: 6px;
   overflow-x: auto;
 }
@@ -83,7 +91,7 @@ defineEmits(['set-filter', 'toggle-wrap', 'jump-level', 'scroll-bottom', 'copy']
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-interactive, var(--text-muted));
-  border-radius: 4px;
+  border-radius: var(--toolbar-button-radius);
   cursor: pointer;
   font-size: 12px;
   display: inline-flex;
@@ -93,13 +101,13 @@ defineEmits(['set-filter', 'toggle-wrap', 'jump-level', 'scroll-bottom', 'copy']
   padding: 4px 10px;
   min-width: auto;
   height: 28px;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .log-toolbar-button:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);

@@ -8,6 +8,60 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 格式参考 Keep a Changelog，并尽量按照语义化版本的方式维护。
 
+## [1.5.0] - 2026-05-21
+
+### Added / 新增
+
+- Added a configurable keyboard shortcut system with shared shortcut definitions, conflict detection, persistence, reset actions, and Settings UI.
+- 新增可配置快捷键体系，包含统一快捷键定义、冲突检测、持久化、恢复默认和设置页管理入口。
+
+- Added Markdown preview search and preview-side font-size adjustment with visual feedback.
+- 新增 Markdown 预览内搜索，以及预览侧字号调整和浮层反馈。
+
+- Added safer app-close confirmation and launch-file recovery so unsaved tabs and files opened from the OS are handled more predictably.
+- 新增应用退出确认与启动文件恢复流程，提升未保存标签页和系统文件关联打开场景的可靠性。
+
+- Added SQL line comment toggling from the toolbar and keyboard shortcut.
+- 新增 SQL 行注释切换，支持工具栏按钮和快捷键触发。
+
+### Changed / 调整
+
+- Reworked Settings into a denser desktop layout and added shortcut categories, live preview refinements, and clearer file association guidance.
+- 重构设置页为更紧凑的桌面端布局，并补充快捷键分类、即时预览细节和更清晰的文件关联说明。
+
+- Improved tab handling with configurable unpinned-tab row limits, close-unpinned action, better batch-selection cleanup, and restored dirty untitled tabs across sessions.
+- 优化标签页处理，支持未固定标签最大行数、关闭所有未固定标签页、批量选择清理，并可跨会话恢复未保存的无路径标签页。
+
+- Simplified recent-file ordering and workspace/sidebar interactions, while keeping recent files and folder history easier to scan.
+- 简化最近文件排序和工作台侧栏交互，让最近文件与文件夹历史更易浏览。
+
+- Expanded language detection and language picker support for JSONC, Markdown variants, YAML, TOML, INI/config files, and richer log patterns.
+- 扩展语言检测和语言选择器，补充 JSONC、Markdown 变体、YAML、TOML、INI/配置文件和更多日志格式识别。
+
+- Refined shared surface, popover, hover, focus, and motion styles across the desktop UI.
+- 统一桌面端界面的面板、弹层、悬停、焦点和动效样式。
+
+### Fixed / 修复
+
+- Fixed self-triggered file watcher prompts after saving by suppressing local write change events for a short window.
+- 修复保存后本地写入触发文件监听提示的问题，通过短时间抑制自身写入事件避免误报。
+
+- Fixed file association and second-instance opening paths by persisting pending open files and flushing them after the renderer is ready.
+- 修复文件关联和第二实例打开路径处理，通过持久化待打开文件并在渲染端就绪后补发，避免启动文件丢失。
+
+- Fixed preview search routing so find/replace shortcuts open Markdown preview search when preview-only focus is active.
+- 修复预览聚焦场景下查找/替换快捷键路由，使其优先打开 Markdown 预览搜索。
+
+### Security / 安全
+
+- Sanitized Markdown preview and Markdown PDF HTML output to block unsafe tags, event handlers, inline styles, and unsafe URLs.
+- 对 Markdown 预览和 Markdown PDF HTML 输出增加净化处理，阻止危险标签、事件属性、内联样式和不安全 URL。
+
+### Build / 构建
+
+- Bumped the app version to `1.5.0` and included `src/shared` in packaged files for the shared shortcut registry.
+- 将应用版本提升到 `1.5.0`，并把 `src/shared` 纳入打包文件，确保共享快捷键注册表随应用发布。
+
 ## [1.4.0] - 2026-04-27
 
 ### Added / 新增

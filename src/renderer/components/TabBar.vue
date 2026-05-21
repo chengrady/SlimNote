@@ -1,5 +1,5 @@
 <template>
-  <div class="tab-bar-container ui-pane" :class="tabDensityClass">
+  <div class="tab-bar-container ui-pane" :class="[tabDensityClass, tabMaxRowsClass]" :style="tabMaxRowsStyle">
     <!-- Pinned Tabs Row -->
     <div v-if="pinnedTabs.length > 0" class="pinned-tabs-row">
       <span class="pinned-tabs-label">已固定</span>
@@ -90,6 +90,7 @@
         <div class="menu-item ui-menu-item" @click="handleAction('closeCurrent')">关闭当前标签</div>
         <div class="menu-item ui-menu-item" @click="handleAction('closeOthers')">关闭其他</div>
         <div class="menu-item ui-menu-item" @click="handleAction('closeAll')">关闭所有</div>
+        <div v-if="unpinnedTabs.length > 0" class="menu-item ui-menu-item" @click="handleAction('closeUnpinned')">关闭所有未固定标签页</div>
         <div class="menu-item ui-menu-item" @click="handleAction('closeRight')">关闭右侧</div>
         <div class="menu-separator ui-menu-separator"></div>
         <div class="menu-item ui-menu-item" @click="handleAction('openPinWindow')">在悬浮窗口打开</div>
@@ -146,6 +147,14 @@ const hasTabOverflow = ref(false)
 let tabsResizeObserver = null
 const CONTEXT_MENU_MARGIN = 8
 const tabDensityClass = computed(() => `density-${settingsStore.settings.tabDensity || 'comfortable'}`)
+const tabMaxRows = computed(() => Math.max(1, Math.min(10, Number(settingsStore.settings.unpinnedTabMaxRows || 10))))
+const tabMaxRowsClass = computed(() => `max-tab-rows-${tabMaxRows.value}`)
+const tabMaxRowsStyle = computed(() => {
+  const rowHeight = settingsStore.settings.tabDensity === 'compact' ? 26 : 30
+  const rowGap = 4
+  const extraSpace = 2
+  return { '--tab-max-height': `${rowHeight * tabMaxRows.value + rowGap * Math.max(0, tabMaxRows.value - 1) + extraSpace}px` }
+})
 const dragState = ref({ dragId: null, targetId: null })
 const selectedTabIds = ref([])
 const lastSelectedTabId = ref(null)
@@ -247,6 +256,10 @@ function handleAction(action) {
       break
     case 'closeAll':
       editorStore.closeAllTabs()
+      clearSelectedTabs()
+      break
+    case 'closeUnpinned':
+      closeUnpinnedTabs()
       break
     case 'closeRight':
       editorStore.closeTabsToRight(tabId)
@@ -349,6 +362,17 @@ function closeSelectedTabs() {
   clearSelectedTabs()
 }
 
+function closeUnpinnedTabs() {
+  if (unpinnedTabs.value.length === 0) return
+
+  editorStore.closeUnpinnedTabs()
+  const openIds = new Set(editorStore.tabs.map(tab => tab.id))
+  selectedTabIds.value = selectedTabIds.value.filter(id => openIds.has(id))
+  if (lastSelectedTabId.value && !openIds.has(lastSelectedTabId.value)) {
+    lastSelectedTabId.value = selectedTabIds.value.at(-1) || null
+  }
+}
+
 function pinSelectedTabs() {
   if (!hasUnpinnedSelection.value) return
   editorStore.setTabsPinned(selectedTabIds.value, true)
@@ -394,10 +418,14 @@ function updateTabOverflow() {
     return
   }
 
-  hasTabOverflow.value = tabsRef.value.scrollHeight > tabsRef.value.clientHeight + 1
+  hasTabOverflow.value = tabsRef.value.scrollHeight > tabsRef.value.clientHeight + 1 || tabsRef.value.scrollWidth > tabsRef.value.clientWidth + 1
 }
 
 watch([() => unpinnedTabs.value.length, () => pinnedTabs.value.length], () => {
+  nextTick(updateTabOverflow)
+})
+
+watch([() => settingsStore.settings.tabDensity, () => settingsStore.settings.unpinnedTabMaxRows], () => {
   nextTick(updateTabOverflow)
 })
 
@@ -435,6 +463,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+  --tab-max-height: 32px;
 }
 
 .pinned-tabs-row {
@@ -443,7 +472,7 @@ onUnmounted(() => {
   gap: var(--space-2);
   padding: 6px 8px;
   min-width: 0;
-  background: color-mix(in srgb, var(--bg-secondary) 82%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-toolbar);
   border-bottom: 1px solid var(--glass-border);
 }
 
@@ -464,7 +493,7 @@ onUnmounted(() => {
 
 .tab-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding: 4px 8px; /* Extremely minimal inner padding */
   margin-top: 0;
   margin-bottom: 0; /* Rely on MainEditor.vue's gap: 8px to space out from editor */
@@ -477,19 +506,22 @@ onUnmounted(() => {
 
 .tabs {
   display: flex;
-  flex-wrap: nowrap; /* Prevent wrap to match VS Code sliding tabs */
-  align-items: center; /* Pill style */
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
   flex: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   gap: var(--space-1);
   padding-right: var(--space-4); /* Add some right padding so the last tab doesn't hit the wall */
   padding-bottom: 2px; /* Small breathing room for scrollbar */
   margin-bottom: 0; /* Remove negative shift */
+  max-height: var(--tab-max-height);
   z-index: 2;
 }
 
 .tabs::-webkit-scrollbar {
+  width: 4px;
   height: 4px;
 }
 
@@ -503,7 +535,15 @@ onUnmounted(() => {
 }
 
 .tabs:hover::-webkit-scrollbar {
+  width: 6px;
   height: 6px;
+}
+
+.tab-bar-container.max-tab-rows-1 .tabs {
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .tab {
@@ -514,12 +554,12 @@ onUnmounted(() => {
   height: 30px; /* Slight height tweak for pill */
   background: transparent; /* Clean invisible background */
   border: 1px solid transparent;
-  border-radius: 6px; /* Fully rounded elegant pill */
+  border-radius: var(--radius-sm);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all var(--transition-fast) ease-out;
+  transition: var(--transition-interactive), max-width var(--transition-fast);
   color: var(--text-muted);
   font-size: var(--ui-font-size-sm);
   font-weight: var(--ui-font-weight-medium);
@@ -538,26 +578,24 @@ onUnmounted(() => {
   max-width: 180px;
 }
 
-.tab-bar-container.density-compact .tabs {
-  /* Dynamic height container */
-}
-
 .tab.pinned {
   min-width: 0;
-  background: rgba(var(--accent-primary-rgb), 0.05); /* Subtle pin hint */
+  background: rgba(var(--accent-primary-rgb), 0.05);
 }
 
 .tab:hover {
-  background: var(--btn-bg); /* Soft button hover */
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
+  border-color: var(--interactive-hover-border);
+  box-shadow: var(--interactive-hover-ring);
 }
 
 .tab.active {
-  background: var(--bg-primary);
+  background: var(--surface-panel-strong);
   border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, var(--glass-border));
   color: var(--accent-primary);
   font-weight: var(--ui-font-weight-semibold);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); /* Very faint shadow */
+  box-shadow: var(--shadow-subtle);
   z-index: 2;
 }
 
@@ -708,7 +746,7 @@ onUnmounted(() => {
   padding: 0;
   display: flex;
   align-items: center;
-  align-self: center;
+  align-self: flex-start;
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -729,9 +767,9 @@ onUnmounted(() => {
   min-height: var(--toolbar-button-height);
   padding: 0 8px 0 6px;
   border-radius: var(--toolbar-button-radius);
-  background: color-mix(in srgb, var(--bg-secondary) 82%, rgba(var(--accent-primary-rgb), 0.05));
+  background: var(--surface-toolbar);
   border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(var(--accent-primary-rgb), 0.12));
-  box-shadow: var(--panel-inner-shadow);
+  box-shadow: var(--shadow-subtle);
 }
 
 .batch-count {
@@ -752,6 +790,6 @@ onUnmounted(() => {
 }
 
 .menu-item {
-  transition: background 0.1s;
+  transition: var(--transition-interactive);
 }
 </style>
