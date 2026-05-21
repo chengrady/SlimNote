@@ -133,7 +133,8 @@ function handleBackdropClose() {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(10px) saturate(120%);
-  transition: opacity 0.18s ease;
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  transition: opacity var(--transition-popover);
 }
 
 .modal-wrapper {
@@ -153,13 +154,11 @@ function handleBackdropClose() {
   width: min(420px, calc(100vw - 40px));
   margin: 0 auto;
   max-height: min(calc(100vh - 48px), 920px);
-  background: color-mix(in srgb, var(--bg-primary) 92%, rgba(255, 255, 255, 0.02));
-  border: 1px solid color-mix(in srgb, var(--glass-border) 86%, rgba(255, 255, 255, 0.08));
-  border-radius: 12px;
-  box-shadow:
-    0 18px 48px rgba(0, 0, 0, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
-  transition: transform 0.18s ease, opacity 0.18s ease, border-color var(--transition-fast);
+  background: var(--surface-panel-strong);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(var(--accent-primary-rgb), 0.12));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-floating);
+  transition: transform var(--transition-popover), opacity var(--transition-popover), border-color var(--transition-fast);
   color: var(--text-main);
   overflow: hidden;
   display: flex;
@@ -174,7 +173,7 @@ function handleBackdropClose() {
   min-height: 46px;
   padding: 0 18px;
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 88%, rgba(255, 255, 255, 0.05));
-  background: color-mix(in srgb, var(--bg-secondary) 78%, rgba(var(--accent-primary-rgb), 0.025));
+  background: var(--surface-toolbar);
 }
 
 .modal-title-group {
@@ -211,7 +210,7 @@ function handleBackdropClose() {
   line-height: 1.6;
   color: var(--text-main);
   overflow: auto;
-  background: color-mix(in srgb, var(--bg-primary) 94%, transparent);
+  background: color-mix(in srgb, var(--surface-panel-strong) 96%, transparent);
 }
 
 .modal-body--flush {
@@ -225,7 +224,7 @@ function handleBackdropClose() {
   gap: 8px;
   padding: 12px 18px;
   border-top: 1px solid color-mix(in srgb, var(--glass-border) 88%, rgba(255, 255, 255, 0.05));
-  background: color-mix(in srgb, var(--bg-secondary) 76%, rgba(var(--accent-primary-rgb), 0.02));
+  background: var(--surface-toolbar);
 }
 
 /* Transitions */

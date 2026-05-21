@@ -59,7 +59,7 @@ defineEmits(['bold', 'italic', 'heading', 'unordered-list', 'ordered-list', 'che
   align-items: center;
   padding: 0 10px;
   border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-toolbar);
   gap: 6px;
   overflow-x: auto;
 }
@@ -80,13 +80,13 @@ defineEmits(['bold', 'italic', 'heading', 'unordered-list', 'ordered-list', 'che
   background: transparent;
   border: none;
   color: var(--text-interactive, var(--text-muted));
-  border-radius: 4px;
+  border-radius: var(--toolbar-button-radius);
   cursor: pointer;
   font-size: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-weight: 500;
   white-space: nowrap;
   padding: 4px;
@@ -95,7 +95,7 @@ defineEmits(['bold', 'italic', 'heading', 'unordered-list', 'ordered-list', 'che
 }
 
 .markdown-format-toolbar-button:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }

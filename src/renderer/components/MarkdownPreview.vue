@@ -2,13 +2,34 @@
   <div
     ref="previewContainer"
     class="markdown-preview"
+    :style="previewStyle"
     tabindex="0"
     @scroll="handleScroll"
     @click="handleClick"
     @contextmenu="handleContextMenu"
     @keydown="handleKeydown"
     @copy="handleCopy"
+    @wheel="handleWheel"
+    @auxclick="handleAuxClick"
   >
+    <div v-if="searchVisible" class="preview-floating-tools" @click.stop>
+      <div class="preview-search-panel" @keydown.stop>
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          class="preview-search-input"
+          type="search"
+          :placeholder="t('markdown.searchPlaceholder')"
+          spellcheck="false"
+          @input="runSearch"
+          @keydown="handleSearchKeydown"
+        >
+        <span class="preview-search-count">{{ searchSummary }}</span>
+        <button type="button" class="preview-tool-btn" :disabled="searchMatches.length === 0" :title="t('markdown.previousMatch')" @click="jumpToPreviousMatch">↑</button>
+        <button type="button" class="preview-tool-btn" :disabled="searchMatches.length === 0" :title="t('markdown.nextMatch')" @click="jumpToNextMatch">↓</button>
+        <button type="button" class="preview-tool-btn" :title="t('markdown.closeSearch')" @click="closeSearch">×</button>
+      </div>
+    </div>
     <div ref="previewContent" class="markdown-preview-content" v-html="htmlContent"></div>
   </div>
 
@@ -38,13 +59,14 @@ import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css' // Or another style
 import { useSettingsStore } from '../stores/settings'
 import { resolveRelativeFilePath } from '../utils/fileUrlUtils'
+import { sanitizeHtml } from '../utils/htmlSanitizer'
 import { buildStructuredPlainText, decorateListPrefixes, stripDecoratedListPrefixes } from '../utils/markdownListFormat'
 import { buildMarkdownFragmentClipboardPayload } from '../utils/markdownPdf'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
-const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll', 'copy-error', 'open-file'])
+const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll', 'copy-error', 'open-file', 'change-font-size'])
 
 const props = defineProps({
   content: {
@@ -54,11 +76,20 @@ const props = defineProps({
   sourcePath: {
     type: String,
     default: ''
+  },
+  fontSize: {
+    type: Number,
+    default: 14
   }
 })
 
 const previewContainer = ref(null)
 const previewContent = ref(null)
+const searchInputRef = ref(null)
+const searchVisible = ref(false)
+const searchQuery = ref('')
+const searchMatches = ref([])
+const activeSearchIndex = ref(-1)
 const contextMenu = ref({
   visible: false,
   x: 0,
@@ -69,6 +100,18 @@ const contextMenuRef = ref(null)
 let isSyncingScroll = false
 let mermaidRenderVersion = 0
 const CONTEXT_MENU_MARGIN = 8
+const MIN_FONT_SIZE = 8
+const MAX_FONT_SIZE = 72
+const FONT_SIZE_STEP = 1
+const normalizedFontSize = computed(() => clampFontSize(props.fontSize || settingsStore.settings.fontSize || 14))
+const previewStyle = computed(() => ({
+  '--markdown-preview-font-size': `${normalizedFontSize.value}px`
+}))
+const searchSummary = computed(() => {
+  if (!searchQuery.value.trim()) return t('markdown.searchReady')
+  if (searchMatches.value.length === 0) return t('markdown.noMatches')
+  return `${activeSearchIndex.value + 1}/${searchMatches.value.length}`
+})
 
 function escapeHtml(value = '') {
   return String(value)
@@ -80,6 +123,37 @@ function escapeHtml(value = '') {
 
 function isPrimarySelectAll(event) {
   return (event.ctrlKey || event.metaKey) && !event.altKey && String(event.key || '').toLowerCase() === 'a'
+}
+
+function isPrimaryFind(event) {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && String(event.key || '').toLowerCase() === 'f'
+}
+
+function clampFontSize(value) {
+  return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Number(value) || settingsStore.settings.fontSize || 14))
+}
+
+function changeFontSize(delta) {
+  const nextSize = clampFontSize(normalizedFontSize.value + delta)
+  if (nextSize !== normalizedFontSize.value) {
+    emit('change-font-size', nextSize)
+  }
+}
+
+function resetFontSize() {
+  emit('change-font-size', clampFontSize(settingsStore.settings.fontSize || 14))
+}
+
+function handleWheel(event) {
+  if (!(event.ctrlKey || event.metaKey)) return
+  event.preventDefault()
+  changeFontSize(event.deltaY < 0 ? FONT_SIZE_STEP : -FONT_SIZE_STEP)
+}
+
+function handleAuxClick(event) {
+  if (event.button !== 1 || !(event.ctrlKey || event.metaKey)) return
+  event.preventDefault()
+  resetFontSize()
 }
 
 function isSelectionInsideContainer(container) {
@@ -273,8 +347,19 @@ function handleClick(event) {
 function handleKeydown(event) {
   if (!previewContainer.value) return
 
+  if (isPrimaryFind(event)) {
+    event.preventDefault()
+    openSearch()
+    return
+  }
+
   if (event.key === 'Escape' && contextMenu.value.visible) {
     closeContextMenu()
+    return
+  }
+
+  if (event.key === 'Escape' && searchVisible.value) {
+    closeSearch()
     return
   }
 
@@ -361,6 +446,148 @@ function closeContextMenu() {
     y: 0,
     payload: null
   }
+}
+
+function escapeRegExp(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function clearSearchHighlights() {
+  const container = previewContent.value
+  if (!container) return
+
+  const marks = Array.from(container.querySelectorAll('mark.preview-search-match'))
+  marks.forEach((mark) => {
+    const textNode = document.createTextNode(mark.textContent || '')
+    mark.replaceWith(textNode)
+    textNode.parentNode?.normalize()
+  })
+  searchMatches.value = []
+  activeSearchIndex.value = -1
+}
+
+function shouldSkipSearchNode(node) {
+  const parent = node?.parentElement
+  return Boolean(parent?.closest('script, style, svg'))
+}
+
+function applySearchHighlights() {
+  clearSearchHighlights()
+
+  const container = previewContent.value
+  const keyword = searchQuery.value.trim()
+  if (!container || !keyword) return
+
+  const pattern = new RegExp(escapeRegExp(keyword), 'gi')
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || shouldSkipSearchNode(node)) return NodeFilter.FILTER_REJECT
+      pattern.lastIndex = 0
+      return pattern.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    }
+  })
+  const textNodes = []
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode)
+  }
+
+  const matches = []
+  textNodes.forEach((node) => {
+    const text = node.nodeValue || ''
+    const fragment = document.createDocumentFragment()
+    let cursor = 0
+    pattern.lastIndex = 0
+
+    text.replace(pattern, (match, offset) => {
+      if (offset > cursor) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor, offset)))
+      }
+
+      const mark = document.createElement('mark')
+      mark.className = 'preview-search-match'
+      mark.textContent = match
+      fragment.appendChild(mark)
+      matches.push(mark)
+      cursor = offset + match.length
+      return match
+    })
+
+    if (cursor < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(cursor)))
+    }
+
+    node.parentNode?.replaceChild(fragment, node)
+  })
+
+  searchMatches.value = matches
+  if (matches.length > 0) {
+    setActiveSearchIndex(0)
+  }
+}
+
+function setActiveSearchIndex(index) {
+  const matches = searchMatches.value
+  matches.forEach(mark => mark.classList.remove('active'))
+  if (!matches.length) {
+    activeSearchIndex.value = -1
+    return
+  }
+
+  const nextIndex = (index + matches.length) % matches.length
+  activeSearchIndex.value = nextIndex
+  const activeMark = matches[nextIndex]
+  activeMark.classList.add('active')
+  activeMark.scrollIntoView({ block: 'center', inline: 'nearest' })
+}
+
+function runSearch() {
+  applySearchHighlights()
+}
+
+function jumpToNextMatch() {
+  setActiveSearchIndex(activeSearchIndex.value + 1)
+}
+
+function jumpToPreviousMatch() {
+  setActiveSearchIndex(activeSearchIndex.value - 1)
+}
+
+function openSearch() {
+  searchVisible.value = true
+  nextTick(() => {
+    searchInputRef.value?.focus()
+    searchInputRef.value?.select?.()
+    if (searchQuery.value.trim()) {
+      runSearch()
+    }
+  })
+}
+
+function closeSearch() {
+  searchVisible.value = false
+  clearSearchHighlights()
+  previewContainer.value?.focus()
+}
+
+function handleSearchKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeSearch()
+    return
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    if (event.shiftKey) {
+      jumpToPreviousMatch()
+      return
+    }
+    jumpToNextMatch()
+  }
+}
+
+function focusPreview() {
+  previewContainer.value?.focus()
 }
 
 function reportCopyError(prefix, error) {
@@ -460,7 +687,9 @@ async function renderMermaidDiagrams() {
 
 defineExpose({
   setScrollRatio,
-  scrollToHeading
+  scrollToHeading,
+  openSearch,
+  focusPreview
 })
 
 // Configure marked with highlight.js
@@ -500,7 +729,7 @@ const htmlContent = computed(() => {
   try {
     // 兼容不同版本的 marked
     const parser = typeof marked === 'function' ? marked : marked.parse
-    return parser(props.content, {
+    return sanitizeHtml(parser(props.content, {
       gfm: true,
       breaks: true,
       renderer: createHeadingRenderer(),
@@ -509,7 +738,7 @@ const htmlContent = computed(() => {
         return hljs.highlight(code, { language }).value
       },
       langPrefix: 'hljs language-'
-    })
+    }))
   } catch (e) {
     console.error('Markdown parsing error:', e)
     return `<p>${t('markdown.parseError')}</p>`
@@ -521,6 +750,9 @@ watch(htmlContent, async () => {
   await renderMermaidDiagrams()
   decorateListPrefixes(previewContent.value, { includeTaskListPrefix: false })
   syncActiveHeading()
+  if (searchVisible.value && searchQuery.value.trim()) {
+    applySearchHighlights()
+  }
 }, { immediate: true })
 
 watch(() => settingsStore.settings.theme, async () => {
@@ -531,6 +763,9 @@ watch(() => settingsStore.settings.theme, async () => {
   await renderMermaidDiagrams()
   decorateListPrefixes(previewContent.value, { includeTaskListPrefix: false })
   syncActiveHeading()
+  if (searchVisible.value && searchQuery.value.trim()) {
+    applySearchHighlights()
+  }
 })
 
 onMounted(() => {
@@ -549,6 +784,8 @@ onUnmounted(() => {
 <style scoped>
 .markdown-preview {
   display: flex;
+  flex-direction: column;
+  position: relative;
   padding: clamp(20px, 2.8vw, 36px);
   overflow-y: auto;
   height: 100%;
@@ -568,6 +805,101 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  font-size: var(--markdown-preview-font-size, 14px);
+}
+
+.preview-floating-tools {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: calc(clamp(20px, 2.8vw, 36px) * -0.5) 0 12px auto;
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+.preview-search-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(var(--accent-primary-rgb), 0.16));
+  border-radius: 999px;
+  background: var(--surface-popover);
+  box-shadow: var(--menu-card-shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: popoverIn var(--transition-popover);
+}
+
+.preview-search-panel {
+  border-radius: 12px;
+}
+
+.preview-search-input {
+  width: min(240px, 34vw);
+  min-width: 120px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--field-radius);
+  background: color-mix(in srgb, var(--surface-panel-strong) 86%, transparent);
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.preview-search-input:focus {
+  outline: none;
+  border-color: rgba(var(--accent-primary-rgb), 0.28);
+  box-shadow: var(--field-focus-ring);
+}
+
+.preview-search-count {
+  min-width: 44px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.preview-tool-btn {
+  min-width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-interactive, var(--text-muted));
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: var(--transition-interactive);
+}
+
+.preview-tool-btn:hover:not(:disabled) {
+  color: var(--text-interactive-active, var(--accent-primary));
+  background: var(--surface-hover);
+  box-shadow: var(--interactive-hover-ring);
+}
+
+.preview-tool-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.markdown-preview-content :deep(mark.preview-search-match) {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: rgba(255, 204, 0, 0.34);
+  color: inherit;
+}
+
+.markdown-preview-content :deep(mark.preview-search-match.active) {
+  background: rgba(var(--accent-primary-rgb), 0.28);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-primary-rgb), 0.36);
 }
 
 .markdown-preview-content :deep(> :first-child) {
@@ -627,10 +959,11 @@ onUnmounted(() => {
 .markdown-preview-content :deep(pre) {
   padding: 16px;
   overflow: auto;
-  font-size: 14px;
+  font-size: 0.875em;
   line-height: 1.45;
-  background-color: var(--btn-bg);
-  border-radius: 6px;
+  background-color: var(--surface-toolbar);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(var(--accent-primary-rgb), 0.08));
+  border-radius: var(--radius-md);
   margin-bottom: 16px;
 }
 
@@ -650,7 +983,7 @@ onUnmounted(() => {
   overflow-x: auto;
   border: 1px solid var(--glass-border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--bg-secondary) 78%, transparent);
+  background: var(--surface-panel);
 }
 
 .markdown-preview-content :deep(.mermaid-block svg) {
@@ -770,9 +1103,11 @@ onUnmounted(() => {
   padding: 4px 0;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--glass-bg) 92%, var(--bg-deep));
+  background: var(--surface-popover);
   box-shadow: var(--menu-card-shadow);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: popoverIn var(--transition-popover);
 }
 
 .preview-context-menu-item {
@@ -785,17 +1120,18 @@ onUnmounted(() => {
   font-weight: var(--ui-font-weight-medium);
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  border-radius: var(--radius-sm);
+  transition: var(--transition-interactive);
 }
 
 .preview-context-menu-item:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-active, var(--accent-primary));
 }
 
 .preview-context-menu-item:focus-visible {
   outline: none;
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-active, var(--accent-primary));
 }
 </style>

@@ -307,13 +307,14 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .workflow-card:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
+  box-shadow: var(--interactive-hover-ring), var(--shadow-subtle);
+  transform: translateY(-1px);
 }
 
 .workflow-card strong {
@@ -506,13 +507,14 @@ onUnmounted(() => {
   gap: 6px;
   text-align: left;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .start-action:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
+  box-shadow: var(--interactive-hover-ring), var(--shadow-subtle);
+  transform: translateY(-1px);
 }
 
 .start-action strong {
@@ -557,13 +559,14 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 6px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .scenario-item:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
+  box-shadow: var(--interactive-hover-ring), var(--shadow-subtle);
+  transform: translateY(-1px);
 }
 
 .scenario-item strong {
@@ -613,13 +616,14 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   padding: 10px 14px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .clipboard-btn:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
+  box-shadow: var(--interactive-hover-ring), var(--shadow-subtle);
+  transform: translateY(-1px);
 }
 
 .template-item {
@@ -632,7 +636,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 6px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .welcome-card > .welcome-empty-text,
@@ -643,9 +647,10 @@ onUnmounted(() => {
 }
 
 .template-item:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
-  box-shadow: var(--interactive-hover-ring);
+  box-shadow: var(--interactive-hover-ring), var(--shadow-subtle);
+  transform: translateY(-1px);
 }
 
 .template-title {

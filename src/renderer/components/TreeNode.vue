@@ -480,12 +480,12 @@ async function copyValue() {
   background: transparent;
   color: var(--text-muted, #888);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--icon-button-radius, 4px);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.15s;
+  transition: var(--transition-interactive, opacity 0.15s ease, background 0.15s ease, color 0.15s ease);
   margin-left: 6px;
 }
 
@@ -500,7 +500,7 @@ async function copyValue() {
 }
 
 .copy-btn:hover {
-  background: var(--json-tree-hover-bg, var(--btn-hover-bg, rgba(255, 255, 255, 0.15)));
+  background: var(--json-tree-hover-bg, var(--surface-hover, rgba(255, 255, 255, 0.15)));
   color: var(--text-main, #d4d4d4);
 }
 

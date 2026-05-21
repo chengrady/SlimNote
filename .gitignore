@@ -31,7 +31,7 @@ resources.pak
 snapshot_blob.bin
 v8_context_snapshot.bin
 LICENSES.chromium.html
-locales/
+/locales/
 resources/
 version
 

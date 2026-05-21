@@ -61,6 +61,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // External links
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
+  // Shortcuts
+  getShortcuts: () => ipcRenderer.invoke('get-shortcuts'),
+  updateShortcut: (payload) => ipcRenderer.invoke('update-shortcut', payload),
+  resetShortcut: (id) => ipcRenderer.invoke('reset-shortcut', id),
+  resetShortcuts: () => ipcRenderer.invoke('reset-shortcuts'),
+  onShortcutsChanged: (callback) => bindIpcListener('shortcuts-changed', callback),
+
   // Menu Events
   showContextMenu: (menuName, position) => ipcRenderer.send('show-context-menu', menuName, position),
   showEditorContextMenu: () => ipcRenderer.send('show-editor-context-menu'),

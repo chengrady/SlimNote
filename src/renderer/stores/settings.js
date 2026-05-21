@@ -16,16 +16,25 @@ const DEFAULT_SETTINGS = {
   sidebarCollapsed: false,
   sidebarWidth: 250,
   tabDensity: 'comfortable',
+  unpinnedTabMaxRows: 10,
   locale: 'zh-CN'
 }
 
 const MIN_FONT_SIZE = 8
 const MAX_FONT_SIZE = 72
+const MIN_UNPINNED_TAB_MAX_ROWS = 1
+const MAX_UNPINNED_TAB_MAX_ROWS = 10
 
 function normalizeFontSize(value, fallback = DEFAULT_SETTINGS.fontSize) {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10)
   if (!Number.isFinite(parsed)) return fallback
   return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, parsed))
+}
+
+function normalizeUnpinnedTabMaxRows(value, fallback = DEFAULT_SETTINGS.unpinnedTabMaxRows) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(MIN_UNPINNED_TAB_MAX_ROWS, Math.min(MAX_UNPINNED_TAB_MAX_ROWS, parsed))
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -40,7 +49,8 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value = {
           ...settings.value,
           ...parsed,
-          fontSize: normalizeFontSize(parsed.fontSize, settings.value.fontSize)
+          fontSize: normalizeFontSize(parsed.fontSize, settings.value.fontSize),
+          unpinnedTabMaxRows: normalizeUnpinnedTabMaxRows(parsed.unpinnedTabMaxRows, settings.value.unpinnedTabMaxRows)
         }
       } catch (error) {
         console.error('Failed to load settings:', error)
@@ -59,13 +69,15 @@ export const useSettingsStore = defineStore('settings', () => {
     const nextTabDensity = newSettings.tabDensity ?? settings.value.tabDensity
     const nextSidebarWidth = Number(newSettings.sidebarWidth ?? settings.value.sidebarWidth)
     const nextFontSize = normalizeFontSize(newSettings.fontSize ?? settings.value.fontSize, DEFAULT_SETTINGS.fontSize)
+    const nextUnpinnedTabMaxRows = normalizeUnpinnedTabMaxRows(newSettings.unpinnedTabMaxRows ?? settings.value.unpinnedTabMaxRows)
 
     settings.value = {
       ...settings.value,
       ...newSettings,
       fontSize: nextFontSize,
       sidebarWidth: Math.max(220, Math.min(420, Number.isFinite(nextSidebarWidth) ? nextSidebarWidth : DEFAULT_SETTINGS.sidebarWidth)),
-      tabDensity: ['comfortable', 'compact'].includes(nextTabDensity) ? nextTabDensity : DEFAULT_SETTINGS.tabDensity
+      tabDensity: ['comfortable', 'compact'].includes(nextTabDensity) ? nextTabDensity : DEFAULT_SETTINGS.tabDensity,
+      unpinnedTabMaxRows: nextUnpinnedTabMaxRows
     }
     saveSettings()
     applyTheme()

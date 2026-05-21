@@ -72,14 +72,14 @@ function handleOpenFile(filePath) {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--glass-bg);
+  background: var(--surface-panel);
   backdrop-filter: blur(var(--backdrop-blur));
   border: 1px solid var(--glass-border);
   font-size: 13px;
   margin: var(--space-3) 0 var(--space-3) var(--space-3);
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: var(--panel-card-shadow);
+  box-shadow: var(--shadow-panel);
 }
 
 .explorer-header {
@@ -94,6 +94,7 @@ function handleOpenFile(filePath) {
   line-height: var(--panel-title-line-height);
   color: var(--text-interactive-active, var(--accent-primary));
   border-bottom: 1px solid var(--glass-border);
+  background: var(--surface-toolbar);
 }
 
 .explorer-actions {
@@ -104,7 +105,7 @@ function handleOpenFile(filePath) {
 .explorer-actions button {
   width: var(--icon-button-size-md);
   height: var(--icon-button-size-md);
-  background: rgba(var(--accent-primary-rgb), 0.05);
+  background: var(--icon-button-bg);
   border: 1px solid transparent;
   padding: 0;
   cursor: pointer;
@@ -114,11 +115,11 @@ function handleOpenFile(filePath) {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .explorer-actions button:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
   color: var(--text-interactive-hover, var(--color-text));
   box-shadow: var(--interactive-hover-ring);
@@ -162,7 +163,7 @@ function handleOpenFile(filePath) {
   border-top: 1px solid var(--glass-border);
   max-height: 30%;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-toolbar);
 }
 
 .recent-header {
@@ -182,14 +183,14 @@ function handleOpenFile(filePath) {
   align-items: center;
   justify-content: space-between;
   color: var(--text-main);
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-size: var(--field-font-size);
   line-height: 22px;
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 70%, transparent);
 }
 
 .recent-file:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   box-shadow: var(--interactive-hover-ring);
 }
 
@@ -217,7 +218,7 @@ function handleOpenFile(filePath) {
   height: var(--icon-button-size-sm);
   line-height: 1;
   border-radius: var(--icon-button-radius);
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   display: inline-flex;
   align-items: center;
   justify-content: center;

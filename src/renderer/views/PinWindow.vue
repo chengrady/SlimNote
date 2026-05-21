@@ -18,6 +18,7 @@ import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
+import { sanitizeHtml } from '../utils/htmlSanitizer'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -47,7 +48,7 @@ const htmlContent = computed(() => {
   if (language.value !== 'markdown') return ''
   try {
     const parser = typeof marked === 'function' ? marked : marked.parse
-    return parser(content.value)
+    return sanitizeHtml(parser(content.value))
   } catch (e) {
     console.error('Markdown parsing error:', e)
     return `<p>${t('pinWindow.markdownError')}</p>`
@@ -89,6 +90,8 @@ function closeWindow() {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-border);
+  background: var(--surface-panel-strong, var(--color-bg));
+  box-shadow: var(--shadow-floating, none);
   position: relative;
   z-index: 9999;
 }
@@ -98,11 +101,11 @@ function closeWindow() {
   justify-content: space-between;
   align-items: center;
   padding: 4px 8px;
-  background: var(--color-bg-secondary);
+  background: var(--surface-toolbar, var(--color-bg-secondary));
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--transition-popover, 0.18s ease);
   font-size: 12px;
 }
 
@@ -117,12 +120,13 @@ function closeWindow() {
   cursor: pointer;
   font-size: 12px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--icon-button-radius, 4px);
+  transition: var(--transition-interactive, color 0.16s ease, background 0.16s ease);
   -webkit-app-region: no-drag;
 }
 
 .close-btn:hover {
-  background: var(--color-danger);
+  background: var(--window-close-hover-bg, var(--color-danger));
   color: white;
 }
 
@@ -171,7 +175,7 @@ pre {
   margin: 0;
   font-size: 85%;
   background-color: rgba(175, 184, 193, 0.2);
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
   font-family: 'Fira Code', Consolas, monospace;
 }
 
@@ -180,8 +184,9 @@ pre {
   overflow: auto;
   font-size: 85%;
   line-height: 1.45;
-  background-color: var(--color-bg-secondary);
-  border-radius: 6px;
+  background-color: var(--surface-toolbar, var(--color-bg-secondary));
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--color-border);
   margin-bottom: 16px;
 }
 

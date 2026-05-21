@@ -1,13 +1,13 @@
 <template>
   <div class="json-toolbar">
     <span class="json-toolbar-meta">{{ t('jsonToolbar.meta') }}</span>
-    <button class="json-toolbar-button" type="button" @click="$emit('format')" :title="`${t('jsonToolbar.format')} (Ctrl+Shift+F)`">
+    <button class="json-toolbar-button" type="button" @click="$emit('format')" :title="`${t('jsonToolbar.format')} (${shortcut('json.format')})`">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H3M21 6H3M21 14H3M21 18H3"/></svg>
     </button>
-    <button class="json-toolbar-button" type="button" @click="$emit('minify')" :title="`${t('jsonToolbar.minify')} (Ctrl+Shift+M)`">
+    <button class="json-toolbar-button" type="button" @click="$emit('minify')" :title="`${t('jsonToolbar.minify')} (${shortcut('json.minify')})`">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14L3 21"/></svg>
     </button>
-    <button class="json-toolbar-button" type="button" @click="$emit('repair')" :title="`${t('jsonToolbar.repair')} (Ctrl+Shift+R)`">
+    <button class="json-toolbar-button" type="button" @click="$emit('repair')" :title="`${t('jsonToolbar.repair')} (${shortcut('json.repair')})`">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
     </button>
     <button class="json-toolbar-button" type="button" @click="$emit('unescape')" :title="t('jsonToolbar.unescape')">
@@ -34,7 +34,7 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </button>
     <div class="json-toolbar-separator"></div>
-    <button class="json-toolbar-button" type="button" :class="{ active: showTree }" @click="$emit('toggle-tree')" :title="`${t('jsonToolbar.toggleTree')} (Ctrl+Shift+T)`">
+    <button class="json-toolbar-button" type="button" :class="{ active: showTree }" @click="$emit('toggle-tree')" :title="`${t('jsonToolbar.toggleTree')} (${shortcut('json.toggleTree')})`">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
     </button>
   </div>
@@ -42,8 +42,16 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
+import { useShortcutsStore } from '../stores/shortcuts'
+import { shortcutDisplayById } from '../utils/shortcuts'
 
 const { t } = useI18n()
+const shortcutsStore = useShortcutsStore()
+shortcutsStore.loadShortcuts()
+
+function shortcut(id) {
+  return shortcutDisplayById(id, undefined, shortcutsStore.shortcutOverrides)
+}
 
 defineProps({
   showTree: {
@@ -62,7 +70,7 @@ defineEmits(['format', 'minify', 'repair', 'unescape', 'expand-all', 'collapse-a
   align-items: center;
   padding: 0 10px;
   border-bottom: 1px solid var(--json-toolbar-border, var(--glass-border));
-  background: var(--json-toolbar-bg, color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03)));
+  background: var(--json-toolbar-bg, var(--surface-toolbar));
   gap: 4px;
   overflow-x: auto;
 }
@@ -83,13 +91,13 @@ defineEmits(['format', 'minify', 'repair', 'unescape', 'expand-all', 'collapse-a
   background: transparent;
   border: none;
   color: var(--text-interactive, var(--text-muted));
-  border-radius: 4px;
+  border-radius: var(--toolbar-button-radius);
   cursor: pointer;
   font-size: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-weight: 500;
   white-space: nowrap;
   padding: 4px;
@@ -98,7 +106,7 @@ defineEmits(['format', 'minify', 'repair', 'unescape', 'expand-all', 'collapse-a
 }
 
 .json-toolbar-button:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }

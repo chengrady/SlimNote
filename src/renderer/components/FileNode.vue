@@ -135,8 +135,8 @@ function nodeMatchesSearch(node, searchQuery) {
   cursor: pointer;
   margin: 1px 4px;
   border: none;
-  border-radius: 4px;
-  transition: var(--transition-fast);
+  border-radius: var(--radius-sm);
+  transition: var(--transition-interactive);
   color: var(--text-main);
   line-height: 1.2;
   gap: 4px;
@@ -145,7 +145,7 @@ function nodeMatchesSearch(node, searchQuery) {
 }
 
 .node-label.active {
-  background: rgba(var(--accent-primary-rgb), 0.22);
+  background: var(--surface-active);
   color: var(--text-main);
   box-shadow: none;
 }
@@ -189,7 +189,7 @@ function nodeMatchesSearch(node, searchQuery) {
 }
 
 .node-label:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
 }
 

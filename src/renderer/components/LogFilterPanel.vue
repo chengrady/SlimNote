@@ -58,7 +58,7 @@ const hasEntries = computed(() => props.entries.length > 0)
   gap: 10px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 95%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-panel);
 }
 
 .log-filter-panel.embedded {
@@ -105,19 +105,19 @@ const hasEntries = computed(() => props.entries.length > 0)
   border: 1px solid transparent;
   color: var(--text-muted);
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--toolbar-button-radius);
   cursor: pointer;
   font-size: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .log-filter-action:hover:not(:disabled) {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   color: var(--text-main);
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
@@ -151,15 +151,15 @@ const hasEntries = computed(() => props.entries.length > 0)
   padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: rgba(var(--accent-primary-rgb), 0.03);
+  background: rgba(var(--accent-primary-rgb), 0.04);
   text-align: left;
   color: inherit;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .log-filter-item:hover {
-  background: var(--interactive-hover-bg);
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }

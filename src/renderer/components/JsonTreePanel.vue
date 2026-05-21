@@ -176,7 +176,7 @@ watch(parsedData, (value) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--json-surface-bg, var(--glass-bg, rgba(255, 255, 255, 0.05)));
+  background: var(--json-surface-bg, var(--surface-panel));
   border-left: 1px solid var(--json-toolbar-border, var(--glass-border, rgba(255, 255, 255, 0.1)));
 }
 
@@ -186,7 +186,7 @@ watch(parsedData, (value) => {
   padding: 8px 12px;
   gap: 8px;
   border-bottom: 1px solid var(--json-toolbar-border, var(--glass-border, rgba(255, 255, 255, 0.1)));
-  background: var(--json-toolbar-bg, var(--glass-bg, rgba(255, 255, 255, 0.05)));
+  background: var(--json-toolbar-bg, var(--surface-toolbar));
 }
 
 .search-box {
@@ -213,7 +213,7 @@ watch(parsedData, (value) => {
   color: var(--text-main, #d4d4d4);
   font-size: var(--field-font-size, 13px);
   outline: none;
-  transition: var(--transition-fast, 0.16s ease);
+  transition: var(--transition-interactive);
 }
 
 .search-input:focus {
@@ -236,15 +236,15 @@ watch(parsedData, (value) => {
   background: transparent;
   color: var(--text-muted, #888);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--toolbar-button-radius);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: var(--transition-interactive);
 }
 
 .toolbar-actions button:hover {
-  background: var(--json-tree-hover-bg, var(--btn-hover-bg, rgba(255, 255, 255, 0.1)));
+  background: var(--json-tree-hover-bg, var(--surface-hover));
   color: var(--text-main, #d4d4d4);
 }
 

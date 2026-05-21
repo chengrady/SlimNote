@@ -5,6 +5,9 @@ const LANGUAGE_LABELS = {
   typescript: 'TypeScript',
   json: 'JSON',
   markdown: 'Markdown',
+  yaml: 'YAML',
+  toml: 'TOML',
+  ini: 'INI / Config',
   html: 'HTML',
   css: 'CSS',
   scss: 'SCSS',
@@ -132,8 +135,12 @@ function scorePython(text) {
 function scoreLog(text) {
   return countMatches(text, [
     /^\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}:\d{2}/m,
+    /^\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d{3,7})?\s+\[[^\]]+\]\s+(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\b/m,
+    /^\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d{3,7})?\s+.*?\b(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\b\s+[\w.$-]+(?:\s+-|\s*:)/m,
     /^\[?(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\]?/m,
     /\b(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\b/m,
+    /\[[^\]]+\]\s+(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\b/m,
+    /\b(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\b\s+[\w.$-]+\s+-\s+/m,
     /^\d{2}:\d{2}:\d{2}(?:[.,]\d{3})?/m
   ])
 }

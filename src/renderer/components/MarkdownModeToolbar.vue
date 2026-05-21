@@ -175,7 +175,7 @@ defineEmits(['set-mode', 'set-split-focus', 'copy-plain', 'copy-rich', 'export-p
   align-items: center;
   padding: 0 var(--panel-header-padding-x);
   border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-toolbar);
   gap: 6px;
   overflow-x: auto;
 }
@@ -202,7 +202,7 @@ defineEmits(['set-mode', 'set-split-focus', 'copy-plain', 'copy-rich', 'export-p
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-weight: 500;
   white-space: nowrap;
   min-width: 28px;
@@ -212,7 +212,7 @@ defineEmits(['set-mode', 'set-split-focus', 'copy-plain', 'copy-rich', 'export-p
 }
 
 .markdown-mode-toolbar-button:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }

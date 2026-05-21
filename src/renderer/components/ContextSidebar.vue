@@ -75,7 +75,7 @@ defineEmits(['toggle-collapse'])
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
+  background: var(--surface-panel-strong);
   border-left: 1px solid var(--glass-border);
 }
 
@@ -92,7 +92,7 @@ defineEmits(['toggle-collapse'])
   gap: 10px;
   padding: var(--panel-header-padding-y) var(--panel-header-padding-x);
   border-bottom: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 92%, rgba(var(--accent-primary-rgb), 0.05));
+  background: var(--surface-toolbar);
 }
 
 .context-sidebar.collapsed .context-sidebar-header {
@@ -132,19 +132,19 @@ defineEmits(['toggle-collapse'])
   width: 28px;
   height: 28px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--toolbar-button-radius);
   background: var(--icon-button-bg);
   color: var(--text-interactive, var(--text-muted));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .context-sidebar-toggle:hover {
   color: var(--text-interactive-hover, var(--text-main));
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }

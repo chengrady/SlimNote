@@ -45,6 +45,7 @@
         @snippet="insertSqlSnippet"
         @format="formatActiveSql"
         @minify="minifyActiveSql"
+        @comment="toggleSqlLineComment"
         @upper-keywords="uppercaseActiveSqlKeywords"
         @lower-keywords="lowercaseActiveSqlKeywords"
         @copy="copyActiveContent('SQL')"
@@ -69,7 +70,7 @@
         @export="exportFilteredLogResults"
       />
       <MarkdownFormatToolbar
-        v-if="!isPresentationMode && activeTab.language === 'markdown' && editorMode === 'source'"
+        v-if="!isPresentationMode && activeTab.language === 'markdown' && editorMode === 'source' && !isMarkdownPreviewOnlyFocus"
         @bold="mdBold"
         @italic="mdItalic"
         @heading="mdHeading"
@@ -161,11 +162,13 @@
                 ref="markdownPreviewRef"
                 :content="activeTab.content"
                 :source-path="activeTab.filePath || ''"
+                :font-size="activeTab.fontSize"
                 @scroll="handlePreviewScroll"
                 @active-heading-change="handleActiveHeadingChange"
                 @heading-click="handlePreviewHeadingClick"
                 @copy-error="handleMarkdownPreviewCopyError"
                 @open-file="handlePreviewOpenFile"
+                @change-font-size="handleFontSizeChange"
               />
             </div>
           </div>
@@ -231,11 +234,13 @@
               class="context-markdown-preview"
               :content="activeTab.content"
               :source-path="activeTab.filePath || ''"
+              :font-size="activeTab.fontSize"
               @scroll="handlePreviewScroll"
               @active-heading-change="handleActiveHeadingChange"
               @heading-click="handlePreviewHeadingClick"
               @copy-error="handleMarkdownPreviewCopyError"
               @open-file="handlePreviewOpenFile"
+              @change-font-size="handleFontSizeChange"
             />
           </div>
 
@@ -340,6 +345,15 @@
       :content="activeTab?.content || ''"
       @close="showDiff = false"
     />
+    <Transition name="font-size-toast">
+      <div v-if="fontSizeToastVisible" class="font-size-toast" :class="fontSizeToastDelta >= 0 ? 'is-increase' : 'is-decrease'">
+        <span class="font-size-toast-label">{{ t('editorPanel.fontSizeToastLabel') }}</span>
+        <span class="font-size-toast-value">
+          <span :key="fontSizeToastTick" class="font-size-toast-number">{{ fontSizeToastValue }}</span>
+          <span class="font-size-toast-unit">px</span>
+        </span>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -349,6 +363,7 @@ import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import { useSettingsStore } from '../stores/settings'
+import { useShortcutsStore } from '../stores/shortcuts'
 import MonacoEditor from './MonacoEditor.vue'
 import ContextSidebar from './ContextSidebar.vue'
 import JsonToolbar from './JsonToolbar.vue'
@@ -373,6 +388,7 @@ import { buildMarkdownClipboardPayload, buildMarkdownPdfDocument } from '../util
 import { detectLanguageFromContent, getLanguageDisplayName } from '../utils/contentTypeDetection'
 import { getPathFileName as getFileName } from '../utils/pathUtils'
 import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/rendererEvents'
+import { isShortcutEvent } from '../utils/shortcuts'
 import { formatSql, minifySql, transformSqlKeywords } from '../utils/sqlFormatter'
 
 const props = defineProps({
@@ -387,6 +403,8 @@ const { t, te } = useI18n()
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
 const settingsStore = useSettingsStore()
+const shortcutsStore = useShortcutsStore()
+shortcutsStore.loadShortcuts()
 const CONTEXT_SIDEBAR_COLLAPSED_STORAGE_KEY_PREFIX = 'slimnote:context-sidebar-collapsed:'
 const CONTEXT_SIDEBAR_WIDTH_STORAGE_KEY_PREFIX = 'slimnote:context-sidebar-width:'
 const MARKDOWN_VIEW_MODE_STORAGE_KEY = 'slimnote:markdown-view-mode'
@@ -438,6 +456,11 @@ const contentTypeSuggestion = ref({
 })
 const handledContentTypeSuggestionTabs = new Set()
 const rendererEventCleanups = []
+const fontSizeToastVisible = ref(false)
+const fontSizeToastValue = ref(14)
+const fontSizeToastDelta = ref(0)
+const fontSizeToastTick = ref(0)
+let fontSizeToastTimer = null
 
 function triggerEditorEvent(name, detail) {
   emitRendererEvent(name, detail)
@@ -534,6 +557,7 @@ const currentContextType = computed(() => {
 })
 const currentContextSidebarStorageKey = computed(() => `${CONTEXT_SIDEBAR_COLLAPSED_STORAGE_KEY_PREFIX}${currentContextType.value}`)
 const isMarkdownSplitView = computed(() => activeTab.value?.language === 'markdown' && editorMode.value === 'source' && showPreview.value)
+const isMarkdownPreviewOnlyFocus = computed(() => isMarkdownSplitView.value && markdownSplitFocus.value === 'preview')
 const showMarkdownContextPreview = computed(() => activeTab.value?.language === 'markdown' && editorMode.value === 'source' && !isMarkdownSplitView.value && markdownContextTab.value === 'preview')
 const showMarkdownOutlinePanel = computed(() => activeTab.value?.language === 'markdown' && (!showMarkdownContextPreview.value || markdownContextTab.value === 'outline' || isMarkdownSplitView.value || editorMode.value === 'wysiwyg'))
 const showJsonContextTree = computed(() => activeTab.value?.language === 'json' && showJsonTree.value)
@@ -778,8 +802,43 @@ function handleCursorChange(e) {
 
 function handleFontSizeChange(size) {
   if (activeTab.value) {
+    const previousSize = Number(activeTab.value.fontSize) || Number(settingsStore.settings.fontSize) || size
     editorStore.updateTabFontSize(activeTab.value.id, size)
+    showFontSizeToast(size, previousSize)
   }
+}
+
+function shouldShowFloatingFontSizeToast() {
+  return Boolean(activeTab.value)
+}
+
+function showFontSizeToast(size, previousSize = size) {
+  if (!shouldShowFloatingFontSizeToast()) return
+
+  fontSizeToastValue.value = size
+  fontSizeToastDelta.value = size - previousSize
+  fontSizeToastTick.value += 1
+  fontSizeToastVisible.value = true
+
+  if (fontSizeToastTimer) {
+    clearTimeout(fontSizeToastTimer)
+  }
+
+  fontSizeToastTimer = setTimeout(() => {
+    fontSizeToastVisible.value = false
+    fontSizeToastTimer = null
+  }, 1100)
+}
+
+function handleExternalFontSizeChanged(event) {
+  const detail = event.detail || {}
+  if (detail.tabId && activeTab.value?.id && detail.tabId !== activeTab.value.id) return
+
+  const size = Number(detail.size)
+  if (!Number.isFinite(size)) return
+
+  const previousSize = Number(detail.previousSize) || size
+  showFontSizeToast(size, previousSize)
 }
 
 function slugifyHeading(text) {
@@ -1262,6 +1321,62 @@ function lowercaseActiveSqlKeywords() {
   transformActiveContent((content) => transformSqlKeywords(content, 'lower'))
 }
 
+function toggleSqlLineComment() {
+  if (!activeTab.value || activeTab.value.language !== 'sql') return
+
+  const editor = monacoEditorRef.value?.getEditor()
+  const model = editor?.getModel()
+  const selection = editor?.getSelection()
+  if (!editor || !model || !selection) return
+
+  const startLineNumber = selection.startLineNumber
+  const endLineNumber = selection.endColumn === 1 && selection.endLineNumber > startLineNumber ? selection.endLineNumber - 1 : selection.endLineNumber
+  const targetLines = []
+
+  for (let lineNumber = startLineNumber; lineNumber <= endLineNumber; lineNumber += 1) {
+    const content = model.getLineContent(lineNumber)
+    if (content.trim()) {
+      targetLines.push({ lineNumber, content })
+    }
+  }
+
+  if (!targetLines.length) return
+
+  const shouldUncomment = targetLines.every(({ content }) => /^\s*-- ?/.test(content))
+  const edits = targetLines.map(({ lineNumber, content }) => {
+    if (shouldUncomment) {
+      const match = content.match(/^(\s*)-- ?/)
+      return {
+        range: {
+          startLineNumber: lineNumber,
+          startColumn: match[1].length + 1,
+          endLineNumber: lineNumber,
+          endColumn: match[0].length + 1
+        },
+        text: '',
+        forceMoveMarkers: true
+      }
+    }
+
+    const indent = content.match(/^\s*/)?.[0] || ''
+    return {
+      range: {
+        startLineNumber: lineNumber,
+        startColumn: indent.length + 1,
+        endLineNumber: lineNumber,
+        endColumn: indent.length + 1
+      },
+      text: '-- ',
+      forceMoveMarkers: true
+    }
+  })
+
+  editor.pushUndoStop()
+  editor.executeEdits('sql-toggle-comment', edits)
+  editor.pushUndoStop()
+  editor.focus()
+}
+
 function toggleLogWrap() {
   logWrapEnabled.value = !logWrapEnabled.value
   monacoEditorRef.value?.setWordWrap(logWrapEnabled.value)
@@ -1377,83 +1492,77 @@ async function exportMarkdownAsPdf() {
   }
 }
 
+function shouldUseMarkdownPreviewSearch() {
+  if (activeTab.value?.language !== 'markdown') return false
+  return Boolean(markdownPreviewRef.value && (props.isPresentationMode || isMarkdownPreviewOnlyFocus.value))
+}
+
+function openMarkdownPreviewSearch() {
+  if (!shouldUseMarkdownPreviewSearch()) return false
+  markdownPreviewRef.value?.focusPreview?.()
+  markdownPreviewRef.value?.openSearch?.()
+  return true
+}
+
+function interceptPreviewFindEvent(event) {
+  if (!openMarkdownPreviewSearch()) return
+  event.stopImmediatePropagation()
+}
+
+function interceptPreviewReplaceEvent(event) {
+  if (!openMarkdownPreviewSearch()) return
+  event.stopImmediatePropagation()
+}
+
+function isSqlCommentShortcut(e) {
+  return isShortcutEvent(e, 'sql.comment', undefined, shortcutsStore.shortcutOverrides)
+}
+
+function handleSqlCommentShortcut(e) {
+  if (!activeTab.value || activeTab.value.language !== 'sql' || !isSqlCommentShortcut(e)) return
+  if (!monacoEditorRef.value?.getEditor()?.hasTextFocus?.()) return
+  e.preventDefault()
+  e.stopPropagation()
+  toggleSqlLineComment()
+}
+
+function handleShortcutCommand(event, shortcutId, callback, options = {}) {
+  if (!isShortcutEvent(event, shortcutId, undefined, shortcutsStore.shortcutOverrides)) return false
+  if (options.preventDefault !== false) event.preventDefault()
+  callback()
+  return true
+}
+
 // 键盘快捷键
 function handleKeydown(e) {
-  if (e.ctrlKey || e.metaKey) {
-    if (e.shiftKey && e.key.toLowerCase() === 'f') {
-      e.preventDefault()
-      triggerEditorEvent(RENDERER_EVENTS.OPEN_GLOBAL_SEARCH)
-      return
-    }
+  if (handleShortcutCommand(e, 'edit.globalSearch', () => triggerEditorEvent(RENDERER_EVENTS.OPEN_GLOBAL_SEARCH))) return
+  if (!activeTab.value) return
+  if (handleShortcutCommand(e, 'edit.find', () => {
+    if (openMarkdownPreviewSearch()) return
+    triggerEditorEvent(RENDERER_EVENTS.FIND)
+  })) return
+  if (handleShortcutCommand(e, 'edit.replace', () => {
+    if (openMarkdownPreviewSearch()) return
+    triggerEditorEvent(RENDERER_EVENTS.REPLACE)
+  })) return
+  if (handleShortcutCommand(e, 'edit.selectAll', () => triggerEditorEvent(RENDERER_EVENTS.SELECT_ALL), { preventDefault: false })) return
 
-    if (activeTab.value && e.key.toLowerCase() === 'f') {
-      e.preventDefault()
-      triggerEditorEvent(RENDERER_EVENTS.FIND)
-      return
-    }
-
-    if (activeTab.value && e.key.toLowerCase() === 'h') {
-      e.preventDefault()
-      triggerEditorEvent(RENDERER_EVENTS.REPLACE)
-      return
-    }
-
-    if (activeTab.value && e.key.toLowerCase() === 'a') {
-      triggerEditorEvent(RENDERER_EVENTS.SELECT_ALL)
-    }
-
-    if (!activeTab.value) return
-
-    if (e.shiftKey) {
-      switch (activeTab.value.language) {
-        case 'json':
-          switch (e.key.toLowerCase()) {
-            case 'f':
-              e.preventDefault()
-              formatJson()
-              break
-            case 'm':
-              e.preventDefault()
-              minifyJson()
-              break
-            case 'r':
-              e.preventDefault()
-              repairJson()
-              break
-            case 't':
-              e.preventDefault()
-              toggleJsonTree()
-              break
-          }
-          break
-        case 'sql':
-          switch (e.key.toLowerCase()) {
-            case 'f':
-              e.preventDefault()
-              formatActiveSql()
-              break
-            case 'm':
-              e.preventDefault()
-              minifyActiveSql()
-              break
-            case 'u':
-              e.preventDefault()
-              uppercaseActiveSqlKeywords()
-              break
-            case 'l':
-              e.preventDefault()
-              lowercaseActiveSqlKeywords()
-              break
-          }
-          break
-        case 'log':
-          if (e.key.toLowerCase() === 'w') {
-            e.preventDefault()
-            toggleLogWrap()
-          }
-          break
-      }
-    }
+  switch (activeTab.value.language) {
+    case 'json':
+      if (handleShortcutCommand(e, 'json.format', formatJson)) return
+      if (handleShortcutCommand(e, 'json.minify', minifyJson)) return
+      if (handleShortcutCommand(e, 'json.repair', repairJson)) return
+      handleShortcutCommand(e, 'json.toggleTree', toggleJsonTree)
+      break
+    case 'sql':
+      if (handleShortcutCommand(e, 'sql.format', formatActiveSql)) return
+      if (handleShortcutCommand(e, 'sql.minify', minifyActiveSql)) return
+      if (handleShortcutCommand(e, 'sql.upperKeywords', uppercaseActiveSqlKeywords)) return
+      handleShortcutCommand(e, 'sql.lowerKeywords', lowercaseActiveSqlKeywords)
+      break
+    case 'log':
+      handleShortcutCommand(e, 'log.toggleWrap', toggleLogWrap)
+      break
   }
 }
 
@@ -1476,6 +1585,10 @@ onMounted(() => {
   contextSidebarWidth.value = loadContextSidebarWidth(currentContextType.value)
 
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('keydown', handleSqlCommentShortcut, true)
+  rendererEventCleanups.push(onRendererEvent(RENDERER_EVENTS.FONT_SIZE_CHANGED, handleExternalFontSizeChanged))
+  rendererEventCleanups.push(onRendererEvent(RENDERER_EVENTS.FIND, interceptPreviewFindEvent, { capture: true }))
+  rendererEventCleanups.push(onRendererEvent(RENDERER_EVENTS.REPLACE, interceptPreviewReplaceEvent, { capture: true }))
   rendererEventCleanups.push(onRendererEvent(RENDERER_EVENTS.JUMP_TO_LOCATION, handleJumpToLocation))
   document.addEventListener('mousemove', handleSplitMouseMove)
   document.addEventListener('mouseup', stopSplitResize)
@@ -1485,6 +1598,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('keydown', handleSqlCommentShortcut, true)
+  if (fontSizeToastTimer) {
+    clearTimeout(fontSizeToastTimer)
+  }
   rendererEventCleanups.splice(0).forEach((cleanup) => cleanup())
   document.removeEventListener('mousemove', handleSplitMouseMove)
   document.removeEventListener('mouseup', stopSplitResize)
@@ -1634,7 +1751,7 @@ async function restoreLastFolder() {
   try {
     await fileStore.loadLastOpenedFolder()
   } catch (error) {
-    errorMessage.value = `恢复最近目录失败：${error.message}`
+    errorMessage.value = `恢复最近文件夹失败：${error.message}`
     showErrorDialog.value = true
   }
 }
@@ -1687,15 +1804,104 @@ async function openFolder() {
 
 <style scoped>
 .editor-panel {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-primary); /* Use primary color to match layout */
+  background: var(--surface-panel-strong);
   margin: 0;
   border: 1px solid var(--glass-border);
-  border-radius: 8px; /* Restoring rounded corners */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+
+.font-size-toast {
+  --font-size-toast-color: var(--json-valid-color, #22a06b);
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  z-index: 20;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 72%, rgba(var(--accent-primary-rgb), 0.24));
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, var(--surface-panel), var(--surface-panel-strong));
+  box-shadow: var(--shadow-floating);
+  color: var(--text-main);
+  pointer-events: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.font-size-toast.is-decrease {
+  --font-size-toast-color: var(--json-invalid-color, #d1242f);
+}
+
+.font-size-toast-label {
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.font-size-toast-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.font-size-toast-number {
+  display: inline-block;
+  color: var(--font-size-toast-color);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  animation: fontSizeToastNumber 380ms cubic-bezier(0.2, 0.85, 0.25, 1.08);
+}
+
+.font-size-toast-unit {
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0.92;
+}
+
+.font-size-toast-enter-active,
+.font-size-toast-leave-active {
+  transition: opacity var(--transition-popover), transform var(--transition-popover);
+}
+
+.font-size-toast-enter-from,
+.font-size-toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 5px);
+}
+
+@keyframes fontSizeToastNumber {
+  0% {
+    opacity: 0.48;
+    transform: translateY(5px) scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .editor-pane {
@@ -1738,7 +1944,7 @@ async function openFolder() {
   align-items: center;
   padding: 0 var(--panel-header-padding-x);
   border-bottom: 1px solid var(--glass-border);
-  background: var(--bg-primary); /* Flat integration */
+  background: var(--surface-toolbar);
   gap: 4px;
   overflow-x: auto;
 }
@@ -1759,7 +1965,7 @@ async function openFolder() {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
   font-weight: 500;
   white-space: nowrap;
   min-width: 28px;
@@ -1767,7 +1973,7 @@ async function openFolder() {
 }
 
 .toolbar button:hover {
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   color: var(--text-interactive-hover, var(--text-main));
   box-shadow: var(--interactive-hover-ring);
 }
@@ -1866,7 +2072,7 @@ async function openFolder() {
   flex-direction: column;
   position: relative;
   min-height: 0;
-  background: var(--bg-primary); /* Blend seamlessly */
+  background: var(--surface-panel-strong);
 }
 
 .document-workspace {
@@ -1919,16 +2125,17 @@ async function openFolder() {
   padding: 0 8px;
   border-radius: 999px;
   border: 1px solid rgba(var(--accent-primary-rgb), 0.1);
-  background: color-mix(in srgb, var(--icon-button-bg) 78%, var(--glass-bg));
+  background: color-mix(in srgb, var(--icon-button-bg) 78%, var(--surface-panel));
   color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   cursor: pointer;
-  box-shadow: var(--panel-inner-shadow);
+  box-shadow: var(--shadow-subtle);
   backdrop-filter: blur(8px);
-  transition: var(--transition-fast);
+  -webkit-backdrop-filter: blur(8px);
+  transition: var(--transition-interactive);
   font-size: 11px;
   font-weight: var(--ui-font-weight-medium);
   letter-spacing: 0.01em;
@@ -1937,7 +2144,7 @@ async function openFolder() {
 
 .split-resizer-action:hover {
   color: var(--accent-primary);
-  background: color-mix(in srgb, var(--glass-bg) 92%, rgba(var(--accent-primary-rgb), 0.08));
+  background: var(--surface-hover);
   border-color: rgba(var(--accent-primary-rgb), 0.18);
 }
 
@@ -2004,7 +2211,7 @@ async function openFolder() {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: color-mix(in srgb, var(--bg-primary) 92%, rgba(var(--accent-primary-rgb), 0.03));
+  background: color-mix(in srgb, var(--surface-panel-strong) 92%, rgba(var(--accent-primary-rgb), 0.03));
   border-left: 1px solid var(--glass-border);
   box-shadow: inset 12px 0 24px rgba(0, 0, 0, 0.03);
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
@@ -2063,20 +2270,20 @@ async function openFolder() {
 .log-context-shortcuts button {
   height: 28px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--toolbar-button-radius);
   border: 1px solid transparent;
   background: rgba(var(--accent-primary-rgb), 0.05);
   color: var(--text-interactive, var(--text-muted));
   font-size: 12px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-interactive);
 }
 
 .context-tab-button:hover,
 .context-header-button:hover,
 .log-context-shortcuts button:hover {
   color: var(--text-interactive-hover, var(--text-main));
-  background: var(--interactive-hover-bg-strong, var(--interactive-hover-bg));
+  background: var(--surface-hover);
   border-color: var(--interactive-hover-border);
   box-shadow: var(--interactive-hover-ring);
 }
@@ -2123,7 +2330,7 @@ async function openFolder() {
   padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass-bg) 94%, rgba(var(--accent-primary-rgb), 0.03));
+  background: var(--surface-panel);
   display: flex;
   flex-direction: column;
   gap: 4px;

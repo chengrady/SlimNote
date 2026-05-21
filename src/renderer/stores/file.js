@@ -2,61 +2,26 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { isSupportedFile } from '../utils/fileSupport'
 
+const MAX_RECENT_FILES = 20
+const MAX_RECENT_FOLDERS = 20
+
 function normalizeRecentFile(entry) {
   if (typeof entry === 'string') {
     return {
       path: entry,
-      pinned: false,
-      lastOpenedAt: Date.now(),
-      pinnedOrder: null
+      lastOpenedAt: Date.now()
     }
   }
 
   return {
     path: entry?.path || '',
-    pinned: Boolean(entry?.pinned),
-    lastOpenedAt: Number(entry?.lastOpenedAt) || Date.now(),
-    pinnedOrder: Number.isFinite(Number(entry?.pinnedOrder)) ? Number(entry?.pinnedOrder) : null
+    lastOpenedAt: Number(entry?.lastOpenedAt) || Date.now()
   }
 }
 
 function sortRecentFiles(items) {
-  return [...items].sort((a, b) => {
-    if (a.pinned !== b.pinned) {
-      return a.pinned ? -1 : 1
-    }
-
-    if (a.pinned && b.pinned) {
-      const orderA = a.pinnedOrder ?? Number.MAX_SAFE_INTEGER
-      const orderB = b.pinnedOrder ?? Number.MAX_SAFE_INTEGER
-      if (orderA !== orderB) {
-        return orderA - orderB
-      }
-    }
-
-    return b.lastOpenedAt - a.lastOpenedAt
-  })
+  return [...items].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
 }
-
-function normalizePinnedOrders(items) {
-  const pinnedItems = items.filter(item => item.pinned)
-  const unpinnedItems = items.filter(item => !item.pinned)
-
-  const normalizedPinned = pinnedItems.map((item, index) => ({
-    ...item,
-    pinnedOrder: index
-  }))
-
-  const normalizedUnpinned = unpinnedItems.map(item => ({
-    ...item,
-    pinnedOrder: null
-  }))
-
-  return [...normalizedPinned, ...normalizedUnpinned]
-}
-
-const MAX_RECENT_FILES = 20
-const MAX_RECENT_FOLDERS = 20
 
 export const useFileStore = defineStore('file', () => {
   const rootPath = ref(null)
@@ -86,24 +51,24 @@ export const useFileStore = defineStore('file', () => {
   }
 
   // 构建文件树
-  async function buildFileTree(dirPath) {
+  async function buildFileTree(folderPath) {
     try {
-      const items = await window.electronAPI.readDir(dirPath)
+      const items = await window.electronAPI.readDir(folderPath)
       const nodes = []
 
       // 先添加文件夹，再添加文件
-      const dirs = items.filter(item => item.isDirectory).sort((a, b) => a.name.localeCompare(b.name))
+      const folders = items.filter(item => item.isDirectory).sort((a, b) => a.name.localeCompare(b.name))
       const files = items
         .filter(item => !item.isDirectory && isSupportedFile(item.name))
         .sort((a, b) => a.name.localeCompare(b.name))
 
-      for (const dir of dirs) {
+      for (const folder of folders) {
         nodes.push({
-          name: dir.name,
-          path: dir.path,
+          name: folder.name,
+          path: folder.path,
           isDirectory: true,
           children: [],
-          expanded: false,
+          expanded: false
         })
       }
 
@@ -111,7 +76,7 @@ export const useFileStore = defineStore('file', () => {
         nodes.push({
           name: file.name,
           path: file.path,
-          isDirectory: false,
+          isDirectory: false
         })
       }
 
@@ -143,18 +108,15 @@ export const useFileStore = defineStore('file', () => {
     node.expanded = true
   }
 
-  // 添加最近文件
+  // 添加最近文档
   function addRecentFile(filePath) {
     const current = recentFiles.value.map(normalizeRecentFile).filter(item => item.path && item.path !== filePath)
-    const existing = recentFiles.value.map(normalizeRecentFile).find(item => item.path === filePath)
     const nextEntry = {
       path: filePath,
-      pinned: existing?.pinned || false,
-      lastOpenedAt: Date.now(),
-      pinnedOrder: existing?.pinned ? existing.pinnedOrder : null
+      lastOpenedAt: Date.now()
     }
 
-    recentFiles.value = sortRecentFiles(normalizePinnedOrders([nextEntry, ...current])).slice(0, MAX_RECENT_FILES)
+    recentFiles.value = sortRecentFiles([nextEntry, ...current]).slice(0, MAX_RECENT_FILES)
     saveRecentFiles()
   }
 
@@ -172,90 +134,6 @@ export const useFileStore = defineStore('file', () => {
     saveRecentFolders()
   }
 
-  function removeRecentFolder(folderPath) {
-    recentFolders.value = recentFolders.value.filter(item => item.path !== folderPath)
-    saveRecentFolders()
-  }
-
-  function clearRecentFolders() {
-    recentFolders.value = []
-    saveRecentFolders()
-  }
-
-  function toggleRecentPin(filePath) {
-    const normalized = recentFiles.value.map(normalizeRecentFile)
-    const pinnedCount = normalized.filter(item => item.pinned).length
-
-    recentFiles.value = sortRecentFiles(normalizePinnedOrders(
-      normalized.map(item => {
-        if (item.path !== filePath) return item
-
-        const nextPinned = !item.pinned
-        return {
-          ...item,
-          pinned: nextPinned,
-          pinnedOrder: nextPinned ? pinnedCount : null
-        }
-      })
-    )).slice(0, MAX_RECENT_FILES)
-    saveRecentFiles()
-  }
-
-  function movePinnedRecentFile(filePath, targetPath) {
-    if (!filePath || !targetPath || filePath === targetPath) return
-
-    const normalized = recentFiles.value.map(normalizeRecentFile)
-    const pinnedItems = normalized.filter(item => item.pinned)
-    const unpinnedItems = normalized.filter(item => !item.pinned)
-    const sourceIndex = pinnedItems.findIndex(item => item.path === filePath)
-    const targetIndex = pinnedItems.findIndex(item => item.path === targetPath)
-
-    if (sourceIndex === -1 || targetIndex === -1) return
-
-    const [movedItem] = pinnedItems.splice(sourceIndex, 1)
-    pinnedItems.splice(targetIndex, 0, movedItem)
-
-    recentFiles.value = sortRecentFiles(normalizePinnedOrders([...pinnedItems, ...unpinnedItems])).slice(0, MAX_RECENT_FILES)
-    saveRecentFiles()
-  }
-
-  function moveRecentFile(filePath, targetPath = null, targetPinned = null, position = 'before') {
-    if (!filePath) return
-
-    const normalized = recentFiles.value.map(normalizeRecentFile)
-    const sourceItem = normalized.find(item => item.path === filePath)
-    if (!sourceItem) return
-
-    const nextPinned = typeof targetPinned === 'boolean' ? targetPinned : sourceItem.pinned
-    const remainingItems = normalized.filter(item => item.path !== filePath)
-    const pinnedItems = remainingItems.filter(item => item.pinned)
-    const unpinnedItems = remainingItems.filter(item => !item.pinned)
-    const destinationList = nextPinned ? pinnedItems : unpinnedItems
-
-    let insertIndex = destinationList.length
-    if (targetPath) {
-      const targetIndex = destinationList.findIndex(item => item.path === targetPath)
-      if (targetIndex !== -1) {
-        insertIndex = position === 'after' ? targetIndex + 1 : targetIndex
-      }
-    } else {
-      insertIndex = 0
-    }
-
-    destinationList.splice(insertIndex, 0, {
-      ...sourceItem,
-      pinned: nextPinned,
-      pinnedOrder: nextPinned ? insertIndex : null
-    })
-
-    recentFiles.value = sortRecentFiles(normalizePinnedOrders([
-      ...pinnedItems,
-      ...unpinnedItems
-    ])).slice(0, MAX_RECENT_FILES)
-    saveRecentFiles()
-  }
-
-  // 移除最近文件
   function removeRecentFile(filePath) {
     recentFiles.value = recentFiles.value
       .map(normalizeRecentFile)
@@ -263,15 +141,41 @@ export const useFileStore = defineStore('file', () => {
     saveRecentFiles()
   }
 
-  // 清空最近文件
-  function clearRecentFiles(options = { keepPinned: true }) {
-    recentFiles.value = options.keepPinned
-      ? normalizePinnedOrders(recentFiles.value.map(normalizeRecentFile).filter(item => item.pinned)).slice(0, MAX_RECENT_FILES)
-      : []
+  function removeRecentFolder(folderPath) {
+    recentFolders.value = recentFolders.value.filter(item => item.path !== folderPath)
+    saveRecentFolders()
+  }
+
+  function clearRecentFiles() {
+    recentFiles.value = []
     saveRecentFiles()
   }
 
-  // 保存最近文件到本地存储
+  function moveRecentFile(filePath, targetPath = null, position = 'before') {
+    if (!filePath) return
+
+    const normalized = recentFiles.value.map(normalizeRecentFile)
+    const sourceIndex = normalized.findIndex(item => item.path === filePath)
+    if (sourceIndex === -1) return
+
+    const [movedItem] = normalized.splice(sourceIndex, 1)
+    let insertIndex = 0
+
+    if (targetPath) {
+      const targetIndex = normalized.findIndex(item => item.path === targetPath)
+      insertIndex = targetIndex === -1 ? normalized.length : targetIndex + (position === 'after' ? 1 : 0)
+    }
+
+    normalized.splice(insertIndex, 0, movedItem)
+    recentFiles.value = normalized.slice(0, MAX_RECENT_FILES)
+    saveRecentFiles()
+  }
+
+  function clearRecentFolders() {
+    recentFolders.value = []
+    saveRecentFolders()
+  }
+
   function saveRecentFiles() {
     localStorage.setItem('recentFiles', JSON.stringify(recentFiles.value))
   }
@@ -280,12 +184,11 @@ export const useFileStore = defineStore('file', () => {
     localStorage.setItem('recentFolders', JSON.stringify(recentFolders.value))
   }
 
-  // 加载最近文件
   function loadRecentFiles() {
     const saved = localStorage.getItem('recentFiles')
     if (saved) {
       try {
-        recentFiles.value = sortRecentFiles(normalizePinnedOrders(JSON.parse(saved).map(normalizeRecentFile).filter(item => item.path))).slice(0, MAX_RECENT_FILES)
+        recentFiles.value = sortRecentFiles(JSON.parse(saved).map(normalizeRecentFile).filter(item => item.path)).slice(0, MAX_RECENT_FILES)
       } catch (error) {
         console.error('Failed to load recent files:', error)
       }
@@ -310,7 +213,6 @@ export const useFileStore = defineStore('file', () => {
     }
   }
 
-  // 初始化时加载最近文件
   loadRecentFiles()
   loadRecentFolders()
 
@@ -325,8 +227,6 @@ export const useFileStore = defineStore('file', () => {
     expandFolder,
     addRecentFile,
     addRecentFolder,
-    toggleRecentPin,
-    movePinnedRecentFile,
     moveRecentFile,
     removeRecentFile,
     removeRecentFolder,
