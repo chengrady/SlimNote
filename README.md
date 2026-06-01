@@ -4,9 +4,9 @@
 
 # SlimNote
 
-**All-in-One Text, Code & AI-Assisted Editor with Markdown + JSON Focus**
+**AI-Assisted Text & Code Editor for Markdown, JSON, SQL, Logs, and Notes**
 
-A modern desktop editor for Markdown, JSON, code, notes, SQL, logs, AI-assisted editing, and everyday text work.
+SlimNote combines a practical desktop editor with an integrated AI assistant, inline smart suggestions, Markdown writing, JSON cleanup, SQL formatting, log inspection, and everyday text work.
 
 [![Release](https://img.shields.io/github/v/release/chengrady/SlimNote?display_name=tag)](https://github.com/chengrady/SlimNote/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -17,6 +17,8 @@ A modern desktop editor for Markdown, JSON, code, notes, SQL, logs, AI-assisted 
   <a href="https://github.com/chengrady/SlimNote/releases/latest">Download Latest Release</a>
   ·
   <a href="CHANGELOG.md">Changelog</a>
+  ·
+  <a href="#ai-assistant--smart-suggestions">AI Assistant</a>
   ·
   <a href="#english">English</a>
   ·
@@ -39,20 +41,35 @@ SlimNote is a desktop editor built for practical file work: Markdown writing, JS
 
 ### Highlights
 
+- Built-in AI assistant for asking questions, rewriting selected text, polishing Markdown, explaining code, and applying edits back into the editor
+- Inline smart suggestions while typing, with configurable trigger delay, suggestion length, color, opacity, and log-file behavior
+- Multi-provider AI configuration with OpenAI-compatible APIs, Anthropic, Zhipu GLM, MiniMax, DeepSeek, Qwen, MiMo, and custom endpoints
 - Markdown workspace with WYSIWYG editing, source/preview flow, outline support, KaTeX, and Mermaid-aware PDF export
-- AI assistant panel with provider presets, context attachments, chat history, quick actions, auto-apply helpers, and inline suggestions
 - Plain-text copy and rich copy from Markdown preview for Word and WeChat workflows
 - JSON toolkit for formatting, compression, diff, tree view, schema generation, repair, and JMESPath query
 - SQL formatting helpers plus multi-tab editing for code, notes, logs, and configuration files
 - Pinned tabs, session restore, recent files, recent folders, file tree navigation, and external file change detection
 - Presentation Mode, activity bar navigation, always-on-top pin window, status bar details, in-app update check/download, and About dialog
 
+### AI Assistant & Smart Suggestions
+
+SlimNote 1.6.0 makes AI a first-class editing tool rather than a separate chat window. The assistant can work with the current document, selected text, manual context, and conversation history, then return either an explanation or directly applicable edits.
+
+| Capability | What it does |
+|------------|--------------|
+| Context-aware chat | Send the current document, selected text, and extra manual context with your request |
+| Quick actions | Polish text, proofread, explain content, or request a freeform edit from the editor workflow |
+| Auto-apply edits | Apply supported AI edits back into the selected text or the current document |
+| Inline suggestions | Show predictive text inside Monaco and Milkdown editors, accepted from the editing flow |
+| Conversation history | Keep AI sessions, switch between conversations, and summarize older context |
+| Provider settings | Configure provider presets, models, API keys, request timeout, temperature, and token limits |
+
 ### Built-In Tools
 
 | Tool | What it helps with |
 |------|---------------------|
 | Markdown | WYSIWYG editing, preview, outline, export to PDF/image, plain-text copy, rich copy |
-| AI Assistant | Provider/model settings, context-aware chat, inline suggestions, selected-content actions, auto-apply edits |
+| AI Assistant | Context-aware chat, inline smart suggestions, selected-content actions, provider/model settings, auto-apply edits |
 | JSON | Format, compress, diff, tree view, schema generation, repair, JMESPath query, format conversion |
 | SQL | Formatting with dialect-aware helpers |
 | Workspace | Pinned tabs, recent files/folders, file tree browsing, session restore |
@@ -99,20 +116,35 @@ SlimNote 是一个面向日常文件工作的桌面编辑器，适合处理 Mark
 
 ### 核心亮点
 
+- 内置 AI 助手，可提问、改写选中文本、润色 Markdown、解释代码，并把修改结果应用回编辑器
+- 提供行内智能提示，支持配置触发延迟、提示长度、颜色、透明度和日志文件启用策略
+- 支持多供应商 AI 配置，覆盖 OpenAI 兼容接口、Anthropic、智谱 GLM、MiniMax、DeepSeek、通义千问、MiMo 和自定义接口
 - 提供 Markdown 所见即所得编辑、源码与预览协同、目录支持、KaTeX，以及兼顾 Mermaid 的 PDF 导出
-- 新增 AI 助手面板，支持供应商预设、上下文附件、会话历史、快捷操作、自动应用修改和行内智能提示
 - 支持从 Markdown 预览区复制纯文本和富文本，便于粘贴到 Word、微信等场景
 - 内置 JSON 工具箱，支持格式化、压缩、Diff、树视图、Schema 生成、修复和 JMESPath 查询
 - 提供 SQL 格式化能力，并支持代码、笔记、日志、配置文件等多标签编辑
 - 支持固定标签、会话恢复、最近文件、最近文件夹、文件树导航和外部文件变更检测
 - 提供演示模式、活动栏切换、置顶悬浮窗、状态栏信息、应用内更新检查/下载和 About 对话框
 
+### AI 助手与智能提示
+
+SlimNote 1.6.0 把 AI 做成编辑器内的一等能力，而不是外置聊天窗口。AI 助手可以读取当前文档、选中文本、手动补充的上下文和会话历史，然后返回解释内容，或生成可直接应用的修改。
+
+| 能力 | 说明 |
+|------|------|
+| 带上下文对话 | 将当前文档、选中文本和额外上下文一起发送给 AI |
+| 快捷操作 | 在编辑流程中润色、校对、解释内容，或提出自由编辑需求 |
+| 自动应用修改 | 将支持的 AI 修改应用回选中文本或当前文档 |
+| 行内智能提示 | 在 Monaco 和 Milkdown 编辑器内显示预测文本，直接融入输入流程 |
+| 会话历史 | 保留 AI 会话、切换历史对话，并对较早上下文做摘要 |
+| 供应商设置 | 配置供应商预设、模型、API Key、请求超时、温度和 token 限制 |
+
 ### 内置工具
 
 | 工具 | 适用场景 |
 |------|----------|
 | Markdown | 所见即所得编辑、预览、目录、导出 PDF/图片、复制纯文本、复制富文本 |
-| AI 助手 | 供应商/模型设置、带上下文对话、行内智能提示、选区快捷操作、自动应用修改 |
+| AI 助手 | 带上下文对话、行内智能提示、选区快捷操作、供应商/模型设置、自动应用修改 |
 | JSON | 格式化、压缩、Diff、树视图、Schema 生成、修复、JMESPath 查询、格式转换 |
 | SQL | 多方言格式化辅助 |
 | 工作区 | 固定标签、最近文件/文件夹、文件树浏览、会话恢复 |
