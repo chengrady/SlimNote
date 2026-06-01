@@ -12,8 +12,9 @@ import { useFileStore } from './stores/file'
 const settingsStore = useSettingsStore()
 const fileStore = useFileStore()
 
+settingsStore.loadSettings()
+
 onMounted(() => {
-  settingsStore.loadSettings()
   fileStore.loadRecentFiles()
 })
 </script>

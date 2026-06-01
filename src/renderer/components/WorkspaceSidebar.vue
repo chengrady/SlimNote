@@ -5,14 +5,6 @@
         <span class="panel-title">{{ panelTitle }}</span>
         <span v-if="!collapsed && sidebarSubtitle" class="panel-subtitle">{{ sidebarSubtitle }}</span>
       </div>
-      <div class="header-actions">
-        <button type="button" class="ui-icon-btn" @click="$emit('toggle-collapse')" :title="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')" :aria-label="collapsed ? t('workspaceSidebar.expand') : t('workspaceSidebar.collapse')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline v-if="collapsed" points="9 18 15 12 9 6"/>
-            <polyline v-else points="15 18 9 12 15 6"/>
-          </svg>
-        </button>
-      </div>
     </div>
 
     <div class="panel-content">
@@ -47,18 +39,11 @@
         <div v-if="isExplorerView && currentRootPath" class="file-group workspace-group sidebar-section sidebar-section--workspace">
           <div class="group-header workspace-header">
             <div class="group-heading">
-              <div class="group-eyebrow">{{ t('workspaceSidebar.currentWorkspace') }}</div>
-              <div class="group-title group-title--workspace">{{ workspaceDisplayName }}</div>
+              <div class="group-title group-title--workspace" :title="workspaceDisplayName">{{ workspaceDisplayName }}</div>
             </div>
             <div class="group-actions">
-              <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click.stop="createWorkspaceFile()" :title="t('workspaceSidebar.newFile')" :aria-label="t('workspaceSidebar.newFile')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-              </button>
-              <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click.stop="createWorkspaceFolder()" :title="t('workspaceSidebar.newFolder')" :aria-label="t('workspaceSidebar.newFolder')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h5l2 3h11"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>
-              </button>
-              <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" :class="{ 'is-spinning': isRefreshing }" @click.stop="refreshWorkspace" :title="t('workspaceSidebar.refresh')" :aria-label="t('workspaceSidebar.refresh')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+              <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click.stop="collapseWorkspaceTree" :title="t('workspaceSidebar.menuCollapseAll')" :aria-label="t('workspaceSidebar.menuCollapseAll')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5-5 5 5"/><path d="m7 20 5-5 5 5"/></svg>
               </button>
               <button type="button" class="group-action-btn ui-icon-btn ui-icon-btn--sm" @click.stop="showWorkspaceRootMenuFromButton" :title="t('workspaceSidebar.moreActions')" :aria-label="t('workspaceSidebar.moreActions')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -69,10 +54,6 @@
               </button>
             </div>
           </div>
-          <div class="workspace-summary">
-            <span class="workspace-path" :title="currentRootPath">{{ currentRootPath }}</span>
-            <span class="workspace-count">{{ workspaceNodeSummary }}</span>
-          </div>
           <div class="workspace-filter-shell">
             <label class="workspace-filter" :aria-label="t('workspaceSidebar.filterAria')">
               <span class="workspace-filter-icon" aria-hidden="true">
@@ -80,7 +61,10 @@
               </span>
               <input v-model="workspaceFilter" type="text" :placeholder="t('workspaceSidebar.filterPlaceholder')" spellcheck="false">
               <button v-if="workspaceFilter" type="button" class="workspace-filter-clear ui-icon-btn ui-icon-btn--sm" @click="workspaceFilter = ''" :title="t('workspaceSidebar.clearFilter')" :aria-label="t('workspaceSidebar.clearFilter')">
-                ×
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 6 6 18"/>
+                  <path d="m6 6 12 12"/>
+                </svg>
               </button>
             </label>
           </div>
@@ -222,7 +206,9 @@
         </template>
         <template v-else-if="contextMenu.type === 'workspace'">
           <template v-if="contextMenu.node?.isRoot">
-            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-collapse-all')">{{ t('workspaceSidebar.menuCollapseAll') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-create-file')">{{ t('workspaceSidebar.menuCreateFile') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-create-folder')">{{ t('workspaceSidebar.menuCreateFolder') }}</div>
+            <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-refresh')">{{ t('workspaceSidebar.refresh') }}</div>
             <div class="menu-separator ui-menu-separator"></div>
             <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-change-root')">{{ t('workspaceSidebar.menuChangeRoot') }}</div>
             <div class="menu-item ui-menu-item" @click="handleContextAction('workspace-reveal')">{{ t('workspaceSidebar.menuReveal') }}</div>
@@ -294,7 +280,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['toggle-collapse', 'change-mode'])
+const emit = defineEmits(['change-mode'])
 
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
@@ -328,13 +314,6 @@ const panelTitle = computed(() => isExplorerView.value ? t('workspaceSidebar.exp
 const workspaceDisplayName = computed(() => getFileName(currentRootPath.value) || t('workspaceSidebar.title'))
 const filteredWorkspaceNodeCount = computed(() => countMatchingTreeNodes(fileTreeNodes.value, workspaceFilter.value))
 const hasFilteredWorkspaceNodes = computed(() => filteredWorkspaceNodeCount.value > 0)
-const workspaceNodeSummary = computed(() => {
-  if (!workspaceFilter.value) {
-    return t('workspaceSidebar.itemCount', { count: fileTreeNodes.value.length })
-  }
-
-  return t('workspaceSidebar.matchCount', { count: filteredWorkspaceNodeCount.value })
-})
 const activeFilePath = computed(() => editorStore.getActiveTab()?.filePath || '')
 const sidebarSubtitle = computed(() => {
   if (fileStore.rootPath && isExplorerView.value) {
@@ -985,12 +964,6 @@ onUnmounted(() => {
   max-width: 100%;
 }
 
-.header-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.header-actions button,
 .collapsed-open-btn,
 .section-link,
 .folder-remove,
@@ -998,11 +971,6 @@ onUnmounted(() => {
   transition: var(--transition-interactive);
 }
 
-.header-actions button {
-  border-radius: var(--icon-button-radius);
-}
-
-.header-actions button:hover,
 .collapsed-open-btn:hover,
 .collapsed-file:hover,
 .folder-item:hover,
@@ -1014,7 +982,6 @@ onUnmounted(() => {
   box-shadow: var(--interactive-hover-ring);
 }
 
-.header-actions button:focus-visible,
 .collapsed-open-btn:focus-visible,
 .collapsed-file:focus-visible,
 .folder-item:focus-visible,
@@ -1201,6 +1168,10 @@ onUnmounted(() => {
   letter-spacing: 0;
   text-transform: none;
   color: var(--text-main);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .section-card-desc {
@@ -1305,7 +1276,17 @@ onUnmounted(() => {
 }
 
 .workspace-header {
-  align-items: flex-start;
+  align-items: center;
+}
+
+.workspace-header .group-heading,
+.workspace-header .group-actions {
+  min-height: var(--icon-button-size-md);
+  align-items: center;
+}
+
+.workspace-header .group-heading {
+  justify-content: center;
 }
 
 .workspace-header .group-actions {
@@ -1318,45 +1299,20 @@ onUnmounted(() => {
   border-radius: calc(var(--icon-button-radius) + 1px);
 }
 
-.workspace-summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 4px 10px;
-}
-
-.workspace-summary.collapsed {
-  padding-top: 4px;
-}
-
-.workspace-path {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
-.workspace-count {
-  color: var(--text-muted);
-  font-size: var(--ui-font-size-xs);
-  white-space: nowrap;
-  padding-top: 1px;
-}
-
 .workspace-filter-shell {
   padding-top: 2px;
 }
 
 .workspace-filter {
   min-height: 36px;
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 10px 0 12px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--glass-border) 92%, rgba(var(--accent-primary-rgb), 0.08));
   background: var(--surface-panel-strong);
+  box-sizing: border-box;
 }
 
 .workspace-filter:focus-within {
@@ -1365,32 +1321,48 @@ onUnmounted(() => {
 }
 
 .workspace-filter-icon {
+  width: 16px;
+  height: 16px;
   color: var(--text-shortcut, var(--text-muted));
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
-.workspace-filter input {
-  width: 100%;
+.workspace-filter input[type="text"] {
+  flex: 1 1 0;
+  width: auto;
   min-width: 0;
-  height: 32px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
   border: none;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
   color: var(--text-main);
+  font-family: inherit;
   font-size: 12px;
+  line-height: 34px;
 }
 
-.workspace-filter input:focus {
+.workspace-filter input[type="text"]:focus {
   outline: none;
+  border-color: transparent;
+  box-shadow: none;
 }
 
-.workspace-filter input::placeholder {
+.workspace-filter input[type="text"]::placeholder {
   color: var(--text-dim);
 }
 
 .workspace-filter-clear {
+  width: 22px;
+  height: 22px;
+  margin-right: -2px;
   border-radius: 999px;
+  flex: 0 0 auto;
 }
 
 .workspace-toolbar {
@@ -1732,15 +1704,6 @@ onUnmounted(() => {
     padding: 10px;
   }
 
-  .workspace-summary {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-
-  .workspace-count {
-    padding-top: 0;
-  }
-
   .workspace-toolbar {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1775,7 +1738,6 @@ onUnmounted(() => {
 @container workspace-sidebar (max-width: 300px) {
   .panel-subtitle,
   .group-meta,
-  .workspace-count,
   .folder-path,
   .file-path,
   .section-card-desc,
@@ -1796,19 +1758,6 @@ onUnmounted(() => {
   .recent-file .file-name,
   .folder-name {
     font-size: 12px;
-  }
-
-  .workspace-summary {
-    display: flex;
-    align-items: center;
-  }
-
-  .workspace-path {
-    font-size: 11px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
 
   .group-action-btn,
@@ -1846,8 +1795,7 @@ onUnmounted(() => {
   }
 
   .group-header,
-  .section-card-header,
-  .workspace-summary {
+  .section-card-header {
     gap: 6px;
   }
 }
@@ -1870,7 +1818,6 @@ onUnmounted(() => {
     opacity: 1;
   }
 
-  .workspace-path,
   .session-file {
     font-size: 11px;
   }
@@ -1916,7 +1863,8 @@ onUnmounted(() => {
   }
 
   .workspace-filter {
-    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 8px;
+    padding: 0 8px 0 10px;
   }
 
   .workspace-filter-clear {
@@ -1983,7 +1931,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.workspace-summary,
 .workspace-filter-shell,
 .workspace-toolbar,
 .empty-state {
@@ -1996,7 +1943,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.workspace-summary,
 .workspace-filter-shell,
 .workspace-toolbar {
   margin-top: 4px;

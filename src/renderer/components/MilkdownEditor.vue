@@ -3,8 +3,12 @@
     ref="editorRef"
     class="milkdown-editor-container"
     :class="{ 'dark-theme': isDarkTheme }"
+    :style="inlineCompletionStyle"
     tabindex="0"
     @keydown.capture="handleKeydown"
+    @keyup.capture="handleKeyup"
+    @compositionstart.capture="handleCompositionStart"
+    @compositionend.capture="handleCompositionEnd"
     @copy.capture="handleCopy"
     @paste.capture="handlePaste"
   ></div>
@@ -14,7 +18,9 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { Crepe } from '@milkdown/crepe'
 import { editorViewCtx } from '@milkdown/kit/core'
-import { insert, replaceAll } from '@milkdown/kit/utils'
+import { Plugin, PluginKey } from '@milkdown/kit/prose/state'
+import { Decoration, DecorationSet } from '@milkdown/kit/prose/view'
+import { $prose, getMarkdown, insert, replaceAll } from '@milkdown/kit/utils'
 import '@milkdown/crepe/theme/common/style.css'
 import '@milkdown/crepe/theme/frame.css'
 import { useSettingsStore } from '../stores/settings'
@@ -31,6 +37,14 @@ const props = defineProps({
   fontSize: {
     type: Number,
     default: 14
+  },
+  inlineCompletionProvider: {
+    type: Object,
+    default: null
+  },
+  inlineCompletionStyle: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -41,6 +55,12 @@ const editorRef = ref()
 let crepeEditor = null
 let isEditorReady = false // Track if editor is fully initialized
 let isApplyingExternalUpdate = false
+let isComposing = false
+let inlineCompletionTimer = 0
+let inlineCompletionRequestSerial = 0
+let inlineCompletionAnchor = null
+const inlineCompletionText = ref('')
+const inlineCompletionPluginKey = new PluginKey('slimnote-inline-completion')
 
 const isDarkTheme = computed(() => settingsStore.settings.theme === 'dark')
 
@@ -65,6 +85,89 @@ function applyEditableRootPreferences() {
   editableRoot.setAttribute('data-enable-grammarly', 'false')
 }
 
+function createInlineCompletionPlugin() {
+  return new Plugin({
+    key: inlineCompletionPluginKey,
+    state: {
+      init: () => ({ text: '', pos: 0 }),
+      apply(transaction, value) {
+        const meta = transaction.getMeta(inlineCompletionPluginKey)
+        if (meta?.type === 'set') return { text: meta.text || '', pos: meta.pos || 0 }
+        if (meta?.type === 'clear' || transaction.docChanged) return { text: '', pos: 0 }
+        return value
+      }
+    },
+    props: {
+      decorations(state) {
+        const value = inlineCompletionPluginKey.getState(state)
+        if (!value?.text || !Number.isFinite(value.pos) || value.pos <= 0) return null
+        const widget = Decoration.widget(value.pos, () => {
+          const wrapper = document.createElement('span')
+          wrapper.className = 'milkdown-inline-completion'
+          const ghost = document.createElement('span')
+          ghost.className = 'milkdown-inline-completion-ghost'
+          ghost.textContent = value.text
+          const hint = document.createElement('span')
+          hint.className = 'milkdown-inline-completion-hint'
+          hint.textContent = 'Tab 接受'
+          wrapper.append(ghost, hint)
+          return wrapper
+        }, {
+          side: 1,
+          ignoreSelection: true
+        })
+        return DecorationSet.create(state.doc, [widget])
+      }
+    }
+  })
+}
+
+function getCurrentProsePosition() {
+  if (!crepeEditor || !isEditorReady) return 0
+
+  try {
+    let position = 0
+    crepeEditor.editor.action((ctx) => {
+      position = ctx.get(editorViewCtx).state.selection.from
+    })
+    return position
+  } catch (err) {
+    console.warn('Failed to get Milkdown ProseMirror cursor position:', err)
+    return 0
+  }
+}
+
+function setInlineCompletionDecoration(text, position) {
+  if (!crepeEditor || !isEditorReady || !text || !Number.isFinite(position)) return
+
+  inlineCompletionText.value = text
+  crepeEditor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    view.dispatch(view.state.tr.setMeta(inlineCompletionPluginKey, { type: 'set', text, pos: position }))
+  })
+}
+
+function clearInlineCompletionDecoration() {
+  inlineCompletionText.value = ''
+  inlineCompletionAnchor = null
+  if (!crepeEditor || !isEditorReady) return
+
+  crepeEditor.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    view.dispatch(view.state.tr.setMeta(inlineCompletionPluginKey, { type: 'clear' }))
+  })
+}
+
+function cancelInlineCompletion(options = {}) {
+  if (inlineCompletionTimer) {
+    clearTimeout(inlineCompletionTimer)
+    inlineCompletionTimer = 0
+  }
+  inlineCompletionRequestSerial += 1
+  clearInlineCompletionDecoration()
+  if (options.stopRequest !== false) props.inlineCompletionProvider?.cancel?.()
+}
+
 function isSelectionInsideEditor() {
   const editableRoot = getEditableRoot()
   const selection = window.getSelection()
@@ -72,6 +175,16 @@ function isSelectionInsideEditor() {
 
   const range = selection.getRangeAt(0)
   return editableRoot.contains(range.commonAncestorContainer)
+}
+
+function getSelectionText() {
+  const editableRoot = getEditableRoot()
+  const selection = window.getSelection()
+  if (!editableRoot || !selection || selection.rangeCount === 0) return ''
+
+  const range = selection.getRangeAt(0)
+  if (!editableRoot.contains(range.commonAncestorContainer)) return ''
+  return selection.toString() || ''
 }
 
 function selectAllEditableContent() {
@@ -95,6 +208,30 @@ function getSelectionHtml(selection) {
 }
 
 function handleKeydown(event) {
+  if (inlineCompletionText.value && event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing && event.keyCode !== 229) {
+    event.preventDefault()
+    event.stopPropagation()
+    const text = inlineCompletionText.value
+    cancelInlineCompletion({ stopRequest: false })
+    crepeEditor?.editor?.action(insert(text, !/[\r\n]/.test(text)))
+    applyEditableRootPreferences()
+    crepeEditor?.editor?.action((ctx) => {
+      ctx.get(editorViewCtx).focus()
+    })
+    return
+  }
+
+  if (inlineCompletionText.value && event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    cancelInlineCompletion()
+    return
+  }
+
+  if (inlineCompletionText.value && event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    cancelInlineCompletion()
+  }
+
   if (!isPrimarySelectAll(event)) return
 
   const editableRoot = getEditableRoot()
@@ -103,6 +240,22 @@ function handleKeydown(event) {
   event.preventDefault()
   editableRoot.focus()
   selectAllEditableContent()
+}
+
+function handleKeyup(event) {
+  if (event?.isComposing || event?.keyCode === 229) return
+  if (['Shift', 'Control', 'Alt', 'Meta', 'Escape', 'Tab'].includes(event?.key)) return
+  scheduleInlineCompletion()
+}
+
+function handleCompositionStart() {
+  isComposing = true
+  cancelInlineCompletion()
+}
+
+function handleCompositionEnd() {
+  isComposing = false
+  scheduleInlineCompletion()
 }
 
 function handleCopy(event) {
@@ -120,6 +273,7 @@ function handleCopy(event) {
 }
 
 function handlePaste(event) {
+  cancelInlineCompletion()
   const text = event.clipboardData?.getData('text/plain') || ''
   if (!text) return
 
@@ -140,6 +294,66 @@ function getCurrentMarkdown() {
   }
 }
 
+function getCursorOffset() {
+  if (!crepeEditor || !isEditorReady) return 0
+
+  try {
+    let offset = 0
+    crepeEditor.editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx)
+      const cursorPosition = view.state.selection.from
+      const markdownBeforeCursor = getMarkdown({ from: 0, to: cursorPosition })(ctx)
+      offset = typeof markdownBeforeCursor === 'string' ? markdownBeforeCursor.length : 0
+    })
+    return offset
+  } catch (err) {
+    console.warn('Failed to get Milkdown cursor offset:', err)
+    return 0
+  }
+}
+
+function isNestedCodeEditorFocused() {
+  const editableRoot = getEditableRoot()
+  const activeElement = document.activeElement
+  return Boolean(editableRoot && activeElement?.closest?.('.cm-editor') && editableRoot.contains(activeElement))
+}
+
+function scheduleInlineCompletion(markdown = getCurrentMarkdown()) {
+  const provider = props.inlineCompletionProvider
+  if (!provider?.request || isComposing || isApplyingExternalUpdate || isNestedCodeEditorFocused()) return
+
+  if (inlineCompletionTimer) clearTimeout(inlineCompletionTimer)
+  clearInlineCompletionDecoration()
+
+  const delayMs = provider.getDelayMs?.() ?? 500
+  inlineCompletionTimer = setTimeout(async () => {
+    inlineCompletionTimer = 0
+    if (!crepeEditor || !isEditorReady || isComposing || isNestedCodeEditorFocused()) return
+
+    const serial = ++inlineCompletionRequestSerial
+    const cursorOffset = getCursorOffset()
+    const prosePosition = getCurrentProsePosition()
+    const requestContent = typeof markdown === 'string' ? markdown : getCurrentMarkdown()
+    inlineCompletionAnchor = { cursorOffset, prosePosition, content: requestContent }
+
+    try {
+      const suggestion = await provider.request({
+        source: 'milkdown',
+        content: requestContent,
+        cursorOffset,
+        language: 'markdown',
+        editorMode: 'wysiwyg'
+      })
+
+      if (serial !== inlineCompletionRequestSerial || !suggestion) return
+      if (getCursorOffset() !== cursorOffset || getCurrentProsePosition() !== prosePosition || getCurrentMarkdown() !== requestContent) return
+      setInlineCompletionDecoration(suggestion, prosePosition)
+    } catch (err) {
+      console.warn('Milkdown inline completion failed:', err)
+    }
+  }, Math.max(0, Number(delayMs) || 0))
+}
+
 function replaceMarkdownContent(markdown) {
   if (!crepeEditor || !isEditorReady) return
 
@@ -156,6 +370,7 @@ onMounted(async () => {
       root: editorRef.value,
       defaultValue: typeof props.modelValue === 'string' ? props.modelValue : '',
     })
+    crepeEditor.editor.use($prose(() => createInlineCompletionPlugin()))
 
     // Set up listener for markdown changes
     crepeEditor.on((manager) => {
@@ -163,7 +378,9 @@ onMounted(async () => {
       manager.markdownUpdated((ctx, markdown, prevMarkdown) => {
         if (isApplyingExternalUpdate) return
         if (markdown !== prevMarkdown) {
+          cancelInlineCompletion()
           emit('update:modelValue', markdown)
+          scheduleInlineCompletion(markdown)
         }
       })
 
@@ -183,6 +400,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  cancelInlineCompletion()
   if (crepeEditor) {
     crepeEditor.destroy()
     crepeEditor = null
@@ -196,6 +414,7 @@ watch(() => props.modelValue, (value) => {
   const nextMarkdown = typeof value === 'string' ? value : ''
   if (nextMarkdown === getCurrentMarkdown()) return
 
+  cancelInlineCompletion()
   isApplyingExternalUpdate = true
   try {
     replaceMarkdownContent(nextMarkdown)
@@ -221,6 +440,8 @@ watch(() => settingsStore.settings.theme, () => {
 
 // Expose methods
 defineExpose({
+  getSelectionText,
+  getCursorOffset,
   getMarkdown: () => {
     return getCurrentMarkdown()
   },
@@ -237,6 +458,7 @@ defineExpose({
   insertText: (text) => {
     if (!crepeEditor || !isEditorReady || !text) return
 
+    cancelInlineCompletion({ stopRequest: false })
     crepeEditor.editor.action(insert(text, !/[\r\n]/.test(text)))
     applyEditableRootPreferences()
     crepeEditor.editor.action((ctx) => {
@@ -633,6 +855,31 @@ defineExpose({
 /* Focus state */
 .milkdown-editor-container :deep(.ProseMirror-focused) {
   outline: none;
+}
+
+.milkdown-editor-container :deep(.milkdown-inline-completion) {
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
+.milkdown-editor-container :deep(.milkdown-inline-completion-ghost) {
+  color: var(--inline-completion-color, rgba(34, 211, 238, 0.7));
+  opacity: 1;
+}
+
+.milkdown-editor-container :deep(.milkdown-inline-completion-hint) {
+  margin-left: 8px;
+  padding: 1px 5px;
+  border: 1px solid var(--inline-completion-keycap-border, rgba(34, 211, 238, 0.46));
+  border-radius: 5px;
+  color: var(--inline-completion-strong-color, rgba(34, 211, 238, 0.86));
+  background: var(--inline-completion-keycap-bg, rgba(34, 211, 238, 0.16));
+  font-family: var(--font-family-ui, system-ui, sans-serif);
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.25;
+  vertical-align: 0.06em;
+  white-space: nowrap;
 }
 
 /* Code block with language indicator */

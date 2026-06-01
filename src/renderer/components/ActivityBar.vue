@@ -9,7 +9,7 @@
         type="button"
         :title="item.label"
         :aria-label="item.label"
-        @click="$emit('select-view', item.id)"
+        @click="selectView(item.id)"
       >
         <span class="activity-indicator" aria-hidden="true"></span>
         <span class="activity-icon" aria-hidden="true" v-html="item.icon"></span>
@@ -47,7 +47,7 @@
         type="button"
         :title="t('titleBar.settings')"
         :aria-label="t('titleBar.settings')"
-        @click="$emit('open-settings')"
+        @click="openSettings"
       >
         <span class="activity-indicator" aria-hidden="true"></span>
         <span class="activity-icon" aria-hidden="true">
@@ -77,7 +77,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['select-view', 'toggle-collapse', 'open-settings'])
+const emit = defineEmits(['select-view', 'toggle-collapse', 'open-settings'])
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
@@ -98,6 +98,19 @@ const items = computed(() => ([
 
 function toggleTheme() {
   settingsStore.toggleTheme()
+}
+
+function selectView(viewId) {
+  if (props.activeView === viewId) {
+    emit('toggle-collapse')
+    return
+  }
+
+  emit('select-view', viewId)
+}
+
+function openSettings() {
+  emit('open-settings')
 }
 </script>
 

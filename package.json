@@ -1,6 +1,6 @@
 {
   "name": "slimnote",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "A cross-platform text editor built with Electron and Vue 3",
   "main": "dist-electron/main.js",
   "author": "SlimNote Team",
@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "dev:web": "vite --config vite-frontend.config.js",
+    "test": "node --test test/*.js test/*.mjs",
     "build": "vite build && electron-builder",
     "build:win": "vite build && electron-builder --win",
     "build:mac": "vite build && electron-builder --mac",
@@ -30,6 +31,7 @@
     "@milkdown/preset-gfm": "^7.18.0",
     "ajv": "^6.14.0",
     "chokidar": "^3.6.0",
+    "electron-updater": "^6.8.3",
     "fast-xml-parser": "^5.4.2",
     "highlight.js": "^11.9.0",
     "html2canvas": "^1.4.1",
@@ -62,6 +64,13 @@
   "build": {
     "appId": "com.slimnote.app",
     "productName": "SlimNote",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "chengrady",
+        "repo": "SlimNote"
+      }
+    ],
     "fileAssociations": [
       {
         "ext": [

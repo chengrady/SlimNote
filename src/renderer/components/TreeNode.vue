@@ -9,9 +9,6 @@
         @click="toggleExpand"
       >
         <span class="expand-icon">{{ isExpanded ? '▼' : '▶' }}</span>
-        <span class="node-kind-icon" :class="isArray ? 'node-kind-icon-array' : 'node-kind-icon-object'" aria-hidden="true">
-          {{ isArray ? '[]' : '{}' }}
-        </span>
         <span class="key-name" v-if="displayKey">{{ displayKey }}</span>
         <span class="type-pill" :class="isArray ? 'type-pill-array' : 'type-pill-object'">
           {{ isArray ? 'Array' : 'Object' }}
@@ -66,9 +63,6 @@
       :style="nodeRowStyle"
       @click="handleClick"
     >
-      <span class="node-kind-icon" :class="valueIconClass" aria-hidden="true">
-        {{ valueIconText }}
-      </span>
       <span class="key-name" v-if="displayKey">{{ displayKey }}:</span>
       <span class="value" :class="typeClass">{{ displayValue }}</span>
       <button class="copy-btn" @click.stop="copyValue" title="复制值">
@@ -190,22 +184,6 @@ const typeClass = computed(() => {
   if (typeof props.data === 'number') return 'type-number'
   if (typeof props.data === 'boolean') return 'type-boolean'
   return 'type-unknown'
-})
-
-const valueIconText = computed(() => {
-  if (props.data === null) return '∅'
-  if (typeof props.data === 'string') return '""'
-  if (typeof props.data === 'number') return '#'
-  if (typeof props.data === 'boolean') return '◐'
-  return '•'
-})
-
-const valueIconClass = computed(() => {
-  if (props.data === null) return 'node-kind-icon-null'
-  if (typeof props.data === 'string') return 'node-kind-icon-string'
-  if (typeof props.data === 'number') return 'node-kind-icon-number'
-  if (typeof props.data === 'boolean') return 'node-kind-icon-boolean'
-  return 'node-kind-icon-unknown'
 })
 
 // 显示的值
@@ -356,63 +334,6 @@ async function copyValue() {
   color: var(--json-key-color, var(--text-main, #d4d4d4));
   margin-right: 6px;
   font-weight: 500;
-}
-
-.node-kind-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  margin-right: 8px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-}
-
-.node-kind-icon-object {
-  color: var(--json-key-color, var(--text-main, #d4d4d4));
-  background: color-mix(in srgb, var(--json-chip-bg, rgba(15, 106, 216, 0.08)) 88%, transparent);
-  border-color: var(--json-chip-border, rgba(15, 106, 216, 0.12));
-}
-
-.node-kind-icon-array {
-  color: var(--json-number-color, #6897bb);
-  background: color-mix(in srgb, rgba(255, 158, 100, 0.12) 88%, transparent);
-  border-color: color-mix(in srgb, var(--json-number-color, #6897bb) 28%, transparent);
-}
-
-.node-kind-icon-string {
-  color: var(--json-string-color, #6a8759);
-  background: color-mix(in srgb, var(--json-string-color, #6a8759) 14%, transparent);
-  border-color: color-mix(in srgb, var(--json-string-color, #6a8759) 24%, transparent);
-}
-
-.node-kind-icon-number {
-  color: var(--json-number-color, #6897bb);
-  background: color-mix(in srgb, var(--json-number-color, #6897bb) 14%, transparent);
-  border-color: color-mix(in srgb, var(--json-number-color, #6897bb) 24%, transparent);
-}
-
-.node-kind-icon-boolean {
-  color: var(--json-boolean-color, #cc7832);
-  background: color-mix(in srgb, var(--json-boolean-color, #cc7832) 14%, transparent);
-  border-color: color-mix(in srgb, var(--json-boolean-color, #cc7832) 24%, transparent);
-}
-
-.node-kind-icon-null {
-  color: var(--json-null-color, #808080);
-  background: color-mix(in srgb, var(--json-null-color, #808080) 14%, transparent);
-  border-color: color-mix(in srgb, var(--json-null-color, #808080) 24%, transparent);
-}
-
-.node-kind-icon-unknown {
-  color: var(--text-muted, #888);
-  background: rgba(127, 138, 163, 0.08);
-  border-color: rgba(127, 138, 163, 0.16);
 }
 
 .type-pill {

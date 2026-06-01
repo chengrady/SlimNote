@@ -596,6 +596,7 @@ onUnmounted(() => {
   color: var(--accent-primary);
   font-weight: var(--ui-font-weight-semibold);
   box-shadow: var(--shadow-subtle);
+  transition: color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast), max-width var(--transition-fast);
   z-index: 2;
 }
 

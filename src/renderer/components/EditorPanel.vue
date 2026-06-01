@@ -95,6 +95,8 @@
               :modelValue="activeTab.content"
               :theme="settingsStore.settings.theme"
               :fontSize="activeTab.fontSize"
+              :inline-completion-provider="inlineCompletionProvider"
+              :inline-completion-style="inlineCompletionStyle"
               @update:modelValue="handleContentChange"
               @paste-content="handleEditorPasteContent"
             />
@@ -105,6 +107,8 @@
               :modelValue="activeTab.content"
               :language="activeTab.language"
               :fontSize="activeTab.fontSize"
+              :inline-completion-provider="inlineCompletionProvider"
+              :inline-completion-style="inlineCompletionStyle"
               @update:modelValue="handleContentChange"
               @scroll="handleEditorScroll"
               @cursor-change="handleCursorChange"
@@ -358,34 +362,38 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
+import { useAIStore } from '../stores/ai'
 import { useSettingsStore } from '../stores/settings'
 import { useShortcutsStore } from '../stores/shortcuts'
-import MonacoEditor from './MonacoEditor.vue'
 import ContextSidebar from './ContextSidebar.vue'
 import JsonToolbar from './JsonToolbar.vue'
 import LogToolbar from './LogToolbar.vue'
 import MarkdownFormatToolbar from './MarkdownFormatToolbar.vue'
-import MarkdownPreview from './MarkdownPreview.vue'
 import MarkdownModeToolbar from './MarkdownModeToolbar.vue'
 import MarkdownOutlinePanel from './MarkdownOutlinePanel.vue'
-import MilkdownEditor from './MilkdownEditor.vue'
 import LogFilterPanel from './LogFilterPanel.vue'
 import ModalDialog from './ModalDialog.vue'
 import SqlToolbar from './SqlToolbar.vue'
-import JsonTreePanel from './JsonTreePanel.vue'
 import JsonStatsBar from './JsonStatsBar.vue'
-import JsonConverter from './JsonConverter.vue'
-import CodeGenPanel from './CodeGenPanel.vue'
-import JsonDiffPanel from './JsonDiffPanel.vue'
 import WelcomeWorkbench from './WelcomeWorkbench.vue'
 import { repairAndFormat } from '../utils/jsonRepair'
 import { exportCodeToImage, downloadImage } from '../utils/exportImage'
 import { buildMarkdownClipboardPayload, buildMarkdownPdfDocument } from '../utils/markdownPdf'
 import { detectLanguageFromContent, getLanguageDisplayName } from '../utils/contentTypeDetection'
+import { canApplyAiEdits } from '../utils/aiContext'
+import {
+  buildInlineCompletionContext,
+  buildInlineCompletionStyleVars,
+  cleanInlineCompletionText,
+  createInlineCompletionRequestId,
+  isInlineCompletionLanguageAllowed,
+  normalizeInlineCompletionSettings,
+  shouldRequestInlineCompletion
+} from '../utils/aiInlineCompletion'
 import { getPathFileName as getFileName } from '../utils/pathUtils'
 import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/rendererEvents'
 import { isShortcutEvent } from '../utils/shortcuts'
@@ -400,8 +408,17 @@ const props = defineProps({
 
 const { t, te } = useI18n()
 
+const MonacoEditor = defineAsyncComponent(() => import('./MonacoEditor.vue'))
+const MilkdownEditor = defineAsyncComponent(() => import('./MilkdownEditor.vue'))
+const MarkdownPreview = defineAsyncComponent(() => import('./MarkdownPreview.vue'))
+const JsonTreePanel = defineAsyncComponent(() => import('./JsonTreePanel.vue'))
+const JsonConverter = defineAsyncComponent(() => import('./JsonConverter.vue'))
+const CodeGenPanel = defineAsyncComponent(() => import('./CodeGenPanel.vue'))
+const JsonDiffPanel = defineAsyncComponent(() => import('./JsonDiffPanel.vue'))
+
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
+const aiStore = useAIStore()
 const settingsStore = useSettingsStore()
 const shortcutsStore = useShortcutsStore()
 shortcutsStore.loadShortcuts()
@@ -416,7 +433,8 @@ const CONTEXT_SIDEBAR_JSON_MIN_WIDTH = 420
 const CONTEXT_SIDEBAR_DEFAULT_WIDTH = 320
 const CONTEXT_SIDEBAR_MAX_WIDTH = 720
 const CONTEXT_SIDEBAR_JSON_MAX_WIDTH = 1080
-const CONTEXT_SIDEBAR_JSON_DEFAULT_RATIO = 0.62
+const CONTEXT_SIDEBAR_JSON_LEGACY_DEFAULT_RATIO = 0.62
+const CONTEXT_SIDEBAR_JSON_DEFAULT_RATIO = 0.5
 const CONTEXT_SIDEBAR_JSON_MAX_RATIO = 0.72
 const showPreview = ref(false)
 const monacoEditorRef = ref(null)
@@ -439,6 +457,8 @@ const isContextSidebarCollapsed = ref(false)
 const markdownContextTab = ref(localStorage.getItem(MARKDOWN_CONTEXT_TAB_STORAGE_KEY) === 'outline' ? 'outline' : 'preview')
 const logWrapEnabled = ref(true)
 const logFilterMode = ref('all')
+let activeInlineCompletionRequest = null
+let inlineCompletionSettingsLoading = null
 
 // JSON 编辑器增强功能状态
 const showJsonTree = ref(true)
@@ -594,6 +614,227 @@ const contextSidebarSubtitle = computed(() => {
   }
   return ''
 })
+const inlineCompletionStyle = computed(() => buildInlineCompletionStyleVars(aiStore.settings || {}, settingsStore.settings.theme))
+
+function getCurrentEditorSelection() {
+  if (activeTab.value?.language === 'markdown' && editorMode.value === 'wysiwyg') {
+    return milkdownEditorRef.value?.getSelectionText?.() || ''
+  }
+  return monacoEditorRef.value?.getSelection?.() || ''
+}
+
+function getCurrentCursorOffset() {
+  const content = activeTab.value?.content || ''
+
+  if (activeTab.value?.language === 'markdown' && editorMode.value === 'wysiwyg') {
+    const milkdownOffset = milkdownEditorRef.value?.getCursorOffset?.()
+    if (Number.isFinite(milkdownOffset)) return Math.min(Math.max(Math.trunc(milkdownOffset), 0), content.length)
+  }
+
+  const editor = monacoEditorRef.value?.getEditor?.()
+  const model = editor?.getModel?.()
+  const position = editor?.getPosition?.()
+  if (model && position) return model.getOffsetAt(position)
+
+  const line = Math.max(1, editorStore.cursorPosition.line || 1)
+  const column = Math.max(1, editorStore.cursorPosition.column || 1)
+  const lines = content.split('\n')
+  return lines.slice(0, line - 1).join('\n').length + (line > 1 ? 1 : 0) + column - 1
+}
+
+function getInlineCompletionSettings() {
+  return normalizeInlineCompletionSettings(aiStore.settings || {})
+}
+
+function getInlineCompletionDelayMs() {
+  return getInlineCompletionSettings().delayMs
+}
+
+async function ensureInlineCompletionSettingsLoaded() {
+  if (aiStore.settings) {
+    return true
+  }
+  if (!inlineCompletionSettingsLoading) {
+    inlineCompletionSettingsLoading = aiStore.loadSettings().finally(() => {
+      inlineCompletionSettingsLoading = null
+    })
+  }
+  const result = await inlineCompletionSettingsLoading
+  return Boolean(result?.ok)
+}
+
+function getInlineCompletionModelSelection() {
+  const providers = Array.isArray(aiStore.settings?.providers) ? aiStore.settings.providers : []
+  const provider = providers.find(item => item?.apiKeys?.some(key => key.hasApiKey)) || providers[0] || null
+  const model = provider?.models?.find(item => item.enabled !== false && item.model) || provider?.models?.[0] || null
+  return {
+    providerId: provider?.id || '',
+    modelId: model?.id || ''
+  }
+}
+
+function clearActiveInlineCompletionRequest(requestId = '', resolvePending = true) {
+  if (!activeInlineCompletionRequest) return
+  if (requestId && activeInlineCompletionRequest.requestId !== requestId) return
+  const resolveStale = activeInlineCompletionRequest.resolveStale
+  activeInlineCompletionRequest.cleanups.splice(0).forEach(cleanup => cleanup?.())
+  if (activeInlineCompletionRequest.timeout) clearTimeout(activeInlineCompletionRequest.timeout)
+  activeInlineCompletionRequest = null
+  if (resolvePending) resolveStale?.()
+}
+
+function cancelActiveInlineCompletionRequest() {
+  const requestId = activeInlineCompletionRequest?.requestId
+  clearActiveInlineCompletionRequest()
+  if (requestId) {
+    window.electronAPI?.stopAIInlineCompletion?.(requestId).catch?.(() => {})
+  }
+}
+
+function isInlineCompletionContextCurrent(anchor) {
+  if (!anchor || activeTab.value?.id !== anchor.tabId) return false
+  if (activeTab.value?.language !== anchor.language) return false
+  if ((activeTab.value?.content || '') !== anchor.content) return false
+  return getCurrentCursorOffset() === anchor.cursorOffset
+}
+
+async function requestInlineCompletionSuggestion(options = {}) {
+  const settingsReady = await ensureInlineCompletionSettingsLoaded()
+  if (!settingsReady || !activeTab.value) {
+    return ''
+  }
+
+  const settings = getInlineCompletionSettings()
+  const content = typeof options.content === 'string' ? options.content : (activeTab.value.content || '')
+  const language = options.language || activeTab.value.language || 'plaintext'
+  const cursorOffset = Math.min(Math.max(Number(options.cursorOffset) || 0, 0), content.length)
+  const hasSelection = Boolean(options.hasSelection)
+  const languageAllowed = isInlineCompletionLanguageAllowed(language, settings)
+  const shouldRequest = shouldRequestInlineCompletion({ settings, content, cursorOffset, language, hasSelection, isComposing: false })
+
+  if (!shouldRequest) {
+    return ''
+  }
+  if (!window.electronAPI?.startAIInlineCompletion) {
+    return ''
+  }
+
+  const tab = activeTab.value
+  const context = buildInlineCompletionContext({
+    settings,
+    content,
+    cursorOffset,
+    language,
+    editorMode: options.editorMode || editorMode.value,
+    fileName: tab.filePath ? getFileName(tab.filePath) : tab.title
+  })
+  const anchor = {
+    tabId: tab.id,
+    language,
+    content,
+    cursorOffset
+  }
+
+  cancelActiveInlineCompletionRequest()
+
+  const requestId = createInlineCompletionRequestId()
+  const { providerId, modelId } = getInlineCompletionModelSelection()
+  let buffer = ''
+
+  return new Promise((resolve) => {
+    const settle = (text = '') => {
+      if (activeInlineCompletionRequest?.requestId !== requestId) {
+        resolve('')
+        return
+      }
+
+      const contextCurrent = isInlineCompletionContextCurrent(anchor)
+      const cleaned = contextCurrent
+        ? cleanInlineCompletionText(text, { prefix: context.prefix, maxChars: settings.maxChars, settings })
+        : ''
+      clearActiveInlineCompletionRequest(requestId, false)
+      resolve(cleaned)
+    }
+
+    const cleanups = [
+      window.electronAPI.onAIInlineCompletionChunk?.((event) => {
+        if (event?.requestId === requestId) {
+          buffer += event.text || ''
+        }
+      }),
+      window.electronAPI.onAIInlineCompletionComplete?.((event) => {
+        if (event?.requestId === requestId) {
+          settle(buffer)
+        }
+      }),
+      window.electronAPI.onAIInlineCompletionError?.((event) => {
+        if (event?.requestId === requestId) {
+          settle('')
+        }
+      })
+    ].filter(Boolean)
+
+    activeInlineCompletionRequest = {
+      requestId,
+      cleanups,
+      resolveStale: () => resolve(''),
+      timeout: setTimeout(() => {
+        window.electronAPI?.stopAIInlineCompletion?.(requestId).catch?.(() => {})
+        settle('')
+      }, Math.max(5000, Math.min(20000, settings.delayMs + 16000)))
+    }
+
+    window.electronAPI.startAIInlineCompletion({
+      requestId,
+      providerId,
+      modelId,
+      ...context
+    }).then((result) => {
+      if (!result?.ok) settle('')
+    }).catch(() => {
+      settle('')
+    })
+  })
+}
+
+const inlineCompletionProvider = {
+  getDelayMs: getInlineCompletionDelayMs,
+  request: requestInlineCompletionSuggestion,
+  cancel: cancelActiveInlineCompletionRequest
+}
+
+function handleAiApplyResult({ action, content } = {}) {
+  if (!activeTab.value || !content) return
+
+  if (action === 'new-document') {
+    const tab = editorStore.createTab('ai-result.md', null, content, null, { language: 'markdown' })
+    editorStore.setActiveTab(tab.id)
+    return
+  }
+
+  if (!canApplyAiEdits(activeTab.value.language)) return
+
+  if (action === 'replace-document') {
+    editorStore.updateTabContent(activeTab.value.id, content)
+    return
+  }
+
+  if (action === 'replace-selection' || action === 'insert-cursor') {
+    if (activeTab.value.language === 'markdown' && editorMode.value === 'wysiwyg') {
+      milkdownEditorRef.value?.insertText(content)
+      return
+    }
+
+    monacoEditorRef.value?.replaceSelection(content)
+    return
+  }
+
+  if (action === 'append-end') {
+    const currentContent = activeTab.value.content || ''
+    const separator = currentContent ? (currentContent.endsWith('\n') ? '\n' : '\n\n') : ''
+    editorStore.updateTabContent(activeTab.value.id, `${currentContent}${separator}${content}`)
+  }
+}
 const shouldSyncMarkdownPreview = computed(() => activeTab.value?.language === 'markdown' && editorMode.value === 'source' && (isMarkdownSplitView.value || showMarkdownContextPreview.value))
 const filteredLogEntries = computed(() => {
   if (activeTab.value?.language !== 'log' || logFilterMode.value === 'all') {
@@ -918,6 +1159,9 @@ function getDefaultContextSidebarWidth(type = currentContextType.value) {
 function loadContextSidebarWidth(type = currentContextType.value) {
   const savedWidth = Number(localStorage.getItem(getContextSidebarStorageKey(type)))
   if (Number.isFinite(savedWidth) && savedWidth > 0) {
+    const { workspaceWidth } = getContextSidebarBounds(type)
+    const savedRatio = workspaceWidth > 0 ? savedWidth / workspaceWidth : 0
+    if (type === 'json' && Math.abs(savedRatio - CONTEXT_SIDEBAR_JSON_LEGACY_DEFAULT_RATIO) < 0.03) return getDefaultContextSidebarWidth(type)
     return clampContextSidebarWidth(savedWidth, type)
   }
 
@@ -1477,7 +1721,7 @@ async function exportMarkdownAsPdf() {
       : `${defaultFileName}.pdf`
     const html = await buildMarkdownPdfDocument({
       content: activeTab.value.content,
-      title: activeTab.value.title || defaultFileName,
+      title: '',
       theme: settingsStore.settings.theme,
       sourcePath: activeTab.value.filePath || ''
     })
@@ -1577,6 +1821,7 @@ function handleJumpToLocation(event) {
 }
 
 onMounted(() => {
+  ensureInlineCompletionSettingsLoaded()
   const savedSplitRatio = Number(localStorage.getItem(MARKDOWN_SPLIT_RATIO_STORAGE_KEY))
   if (Number.isFinite(savedSplitRatio) && savedSplitRatio > 0) {
     splitRatio.value = clampSplitRatio(savedSplitRatio)
@@ -1597,6 +1842,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  cancelActiveInlineCompletionRequest()
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('keydown', handleSqlCommentShortcut, true)
   if (fontSizeToastTimer) {
@@ -1610,6 +1856,7 @@ onUnmounted(() => {
 })
 
 watch(() => activeTab.value?.language, (language) => {
+  cancelActiveInlineCompletionRequest()
   if (language === 'log') {
     logWrapEnabled.value = true
     logFilterMode.value = 'all'
@@ -1628,6 +1875,10 @@ watch(currentContextType, (type) => {
   isContextSidebarCollapsed.value = localStorage.getItem(`${CONTEXT_SIDEBAR_COLLAPSED_STORAGE_KEY_PREFIX}${type}`) === '1'
   contextSidebarWidth.value = loadContextSidebarWidth(type)
 }, { immediate: true })
+
+watch(() => [activeTab.value?.id, editorMode.value], () => {
+  cancelActiveInlineCompletionRequest()
+})
 
 watch(contextSidebarWidth, (newWidth) => {
   if (!showContextSidebar.value || isContextSidebarCollapsed.value || !currentContextType.value) return
@@ -1800,6 +2051,12 @@ async function openFolder() {
     await fileStore.loadFolder(result.filePaths[0])
   }
 }
+
+defineExpose({
+  getCurrentEditorSelection,
+  getCurrentCursorOffset,
+  handleAiApplyResult
+})
 </script>
 
 <style scoped>

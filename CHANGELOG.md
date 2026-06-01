@@ -8,6 +8,51 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 格式参考 Keep a Changelog，并尽量按照语义化版本的方式维护。
 
+## [1.6.0] - 2026-06-01
+
+### Added / 新增
+
+- Added an AI assistant panel for context-aware chat, selected-content actions, conversation history, context usage feedback, and auto-apply edit helpers.
+- 新增 AI 助手面板，支持带上下文对话、选区快捷操作、会话历史、上下文用量反馈和自动应用修改辅助。
+
+- Added multi-provider AI settings with presets for OpenAI-compatible APIs, Anthropic, Zhipu GLM, MiniMax, DeepSeek, Qwen, MiMo, and custom endpoints.
+- 新增多供应商 AI 设置，内置 OpenAI 兼容接口、Anthropic、智谱 GLM、MiniMax、DeepSeek、通义千问、MiMo 和自定义接口预设。
+
+- Added inline AI suggestions with configurable delay, max length, color, opacity, and log-file enablement.
+- 新增行内智能提示，支持配置触发延迟、最大长度、颜色、透明度和日志文件启用策略。
+
+- Added in-app update checking, download state tracking, and install handoff for packaged builds backed by GitHub Releases.
+- 新增基于 GitHub Releases 的应用内更新检查、下载状态跟踪和安装交接能力，面向打包版本生效。
+
+### Changed / 调整
+
+- Reworked Settings with a compact AI provider/model/key configuration flow and shared select controls.
+- 重构设置页中的 AI 供应商、模型和密钥配置流程，并复用统一的选择控件。
+
+- Improved editor integration for AI context collection, Markdown/Milkdown cursor handling, selected-content application, and narrow side-panel layouts.
+- 优化 AI 上下文收集、Markdown/Milkdown 光标处理、选区内容应用和窄侧栏布局下的编辑器集成体验。
+
+- Added latest-only async handling for settings saves and AI UI refreshes to avoid stale state updates.
+- 为设置保存和 AI 界面刷新增加“只采纳最新请求”的异步处理，减少旧请求覆盖新状态的问题。
+
+### Fixed / 修复
+
+- Hardened AI request validation, stop handling, provider/model resolution, persisted session cleanup, and conversation summarization.
+- 强化 AI 请求校验、停止处理、供应商/模型解析、持久化会话清理和对话摘要逻辑。
+
+- Fixed AI quick-action and context menu behavior in compact layouts so menus stay aligned and usable.
+- 修复紧凑布局下 AI 快捷操作和上下文菜单的对齐与可用性问题。
+
+### Build / 构建
+
+- Bumped the app version to `1.6.0`, added `electron-updater`, copied Electron main-process helper files into builds, and added a unified `npm test` script.
+- 将应用版本提升到 `1.6.0`，新增 `electron-updater`，构建时复制 Electron 主进程辅助文件，并补充统一的 `npm test` 脚本。
+
+### Docs / 文档
+
+- Updated `README.md` to reflect AI-assisted editing, in-app updates, and the current release packaging flow.
+- 更新 `README.md`，同步 AI 辅助编辑、应用内更新和当前发布打包流程。
+
 ## [1.5.0] - 2026-05-21
 
 ### Added / 新增

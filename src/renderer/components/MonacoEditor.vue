@@ -1,5 +1,5 @@
 <template>
-  <div ref="editorContainer" class="monaco-editor-container"></div>
+  <div ref="editorContainer" class="monaco-editor-container" :style="inlineCompletionStyle"></div>
 </template>
 
 <script setup>
@@ -30,6 +30,14 @@ const props = defineProps({
   editorTheme: {
     type: String,
     default: ''  // 自定义编辑器主题，如 'dracula', 'nord' 等
+  },
+  inlineCompletionProvider: {
+    type: Object,
+    default: null
+  },
+  inlineCompletionStyle: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -39,7 +47,19 @@ const settingsStore = useSettingsStore()
 const editorContainer = ref()
 let editor = null
 let isSyncingScroll = false
+let isComposing = false
+let inlineCompletionDisposable = null
+let inlineCompletionTriggerTimer = 0
 const rendererEventCleanups = []
+const inlineCompletionStyleVarNames = [
+  '--inline-completion-color',
+  '--inline-completion-strong-color',
+  '--inline-completion-keycap-bg',
+  '--inline-completion-keycap-border',
+  '--vscode-editorGhostText-foreground',
+  '--vscode-editorGhostText-background',
+  '--vscode-editorGhostText-border'
+]
 
 function buildMarkdownListContinuation(lineContent, column) {
   const safeColumn = Math.max(1, Number(column) || 1)
@@ -112,6 +132,140 @@ function handleMarkdownEnter() {
 }
 
 const MONOSPACE_FALLBACK = 'Consolas, "Cascadia Mono", "Courier New", monospace'
+
+function waitForInlineCompletionDelay(delayMs, token) {
+  return new Promise((resolve) => {
+    if (token?.isCancellationRequested) {
+      resolve(false)
+      return
+    }
+
+    let cleanup = null
+    const timeout = setTimeout(() => {
+      cleanup?.dispose?.()
+      resolve(!token?.isCancellationRequested)
+    }, Math.max(0, Number(delayMs) || 0))
+
+    cleanup = token?.onCancellationRequested?.(() => {
+      clearTimeout(timeout)
+      cleanup?.dispose?.()
+      resolve(false)
+    })
+  })
+}
+
+function disposeInlineCompletionProvider() {
+  inlineCompletionDisposable?.dispose?.()
+  inlineCompletionDisposable = null
+}
+
+function applyInlineCompletionStyle() {
+  if (!editorContainer.value) return
+  const style = props.inlineCompletionStyle || {}
+  const targets = [
+    editorContainer.value,
+    ...editorContainer.value.querySelectorAll('.monaco-editor')
+  ]
+
+  targets.forEach((target) => {
+    inlineCompletionStyleVarNames.forEach((name) => {
+      const value = style[name]
+      if (typeof value === 'undefined' || value === null || value === '') {
+        target.style.removeProperty(name)
+        return
+      }
+      target.style.setProperty(name, String(value))
+    })
+  })
+}
+
+function clearInlineCompletionTrigger() {
+  if (!inlineCompletionTriggerTimer) return
+  clearTimeout(inlineCompletionTriggerTimer)
+  inlineCompletionTriggerTimer = 0
+}
+
+function triggerInlineCompletion() {
+  if (!editor) {
+    return
+  }
+  if (isComposing) {
+    return
+  }
+  if (!props.inlineCompletionProvider?.request) {
+    return
+  }
+  editor.trigger('slimnote-inline-completion', 'editor.action.inlineSuggest.trigger', {})
+}
+
+function scheduleInlineCompletionTrigger() {
+  clearInlineCompletionTrigger()
+  inlineCompletionTriggerTimer = setTimeout(() => {
+    inlineCompletionTriggerTimer = 0
+    triggerInlineCompletion()
+  }, 0)
+}
+
+function registerInlineCompletionProvider() {
+  disposeInlineCompletionProvider()
+  const provider = props.inlineCompletionProvider
+  if (!provider?.request || !props.language) {
+    return
+  }
+
+  inlineCompletionDisposable = monaco.languages.registerInlineCompletionsProvider(props.language, {
+    async provideInlineCompletions(model, position, _context, token) {
+      if (!editor || isComposing || token?.isCancellationRequested) {
+        return { items: [] }
+      }
+
+      const selection = editor.getSelection()
+      if (!selection?.isEmpty?.()) {
+        return { items: [] }
+      }
+
+      const delayMs = provider.getDelayMs?.() ?? 500
+      const shouldContinue = await waitForInlineCompletionDelay(delayMs, token)
+      if (!shouldContinue || isComposing || token?.isCancellationRequested) {
+        return { items: [] }
+      }
+
+      const versionId = model.getVersionId()
+      const cursorOffset = model.getOffsetAt(position)
+      const tokenCleanup = token?.onCancellationRequested?.(() => provider.cancel?.())
+      let suggestion = ''
+      try {
+        suggestion = await provider.request({
+          source: 'monaco',
+          content: model.getValue(),
+          cursorOffset,
+          language: props.language,
+          editorMode: 'source',
+          contentVersion: versionId
+        }).finally(() => {
+          tokenCleanup?.dispose?.()
+        })
+      } catch {
+        return { items: [] }
+      }
+
+      const currentPosition = editor.getPosition()
+      if (!suggestion || token?.isCancellationRequested || model.getVersionId() !== versionId) return { items: [] }
+      if (!currentPosition || currentPosition.lineNumber !== position.lineNumber || currentPosition.column !== position.column) {
+        return { items: [] }
+      }
+
+      return {
+        items: [{
+          insertText: suggestion,
+          range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column)
+        }],
+        suppressSuggestions: true
+      }
+    },
+    freeInlineCompletions() {}
+  })
+}
 
 function resolveEditorFontFamily(fontFamily) {
   if (!fontFamily || !isMonospaceFontFamily(fontFamily)) {
@@ -311,6 +465,12 @@ onMounted(() => {
     quickSuggestions: false,
     suggestOnTriggerCharacters: false,
     wordBasedSuggestions: 'off',
+    inlineSuggest: {
+      enabled: true,
+      mode: 'prefix',
+      suppressSuggestions: true,
+      showToolbar: 'onHover'
+    },
     unicodeHighlight: getUnicodeHighlightOptions(settingsStore.settings.unicodeHighlight),
     bracketPairColorization: {
       enabled: props.language === 'json'
@@ -321,6 +481,19 @@ onMounted(() => {
       highlightActiveIndentation: true
     }
   })
+
+  editor.onDidCompositionStart(() => {
+    isComposing = true
+    clearInlineCompletionTrigger()
+    props.inlineCompletionProvider?.cancel?.()
+  })
+
+  editor.onDidCompositionEnd(() => {
+    isComposing = false
+  })
+
+  applyInlineCompletionStyle()
+  registerInlineCompletionProvider()
 
   editor.addCommand(monaco.KeyCode.Enter, () => {
     if (handleMarkdownEnter()) {
@@ -372,8 +545,10 @@ onMounted(() => {
 
   // 监听内容变化
   editor.onDidChangeModelContent(() => {
+    props.inlineCompletionProvider?.cancel?.()
     const value = editor.getValue()
     emit('update:modelValue', value)
+    scheduleInlineCompletionTrigger()
   })
 
   // 监听主题变化
@@ -398,6 +573,7 @@ onMounted(() => {
           }
         })
         monaco.editor.setTheme(resolveMonacoTheme(settingsStore.settings.theme, newLang, props.editorTheme))
+        registerInlineCompletionProvider()
       }
     }
   })
@@ -417,6 +593,7 @@ onMounted(() => {
 
   // 监听光标位置变化
   editor.onDidChangeCursorPosition((e) => {
+    props.inlineCompletionProvider?.cancel?.()
     emit('cursor-change', { line: e.position.lineNumber, column: e.position.column })
   })
 
@@ -429,10 +606,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   rendererEventCleanups.splice(0).forEach((cleanup) => cleanup())
+  clearInlineCompletionTrigger()
   if (editorContainer.value) {
     editorContainer.value.removeEventListener('wheel', handleWheel)
   }
   if (editor) {
+    disposeInlineCompletionProvider()
     editor.dispose()
   }
 })
@@ -457,12 +636,22 @@ watch(() => props.language, (newLang) => {
         highlightActiveIndentation: true
       }
     })
+    registerInlineCompletionProvider()
   }
 })
+
+watch(() => props.inlineCompletionProvider, () => {
+  registerInlineCompletionProvider()
+})
+
+watch(() => props.inlineCompletionStyle, () => {
+  applyInlineCompletionStyle()
+}, { deep: true })
 
 watch(() => props.theme, (newTheme) => {
   if (editor) {
     monaco.editor.setTheme(resolveMonacoTheme(newTheme, props.language, props.editorTheme))
+    applyInlineCompletionStyle()
   }
 })
 
@@ -476,6 +665,7 @@ watch(() => props.fontSize, (newSize) => {
 watch(() => props.editorTheme, (newTheme) => {
   if (editor) {
     setEditorTheme(newTheme)
+    applyInlineCompletionStyle()
   }
 })
 
@@ -484,6 +674,7 @@ watch(() => settingsStore.settings, (newSettings) => {
   if (!editor) return
   
   monaco.editor.setTheme(resolveMonacoTheme(newSettings.theme, props.language, props.editorTheme))
+  applyInlineCompletionStyle()
 
   editor.updateOptions({
     // fontSize: newSettings.fontSize, // Use prop instead
@@ -594,6 +785,7 @@ function setWordWrap(enabled) {
 function setEditorTheme(themeId) {
   if (!editor) return
   applyTheme(resolveMonacoTheme(settingsStore.settings.theme, props.language, themeId))
+  applyInlineCompletionStyle()
 }
 
 // 获取编辑器实例
@@ -620,6 +812,7 @@ onUnmounted(() => {
     editorContainer.value.removeEventListener('wheel', handleWheel, { capture: true })
   }
   if (editor) {
+    disposeInlineCompletionProvider()
     editor.dispose()
   }
   rendererEventCleanups.splice(0).forEach((cleanup) => cleanup())
@@ -630,5 +823,38 @@ onUnmounted(() => {
 .monaco-editor-container {
   width: 100%;
   height: 100%;
+}
+
+.monaco-editor-container :deep(.ghost-text-decoration),
+.monaco-editor-container :deep(.ghost-text-decoration-preview),
+.monaco-editor-container :deep(.ghost-text),
+.monaco-editor-container :deep(.suggest-preview-text .ghost-text) {
+  color: var(--inline-completion-color, rgba(34, 211, 238, 0.7)) !important;
+  opacity: 1 !important;
+  font-style: normal;
+}
+
+.monaco-editor-container :deep(.ghost-text-decoration::after),
+.monaco-editor-container :deep(.ghost-text-decoration-preview::after),
+.monaco-editor-container :deep(.suggest-preview-text .ghost-text::after) {
+  content: 'Tab 接受';
+  margin-left: 8px;
+  padding: 1px 5px;
+  border: 1px solid var(--inline-completion-keycap-border, rgba(34, 211, 238, 0.46));
+  border-radius: 5px;
+  color: var(--inline-completion-strong-color, rgba(34, 211, 238, 0.86));
+  background: var(--inline-completion-keycap-bg, rgba(34, 211, 238, 0.16));
+  font-family: var(--font-family-ui, system-ui, sans-serif);
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.25;
+  vertical-align: 0.06em;
+}
+
+.monaco-editor-container :deep(.inlineSuggestionsHints) {
+  border-color: var(--inline-completion-keycap-border, rgba(34, 211, 238, 0.46)) !important;
+  color: var(--inline-completion-strong-color, rgba(34, 211, 238, 0.86)) !important;
+  background: var(--inline-completion-keycap-bg, rgba(34, 211, 238, 0.16)) !important;
+  box-shadow: none !important;
 }
 </style>

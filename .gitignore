@@ -1,6 +1,11 @@
 # Claude Code local settings
 .claude/
+.codex-debug/
 .github/
+.playwright-cli/
+.playwright-mcp/
+.superpowers/
+.worktrees/
 
 # Logs
 logs
@@ -51,3 +56,8 @@ test-*.js
 
 # Project notes
 SlimNote-优化清单.md
+ai-*.html
+ai-*.png
+ai-thinking-complete-design.svg
+slimnote-*.md
+slimnote-*.png
