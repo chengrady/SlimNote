@@ -53,6 +53,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }),
   exportMarkdownPdf: (payload) => ipcRenderer.invoke('export-markdown-pdf', payload),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getUpdateState: () => ipcRenderer.invoke('get-update-state'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateStateChanged: (callback) => onIpc('update-state-changed', callback),
   openFileAssociationSettings: () => ipcRenderer.invoke('open-file-association-settings'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   consumePendingOpenFiles: () => ipcRenderer.invoke('consume-pending-open-files'),
@@ -63,6 +67,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resetShortcut: (id) => ipcRenderer.invoke('reset-shortcut', id),
   resetShortcuts: () => ipcRenderer.invoke('reset-shortcuts'),
   onShortcutsChanged: (callback) => onIpc('shortcuts-changed', callback),
+
+  // AI Settings
+  getAISettings: () => ipcRenderer.invoke('ai:get-settings'),
+  updateAISettings: (payload) => ipcRenderer.invoke('ai:update-settings', payload),
+  clearAISettings: () => ipcRenderer.invoke('ai:clear-settings'),
+  testAIConnection: (payload) => ipcRenderer.invoke('ai:test-connection', payload),
+
+  // AI Sessions
+  listAISessions: () => ipcRenderer.invoke('ai:list-sessions'),
+  saveAISession: (session) => ipcRenderer.invoke('ai:save-session', session),
+  deleteAISession: (id) => ipcRenderer.invoke('ai:delete-session', id),
+  clearAISessions: () => ipcRenderer.invoke('ai:clear-sessions'),
+
+  // AI Chat
+  startAIChat: (payload) => ipcRenderer.invoke('ai:chat-start', payload),
+  stopAIChat: (requestId) => ipcRenderer.invoke('ai:chat-stop', requestId),
+  onAIChatStatus: (callback) => onIpc('ai:chat-status', callback),
+  onAIChatReasoning: (callback) => onIpc('ai:chat-reasoning', callback),
+  onAIChatChunk: (callback) => onIpc('ai:chat-chunk', callback),
+  onAIChatComplete: (callback) => onIpc('ai:chat-complete', callback),
+  onAIChatError: (callback) => onIpc('ai:chat-error', callback),
+
+  // AI Inline Completion
+  startAIInlineCompletion: (payload) => ipcRenderer.invoke('ai:inline-completion-start', payload),
+  stopAIInlineCompletion: (requestId) => ipcRenderer.invoke('ai:inline-completion-stop', requestId),
+  onAIInlineCompletionStatus: (callback) => onIpc('ai:inline-completion-status', callback),
+  onAIInlineCompletionChunk: (callback) => onIpc('ai:inline-completion-chunk', callback),
+  onAIInlineCompletionComplete: (callback) => onIpc('ai:inline-completion-complete', callback),
+  onAIInlineCompletionError: (callback) => onIpc('ai:inline-completion-error', callback),
 
   // Pin Window
   createPinWindow: (content, theme, language) => ipcRenderer.invoke('create-pin-window', { content, theme, language }),
@@ -87,6 +120,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuReplace: (callback) => onIpc('menu-replace', callback),
   onMenuGlobalSearch: (callback) => onIpc('menu-global-search', callback),
   onMenuToggleSidebar: (callback) => onIpc('menu-toggle-sidebar', callback),
+  onMenuToggleRightSidebar: (callback) => onIpc('menu-toggle-right-sidebar', callback),
   onMenuTogglePresentationMode: (callback) => onIpc('menu-toggle-presentation-mode', callback),
   onAppBeforeClose: (callback) => onIpc('app-before-close', callback),
   onAppOpenFile: (callback) => onIpc('app-open-file', callback),

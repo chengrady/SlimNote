@@ -175,6 +175,17 @@
     "accelerator": "CmdOrCtrl+B"
   },
   {
+    "id": "view.toggleRightSidebar",
+    "action": "toggle-right-sidebar",
+    "channel": "menu-toggle-right-sidebar",
+    "labelKey": "menu.toggleRightSidebar",
+    "fallbackZh": "\u5207\u6362\u53f3\u4fa7 AI \u52a9\u624b",
+    "fallbackEn": "Toggle Right AI Assistant",
+    "category": "view",
+    "scope": "global",
+    "accelerator": "CmdOrCtrl+Alt+B"
+  },
+  {
     "id": "view.toggleFullscreen",
     "action": "toggle-fullscreen",
     "labelKey": "menu.toggleFullscreen",

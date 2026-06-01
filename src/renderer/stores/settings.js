@@ -14,7 +14,9 @@ const DEFAULT_SETTINGS = {
   lineNumbers: true,
   minimap: true,
   sidebarCollapsed: false,
-  sidebarWidth: 250,
+  rightSidebarCollapsed: false,
+  sidebarWidth: 280,
+  rightSidebarWidth: 380,
   tabDensity: 'comfortable',
   unpinnedTabMaxRows: 10,
   locale: 'zh-CN'
@@ -22,6 +24,10 @@ const DEFAULT_SETTINGS = {
 
 const MIN_FONT_SIZE = 8
 const MAX_FONT_SIZE = 72
+const MIN_SIDEBAR_WIDTH = 220
+const MAX_SIDEBAR_WIDTH = 1200
+const MIN_RIGHT_SIDEBAR_WIDTH = 320
+const MAX_RIGHT_SIDEBAR_WIDTH = 1200
 const MIN_UNPINNED_TAB_MAX_ROWS = 1
 const MAX_UNPINNED_TAB_MAX_ROWS = 10
 
@@ -37,6 +43,12 @@ function normalizeUnpinnedTabMaxRows(value, fallback = DEFAULT_SETTINGS.unpinned
   return Math.max(MIN_UNPINNED_TAB_MAX_ROWS, Math.min(MAX_UNPINNED_TAB_MAX_ROWS, parsed))
 }
 
+function normalizeWidth(value, fallback, minValue, maxValue) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(minValue, Math.min(maxValue, parsed))
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref({ ...DEFAULT_SETTINGS })
 
@@ -50,6 +62,8 @@ export const useSettingsStore = defineStore('settings', () => {
           ...settings.value,
           ...parsed,
           fontSize: normalizeFontSize(parsed.fontSize, settings.value.fontSize),
+          sidebarWidth: normalizeWidth(parsed.sidebarWidth, settings.value.sidebarWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH),
+          rightSidebarWidth: normalizeWidth(parsed.rightSidebarWidth, settings.value.rightSidebarWidth, MIN_RIGHT_SIDEBAR_WIDTH, MAX_RIGHT_SIDEBAR_WIDTH),
           unpinnedTabMaxRows: normalizeUnpinnedTabMaxRows(parsed.unpinnedTabMaxRows, settings.value.unpinnedTabMaxRows)
         }
       } catch (error) {
@@ -67,7 +81,8 @@ export const useSettingsStore = defineStore('settings', () => {
   // 更新设置
   function updateSettings(newSettings) {
     const nextTabDensity = newSettings.tabDensity ?? settings.value.tabDensity
-    const nextSidebarWidth = Number(newSettings.sidebarWidth ?? settings.value.sidebarWidth)
+    const nextSidebarWidth = newSettings.sidebarWidth ?? settings.value.sidebarWidth
+    const nextRightSidebarWidth = newSettings.rightSidebarWidth ?? settings.value.rightSidebarWidth
     const nextFontSize = normalizeFontSize(newSettings.fontSize ?? settings.value.fontSize, DEFAULT_SETTINGS.fontSize)
     const nextUnpinnedTabMaxRows = normalizeUnpinnedTabMaxRows(newSettings.unpinnedTabMaxRows ?? settings.value.unpinnedTabMaxRows)
 
@@ -75,7 +90,8 @@ export const useSettingsStore = defineStore('settings', () => {
       ...settings.value,
       ...newSettings,
       fontSize: nextFontSize,
-      sidebarWidth: Math.max(220, Math.min(420, Number.isFinite(nextSidebarWidth) ? nextSidebarWidth : DEFAULT_SETTINGS.sidebarWidth)),
+      sidebarWidth: normalizeWidth(nextSidebarWidth, DEFAULT_SETTINGS.sidebarWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH),
+      rightSidebarWidth: normalizeWidth(nextRightSidebarWidth, DEFAULT_SETTINGS.rightSidebarWidth, MIN_RIGHT_SIDEBAR_WIDTH, MAX_RIGHT_SIDEBAR_WIDTH),
       tabDensity: ['comfortable', 'compact'].includes(nextTabDensity) ? nextTabDensity : DEFAULT_SETTINGS.tabDensity,
       unpinnedTabMaxRows: nextUnpinnedTabMaxRows
     }

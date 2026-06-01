@@ -1,15 +1,20 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } = require('electron')
 const { dirname, join, resolve } = require('path')
 const fs = require('fs')
-const https = require('https')
 const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
+const { createUpdateManager } = require('./updateManager')
+const { getPublicAISettings, getPrivateAISettings, updateAISettings, clearAISettings } = require('./aiSettings')
+const { streamChatCompletion } = require('./aiClient')
+const { listAISessions, saveAISession, deleteAISession, clearAISessions } = require('./aiSessions')
 const shortcutRegistry = require('../src/shared/shortcutRegistry.json')
 
 let mainWindow = null
 let pinWindows = new Map()
 let fileWatchers = new Map()
 let localFileWriteSuppressions = new Map()
+let aiActiveRequests = new Map()
+let aiInlineCompletionRequests = new Map()
 let pendingOpenFiles = []
 let rendererReady = false
 let appCloseConfirmed = false
@@ -219,6 +224,89 @@ function notifyShortcutsChanged() {
   mainWindow?.webContents.send('shortcuts-changed', buildShortcutPayload())
 }
 
+function safeSend(sender, channel, payload) {
+  try {
+    if (!sender || sender.isDestroyed?.()) return
+    sender.send(channel, payload)
+  } catch {
+    // Ignore sends to closed or reloading renderer processes.
+  }
+}
+
+function clampNumber(value, fallback, minValue, maxValue) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return fallback
+  return Math.min(maxValue, Math.max(minValue, number))
+}
+
+function cleanInlineCompletionPayloadText(value, maxLength) {
+  return String(value || '').slice(0, maxLength)
+}
+
+function buildInlineCompletionMessages(payload = {}) {
+  const language = String(payload.language || 'plaintext').trim() || 'plaintext'
+  const fileName = String(payload.fileName || 'Untitled').trim() || 'Untitled'
+  const editorMode = String(payload.editorMode || 'source').trim() || 'source'
+  const prefix = cleanInlineCompletionPayloadText(payload.prefix, 20000)
+  const suffix = cleanInlineCompletionPayloadText(payload.suffix, 8000)
+  const currentLine = cleanInlineCompletionPayloadText(payload.currentLine, 2000)
+  const languageRules = [
+    language === 'sql' ? 'For SQL, use uppercase keywords.' : '',
+    ['json', 'yaml', 'toml'].includes(language) ? 'For structured data, return only syntactically plausible continuation text.' : '',
+    language === 'markdown' ? 'For Markdown, preserve lists, tables, code fences, headings, and the document language.' : ''
+  ].filter(Boolean).join('\n')
+
+  const system = [
+    'You are an inline completion engine.',
+    'Return only the text that should be inserted at the cursor.',
+    'Do not explain.',
+    'Do not repeat text that already appears before the cursor.',
+    'Do not wrap the answer in Markdown fences.',
+    'Keep the completion short and natural.',
+    'Respect the document language, syntax, indentation, and formatting.',
+    languageRules
+  ].filter(Boolean).join('\n')
+
+  const user = [
+    `File: ${fileName}`,
+    `Language: ${language}`,
+    `Editor mode: ${editorMode}`,
+    `Current line: ${currentLine}`,
+    '<before_cursor>',
+    prefix,
+    '</before_cursor>',
+    '<after_cursor>',
+    suffix,
+    '</after_cursor>',
+    'Return the best inline continuation for the cursor position.'
+  ].join('\n')
+
+  return [
+    { role: 'system', content: system },
+    { role: 'user', content: user }
+  ]
+}
+
+function shouldDisableThinkingForInlineCompletion(settings = {}) {
+  if (settings.protocol === 'anthropic') return false
+  const model = String(settings.model || '').trim().toLowerCase()
+  return model.startsWith('glm-5') || model.startsWith('glm-4.7') || model.startsWith('glm-4.6') || model.startsWith('glm-4.5')
+}
+
+function buildInlineCompletionRequestSettings(settings, payload = {}) {
+  const maxChars = clampNumber(payload.maxChars, 320, 20, 1200)
+  const requestSettings = {
+    ...settings,
+    temperature: 0.2,
+    maxTokens: Math.round(clampNumber(Math.ceil(maxChars / 2), 160, 64, 512)),
+    timeoutMs: Math.round(clampNumber(settings.timeoutMs, 12000, 5000, 15000))
+  }
+  if (shouldDisableThinkingForInlineCompletion(requestSettings)) {
+    requestSettings.thinking = { type: 'disabled' }
+  }
+  return requestSettings
+}
+
 function resolveDefaultShortcutAccelerator(shortcut) {
   const accelerator = shortcut?.accelerator
   if (!accelerator) return ''
@@ -395,73 +483,6 @@ function shouldSuppressLocalFileChange(filePath) {
   return false
 }
 
-function normalizeVersionTag(version = '') {
-  return String(version || '').trim().replace(/^v/i, '')
-}
-
-function compareVersions(leftVersion = '', rightVersion = '') {
-  const leftParts = normalizeVersionTag(leftVersion).split('.')
-  const rightParts = normalizeVersionTag(rightVersion).split('.')
-  const maxLength = Math.max(leftParts.length, rightParts.length)
-
-  for (let index = 0; index < maxLength; index += 1) {
-    const leftValue = Number.parseInt(leftParts[index] || '0', 10)
-    const rightValue = Number.parseInt(rightParts[index] || '0', 10)
-
-    if (leftValue > rightValue) return 1
-    if (leftValue < rightValue) return -1
-  }
-
-  return 0
-}
-
-function requestJson(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const request = https.get(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': `SlimNote/${app.getVersion()}`,
-        ...headers
-      }
-    }, (response) => {
-      const chunks = []
-
-      response.on('data', chunk => chunks.push(chunk))
-      response.on('end', () => {
-        const body = Buffer.concat(chunks).toString('utf8')
-        const statusCode = response.statusCode || 0
-
-        if (statusCode < 200 || statusCode >= 300) {
-          let message = `GitHub API responded with status ${statusCode}`
-
-          try {
-            const payload = JSON.parse(body)
-            if (payload?.message) {
-              message = payload.message
-            }
-          } catch (error) {
-            // Ignore parse errors for non-JSON responses.
-          }
-
-          reject(new Error(message))
-          return
-        }
-
-        try {
-          resolve(JSON.parse(body))
-        } catch (error) {
-          reject(new Error('Invalid response from release service'))
-        }
-      })
-    })
-
-    request.on('error', reject)
-    request.setTimeout(8000, () => {
-      request.destroy(new Error('Request timed out'))
-    })
-  })
-}
-
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 const iconPath = isDev
   ? join(__dirname, '../public/logo.ico')
@@ -469,7 +490,11 @@ const iconPath = isDev
 const rendererIndexPath = join(__dirname, '../dist/index.html')
 const preloadPath = join(__dirname, 'preload.js')
 const RELEASES_PAGE_URL = 'https://github.com/chengrady/SlimNote/releases'
-const LATEST_RELEASE_API_URL = 'https://api.github.com/repos/chengrady/SlimNote/releases/latest'
+const UPDATE_FEED = {
+  provider: 'github',
+  owner: 'chengrady',
+  repo: 'SlimNote'
+}
 
 const appDataRoot = app.getPath('appData')
 const userDataDir = join(appDataRoot, isDev ? 'SlimNote-dev' : 'SlimNote')
@@ -480,6 +505,17 @@ fs.mkdirSync(sessionDataDir, { recursive: true })
 
 app.setPath('userData', userDataDir)
 app.setPath('sessionData', sessionDataDir)
+
+const updateManager = createUpdateManager({
+  app,
+  getMainWindow: () => mainWindow,
+  releaseUrl: RELEASES_PAGE_URL,
+  feed: UPDATE_FEED,
+  onBeforeInstall: () => {
+    appCloseConfirmed = true
+    resetAppClosePromptState()
+  }
+})
 
 function normalizeCandidatePath(candidate, baseDirectory = process.cwd()) {
   if (!candidate || typeof candidate !== 'string') return null
@@ -798,35 +834,8 @@ async function openFileAssociationSettings() {
   }
 }
 
-async function checkForUpdates() {
-  const currentVersion = normalizeVersionTag(app.getVersion())
-
-  try {
-    const release = await requestJson(LATEST_RELEASE_API_URL)
-    const latestVersion = normalizeVersionTag(release?.tag_name || release?.name || '')
-
-    if (!latestVersion) {
-      throw new Error('Latest release version is missing')
-    }
-
-    return {
-      ok: true,
-      currentVersion,
-      latestVersion,
-      hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
-      releaseName: release?.name || release?.tag_name || latestVersion,
-      releaseUrl: release?.html_url || RELEASES_PAGE_URL,
-      publishedAt: release?.published_at || ''
-    }
-  } catch (error) {
-    console.error('Failed to check for updates:', error)
-    return {
-      ok: false,
-      currentVersion,
-      releaseUrl: RELEASES_PAGE_URL,
-      message: error?.message || 'Unable to check for updates right now.'
-    }
-  }
+async function checkForUpdates(options = {}) {
+  return await updateManager.checkForUpdates(options)
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock(buildSingleInstanceData())
@@ -1141,16 +1150,6 @@ function createMenu() {
         { label: t('menu.zoomOut'), role: 'zoomOut' },
         { type: 'separator' },
         {
-          label: menuLabel('menu.toggleSidebar', '切换侧边栏', 'Toggle Sidebar'),
-          accelerator: shortcutAccelerator('view.toggleSidebar'),
-          click: () => sendShortcutCommand('view.toggleSidebar')
-        },
-        {
-          label: t('menu.toggleTheme'),
-          click: () => mainWindow?.webContents.send('menu-toggle-theme')
-        },
-        { type: 'separator' },
-        {
           label: t('menu.toggleFullscreen'),
           accelerator: shortcutAccelerator('view.toggleFullscreen'),
           click: () => {
@@ -1257,6 +1256,153 @@ function registerIpcHandlers() {
     saveShortcutOverrides()
     notifyShortcutsChanged()
     return buildShortcutPayload()
+  })
+
+  ipcMain.handle('ai:get-settings', () => getPublicAISettings())
+
+  ipcMain.handle('ai:update-settings', (_event, payload = {}) => {
+    return updateAISettings(payload)
+  })
+
+  ipcMain.handle('ai:clear-settings', () => clearAISettings())
+
+  ipcMain.handle('ai:test-connection', async (_event, payload = {}) => {
+    const settings = getPrivateAISettings(payload || '')
+    let request = null
+
+    try {
+      await new Promise((resolve, reject) => {
+        let settled = false
+        let timer = null
+        const settle = (handler, value) => {
+          if (settled) return
+          settled = true
+          if (timer) clearTimeout(timer)
+          handler(value)
+        }
+        timer = setTimeout(() => {
+          request?.stop()
+          settle(reject, new Error('AI test timed out'))
+        }, Math.min(Math.max(Number(settings.timeoutMs) || 10000, 1000), 15000))
+        timer.unref?.()
+
+        try {
+          request = streamChatCompletion(settings, [{ role: 'user', content: 'Say OK.' }], {
+            onChunk: () => {
+              request?.stop()
+              settle(resolve)
+            },
+            onComplete: () => settle(resolve)
+          })
+          request.done.then(() => settle(resolve)).catch(error => settle(reject, error))
+        } catch (error) {
+          settle(reject, error)
+        }
+      })
+
+      return { ok: true }
+    } catch (error) {
+      request?.stop()
+      return { ok: false, message: error.message || 'AI test failed' }
+    }
+  })
+
+  ipcMain.handle('ai:list-sessions', () => listAISessions())
+
+  ipcMain.handle('ai:save-session', (_event, session) => saveAISession(session || {}))
+
+  ipcMain.handle('ai:delete-session', (_event, id) => deleteAISession(String(id || '')))
+
+  ipcMain.handle('ai:clear-sessions', () => clearAISessions())
+
+  ipcMain.handle('ai:chat-start', async (event, payload = {}) => {
+    const requestId = String(payload.requestId || '')
+    const messages = Array.isArray(payload.messages) ? payload.messages : []
+    if (!requestId || messages.length === 0) return { ok: false, message: 'Invalid AI chat request' }
+    if (aiActiveRequests.has(requestId)) return { ok: false, message: 'AI request already running' }
+
+    try {
+      const settings = getPrivateAISettings({ providerId: payload.providerId, modelId: payload.modelId })
+      const request = streamChatCompletion(settings, messages, {
+        onStatus: (phase) => safeSend(event.sender, 'ai:chat-status', { requestId, phase }),
+        onReasoning: (text) => safeSend(event.sender, 'ai:chat-reasoning', { requestId, text }),
+        onChunk: (text) => safeSend(event.sender, 'ai:chat-chunk', { requestId, text }),
+        onComplete: () => safeSend(event.sender, 'ai:chat-complete', { requestId })
+      })
+
+      aiActiveRequests.set(requestId, request)
+      request.done.catch((error) => {
+        safeSend(event.sender, 'ai:chat-error', { requestId, message: error.message || 'AI request failed' })
+      }).finally(() => {
+        if (aiActiveRequests.get(requestId) === request) aiActiveRequests.delete(requestId)
+      })
+
+      return { ok: true, requestId }
+    } catch (error) {
+      return { ok: false, message: error.message || 'AI request failed' }
+    }
+  })
+
+  ipcMain.handle('ai:chat-stop', (_event, requestId) => {
+    const key = String(requestId || '')
+    const request = aiActiveRequests.get(key)
+    if (!request) return { ok: false, message: 'AI request not found' }
+
+    request.stop()
+    aiActiveRequests.delete(key)
+    return { ok: true }
+  })
+
+  ipcMain.handle('ai:inline-completion-start', async (event, payload = {}) => {
+    const requestId = String(payload.requestId || '')
+    if (!requestId) {
+      return { ok: false, message: 'Invalid inline completion request' }
+    }
+    if (aiInlineCompletionRequests.has(requestId)) {
+      return { ok: false, message: 'Inline completion request already running' }
+    }
+
+    try {
+      const settings = buildInlineCompletionRequestSettings(
+        getPrivateAISettings({ providerId: payload.providerId, modelId: payload.modelId }),
+        payload
+      )
+      const messages = buildInlineCompletionMessages(payload)
+      const request = streamChatCompletion(settings, messages, {
+        onStatus: (phase) => {
+          safeSend(event.sender, 'ai:inline-completion-status', { requestId, phase })
+        },
+        onChunk: (text) => {
+          safeSend(event.sender, 'ai:inline-completion-chunk', { requestId, text })
+        },
+        onComplete: () => {
+          safeSend(event.sender, 'ai:inline-completion-complete', { requestId })
+        }
+      })
+
+      aiInlineCompletionRequests.set(requestId, request)
+      request.done.catch((error) => {
+        safeSend(event.sender, 'ai:inline-completion-error', { requestId, message: error.message || 'AI inline completion failed' })
+      }).finally(() => {
+        if (aiInlineCompletionRequests.get(requestId) === request) aiInlineCompletionRequests.delete(requestId)
+      })
+
+      return { ok: true, requestId }
+    } catch (error) {
+      return { ok: false, message: error.message || 'AI inline completion failed' }
+    }
+  })
+
+  ipcMain.handle('ai:inline-completion-stop', (_event, requestId) => {
+    const key = String(requestId || '')
+    const request = aiInlineCompletionRequests.get(key)
+    if (!request) {
+      return { ok: false, message: 'AI inline completion request not found' }
+    }
+
+    request.stop()
+    aiInlineCompletionRequests.delete(key)
+    return { ok: true }
   })
 
   // Window Controls
@@ -1437,7 +1583,19 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('check-for-updates', async () => {
-    return await checkForUpdates()
+    return await checkForUpdates({ manual: true })
+  })
+
+  ipcMain.handle('download-update', async () => {
+    return await updateManager.downloadUpdate()
+  })
+
+  ipcMain.handle('install-update', () => {
+    return updateManager.installUpdate()
+  })
+
+  ipcMain.handle('get-update-state', () => {
+    return updateManager.getState()
   })
 
   ipcMain.handle('consume-pending-open-files', () => {
@@ -1446,6 +1604,7 @@ function registerIpcHandlers() {
     writeOpenFilesDebugLog('consume-pending-open-files', {
       filePaths
     })
+    updateManager.scheduleAutoCheck()
     return filePaths
   })
 
@@ -1453,6 +1612,7 @@ function registerIpcHandlers() {
     rendererReady = true
     writeOpenFilesDebugLog('renderer-ready')
     flushPendingOpenFiles()
+    updateManager.scheduleAutoCheck()
   })
 
   // Pin Window

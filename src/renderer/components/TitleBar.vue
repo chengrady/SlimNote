@@ -23,6 +23,37 @@
 
     <div class="title-drag-spacer" aria-hidden="true"></div>
 
+    <div v-if="showLayoutControls" class="layout-controls" role="group" :aria-label="layoutLabel('\u5e03\u5c40\u63a7\u5236', 'Layout controls')">
+      <button
+        type="button"
+        class="layout-control-button"
+        :class="{ active: !leftSidebarCollapsed }"
+        :title="layoutLabel('\u663e\u793a/\u9690\u85cf\u5de6\u4fa7\u680f', 'Show or hide left sidebar')"
+        :aria-label="layoutLabel('\u663e\u793a/\u9690\u85cf\u5de6\u4fa7\u680f', 'Show or hide left sidebar')"
+        @click="requestMenuAction('toggle-sidebar')"
+      >
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.6" />
+          <path class="layout-pane" d="M4.5 5.5h4v9h-4z" fill="currentColor" />
+          <path d="M9 4v12" stroke="currentColor" stroke-width="1.4" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="layout-control-button"
+        :class="{ active: !rightSidebarCollapsed }"
+        :title="layoutLabel('\u663e\u793a/\u9690\u85cf\u53f3\u4fa7 AI \u52a9\u624b', 'Show or hide right AI assistant')"
+        :aria-label="layoutLabel('\u663e\u793a/\u9690\u85cf\u53f3\u4fa7 AI \u52a9\u624b', 'Show or hide right AI assistant')"
+        @click="requestMenuAction('toggle-right-sidebar')"
+      >
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.6" />
+          <path class="layout-pane" d="M11.5 5.5h4v9h-4z" fill="currentColor" />
+          <path d="M11 4v12" stroke="currentColor" stroke-width="1.4" />
+        </svg>
+      </button>
+    </div>
+
     <div class="window-controls">
       <button type="button" class="control-button minimize" :aria-label="t('window.minimize')" @click="minimize">
         <svg width="12" height="12" viewBox="0 0 12 12">
@@ -88,6 +119,21 @@ import { shortcutDisplayByAction } from '../utils/shortcuts'
 
 const emit = defineEmits(['open-settings', 'menu-action'])
 
+defineProps({
+  leftSidebarCollapsed: {
+    type: Boolean,
+    default: false
+  },
+  rightSidebarCollapsed: {
+    type: Boolean,
+    default: false
+  },
+  showLayoutControls: {
+    type: Boolean,
+    default: true
+  }
+})
+
 const { t, locale } = useI18n()
 const shortcutsStore = useShortcutsStore()
 shortcutsStore.loadShortcuts()
@@ -149,8 +195,6 @@ const menus = computed(() => {
       label: t('menu.view'),
       sections: [
         [
-          { action: 'toggle-sidebar', label: menuLabel('menu.toggleSidebar', '切换侧边栏', 'Toggle Sidebar'), shortcut: shortcut('toggle-sidebar') },
-          { action: 'toggle-theme', label: menuLabel('menu.toggleTheme', '切换主题', 'Toggle Theme') },
           { action: 'toggle-fullscreen', label: menuLabel('menu.toggleFullscreen', '全屏模式', 'Toggle Fullscreen'), shortcut: shortcut('toggle-fullscreen') },
           { action: 'toggle-presentation-mode', label: menuLabel('menu.togglePresentationMode', '演示模式', 'Presentation Mode'), shortcut: shortcut('toggle-presentation-mode') }
         ],
@@ -188,16 +232,24 @@ function menuLabel(key, zhFallback, enFallback) {
   return locale.value === 'zh-CN' ? zhFallback : enFallback
 }
 
+function layoutLabel(zhText, enText) {
+  return locale.value === 'zh-CN' ? zhText : enText
+}
+
+function requestMenuAction(action) {
+  emit('menu-action', action)
+}
+
 function minimize() {
-  window.electronAPI.minimize()
+  window.electronAPI?.minimize?.()
 }
 
 function maximize() {
-  window.electronAPI.maximize()
+  window.electronAPI?.maximize?.()
 }
 
 function close() {
-  window.electronAPI.close()
+  window.electronAPI?.close?.()
 }
 
 function toggleMenu(menuKey, event) {
@@ -269,13 +321,16 @@ function handleGlobalKeydown(event) {
 }
 
 onMounted(async () => {
-  isMaximized.value = await window.electronAPI.isMaximized()
+  const electronAPI = typeof window === 'undefined' ? null : window.electronAPI
+  if (electronAPI?.isMaximized) {
+    isMaximized.value = await electronAPI.isMaximized()
+  }
 
-  window.electronAPI.onWindowMaximized(() => {
+  electronAPI?.onWindowMaximized?.(() => {
     isMaximized.value = true
   })
 
-  window.electronAPI.onWindowUnmaximized(() => {
+  electronAPI?.onWindowUnmaximized?.(() => {
     isMaximized.value = false
   })
 
@@ -348,9 +403,11 @@ onUnmounted(() => {
 }
 
 .menu-bar,
+.layout-controls,
 .window-controls,
 .title-menu-panel,
 .menu-trigger,
+.layout-control-button,
 .control-button,
 .title-menu-item {
   -webkit-app-region: no-drag;
@@ -369,6 +426,7 @@ onUnmounted(() => {
 }
 
 .menu-trigger,
+.layout-control-button,
 .control-button {
   border: 0;
   background: transparent;
@@ -403,10 +461,54 @@ onUnmounted(() => {
 }
 
 .menu-trigger:focus-visible,
+.layout-control-button:focus-visible,
 .control-button:focus-visible,
 .title-menu-item:focus-visible {
   outline: none;
   box-shadow: var(--field-focus-ring);
+}
+
+.layout-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.layout-control-button {
+  width: 32px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  border-radius: var(--icon-button-radius);
+  cursor: pointer;
+  transition: var(--transition-interactive);
+}
+
+.layout-control-button:hover {
+  color: var(--window-control-hover-color);
+  background-color: var(--window-control-hover-bg);
+  box-shadow: var(--interactive-hover-ring);
+}
+
+.layout-control-button.active {
+  color: var(--text-interactive-active, var(--accent-primary));
+  background: var(--surface-active);
+}
+
+.layout-control-button:not(.active) .layout-pane {
+  opacity: 0;
+}
+
+.layout-control-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .window-controls {

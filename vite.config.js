@@ -6,9 +6,28 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
-import { resolve } from 'path'
+import { copyFileSync, existsSync, mkdirSync } from 'fs'
+import { join, resolve } from 'path'
 
 const rendererRoot = resolve(__dirname, 'src/renderer')
+const electronRoot = resolve(__dirname, 'electron')
+const electronDistRoot = resolve(__dirname, 'dist-electron')
+const electronMainHelperFiles = ['aiSettings.js', 'aiSettingsSchema.js', 'aiClient.js', 'aiSessions.js', 'updateManager.js']
+
+function copyElectronMainHelpers() {
+  return {
+    name: 'copy-electron-main-helpers',
+    closeBundle() {
+      mkdirSync(electronDistRoot, { recursive: true })
+
+      for (const fileName of electronMainHelperFiles) {
+        const sourcePath = join(electronRoot, fileName)
+        if (!existsSync(sourcePath)) continue
+        copyFileSync(sourcePath, join(electronDistRoot, fileName))
+      }
+    }
+  }
+}
 
 export default defineConfig({
   define: {
@@ -25,7 +44,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['electron', 'path', 'fs', 'iconv-lite', 'chokidar']
+              external: ['electron', 'path', 'fs', 'iconv-lite', 'chokidar', 'electron-updater']
             }
           }
         },
@@ -44,6 +63,7 @@ export default defineConfig({
         },
       },
     ]),
+    copyElectronMainHelpers(),
     renderer(),
   ],
   resolve: {

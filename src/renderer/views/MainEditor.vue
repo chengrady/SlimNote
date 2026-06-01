@@ -2,10 +2,12 @@
   <div class="window-container">
     <TitleBar
       v-show="!isPresentationMode"
+      :left-sidebar-collapsed="isSidebarCollapsed"
+      :right-sidebar-collapsed="isRightSidebarCollapsed"
       @open-settings="openSettingsDialog"
       @menu-action="handleTitleBarMenuAction"
     />
-    <div class="main-editor" :class="{ resizing: isResizing, 'sidebar-collapsed': isSidebarCollapsed, 'presentation-mode': isPresentationMode }">
+    <div class="main-editor" :class="{ resizing: isResizing || isRightResizing, 'right-resizing': isRightResizing, 'sidebar-collapsed': isSidebarCollapsed, 'right-sidebar-collapsed': isRightSidebarCollapsed, 'presentation-mode': isPresentationMode }">
       <div
         v-if="isResizing && !isSidebarCollapsed && !isPresentationMode"
         class="sidebar-collapse-guide"
@@ -17,14 +19,31 @@
       </div>
       <div v-show="!isPresentationMode" class="sidebar" :class="{ collapsed: isSidebarCollapsed }" :style="sidebarStyle">
         <ActivityBar :active-view="activeSidebarView" :collapsed="isSidebarCollapsed" @select-view="handleSidebarViewSelect" @toggle-collapse="toggleSidebar" @open-settings="openSettingsDialog" />
-        <div v-if="!isSidebarCollapsed" class="sidebar-pane">
-          <WorkspaceSidebar :mode="activeSidebarView" :collapsed="isSidebarCollapsed" @toggle-collapse="toggleSidebar" @change-mode="handleSidebarViewSelect" />
+        <div class="sidebar-pane" :aria-hidden="isSidebarCollapsed ? 'true' : 'false'">
+          <WorkspaceSidebar :mode="activeSidebarView" :collapsed="false" @change-mode="handleSidebarViewSelect" />
         </div>
       </div>
       <div v-if="!isSidebarCollapsed && !isPresentationMode" class="resizer" @mousedown="startResize"></div>
       <div class="editor-area" :class="{ 'no-tabs': !hasTabs }">
         <TabBar v-if="hasTabs && !isPresentationMode" />
-        <EditorPanel :is-presentation-mode="isPresentationMode" />
+        <EditorPanel ref="editorPanelRef" :is-presentation-mode="isPresentationMode" />
+      </div>
+      <div
+        v-if="!isPresentationMode && !isRightSidebarCollapsed"
+        class="right-resizer"
+        role="separator"
+        aria-label="调整 AI 助手宽度"
+        aria-orientation="vertical"
+        @mousedown="startRightResize"
+      ></div>
+      <div v-if="!isPresentationMode && !isRightSidebarCollapsed" class="workbench-right-sidebar" :style="rightSidebarStyle">
+        <AiAssistantPanel
+          :active-tab="activeTab"
+          :get-selection="getCurrentEditorSelection"
+          :get-cursor-offset="getCurrentCursorOffset"
+          @open-settings="openAiSettingsDialog"
+          @apply-result="handleAiApplyResult"
+        />
       </div>
     </div>
     <StatusBar v-show="!isPresentationMode" />
@@ -41,22 +60,23 @@
       :show="showUpdateDialog"
       :title="updateDialogTitle"
       :subtitle="updateDialogSubtitle"
-      :show-footer="!isCheckingUpdates"
+      :show-footer="!isUpdateDialogBusy"
       @close="closeUpdateDialog"
     >
       <template #body>
         <div class="update-dialog-message">{{ updateDialogMessage }}</div>
       </template>
       <template #footer>
-        <button v-if="updateDialogActionUrl" type="button" class="modal-btn" @click="closeUpdateDialog">
-          {{ updateDialogCloseText }}
+        <button v-if="updateDialogSecondaryText" type="button" class="modal-btn" @click="handleUpdateDialogSecondaryAction">
+          {{ updateDialogSecondaryText }}
         </button>
         <button
           type="button"
           class="modal-btn primary"
-          @click="updateDialogActionUrl ? openUpdateActionUrl() : closeUpdateDialog()"
+          :disabled="isUpdateDialogPrimaryDisabled"
+          @click="handleUpdateDialogPrimaryAction"
         >
-          {{ updateDialogActionUrl ? updateDialogActionText : updateDialogCloseText }}
+          {{ updateDialogActionText || updateDialogCloseText }}
         </button>
       </template>
     </ModalDialog>
@@ -77,17 +97,24 @@
     </ModalDialog>
 
     <SettingsDialog
+      v-if="showSettingsDialog"
       :key="settingsDialogKey"
       :show="showSettingsDialog"
+      :initial-section="settingsInitialSection"
+      :left-sidebar-collapsed="isSidebarCollapsed"
+      :right-sidebar-collapsed="isRightSidebarCollapsed"
       @close="closeSettingsDialog"
+      @menu-action="handleTitleBarMenuAction"
     />
 
     <AboutDialog
+      v-if="showAboutDialog"
       :show="showAboutDialog"
       @close="showAboutDialog = false"
     />
 
     <GlobalSearchDialog
+      v-if="showGlobalSearchDialog"
       :show="showGlobalSearchDialog"
       :root-path="fileStore.rootPath"
       @close="showGlobalSearchDialog = false"
@@ -116,18 +143,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import TitleBar from '../components/TitleBar.vue'
 import ActivityBar from '../components/ActivityBar.vue'
 import WorkspaceSidebar from '../components/WorkspaceSidebar.vue'
 import TabBar from '../components/TabBar.vue'
-import EditorPanel from '../components/EditorPanel.vue'
 import StatusBar from '../components/StatusBar.vue'
 import ModalDialog from '../components/ModalDialog.vue'
-import SettingsDialog from '../components/SettingsDialog.vue'
-import AboutDialog from '../components/AboutDialog.vue'
-import GlobalSearchDialog from '../components/GlobalSearchDialog.vue'
 import { useEditorStore } from '../stores/editor'
 import { useFileStore } from '../stores/file'
 import { useSettingsStore } from '../stores/settings'
@@ -138,6 +161,12 @@ import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/re
 import { isShortcutEvent } from '../utils/shortcuts'
 import packageJson from '../../../package.json'
 
+const EditorPanel = defineAsyncComponent(() => import('../components/EditorPanel.vue'))
+const AiAssistantPanel = defineAsyncComponent(() => import('../components/AiAssistantPanel.vue'))
+const SettingsDialog = defineAsyncComponent(() => import('../components/SettingsDialog.vue'))
+const AboutDialog = defineAsyncComponent(() => import('../components/AboutDialog.vue'))
+const GlobalSearchDialog = defineAsyncComponent(() => import('../components/GlobalSearchDialog.vue'))
+
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
 const settingsStore = useSettingsStore()
@@ -146,45 +175,68 @@ shortcutsStore.loadShortcuts()
 const { locale } = useI18n()
 
 const SIDEBAR_MIN_WIDTH = 220
-const SIDEBAR_MAX_WIDTH = 420
+const SIDEBAR_MAX_VIEWPORT_RATIO = 0.45
 const SIDEBAR_AUTO_COLLAPSE_THRESHOLD = 176
+const SIDEBAR_COLLAPSED_WIDTH = 48
 const DEFAULT_SIDEBAR_WIDTH = 280
+const RIGHT_SIDEBAR_MIN_WIDTH = 320
+const RIGHT_SIDEBAR_MAX_VIEWPORT_RATIO = 0.5
+const DEFAULT_RIGHT_SIDEBAR_WIDTH = 380
+const WORKBENCH_MIN_EDITOR_WIDTH = 420
+const WORKBENCH_EDITOR_HORIZONTAL_SPACE = 16
 const RELEASES_PAGE_URL = 'https://github.com/chengrady/SlimNote/releases'
-const LATEST_RELEASE_API_URL = 'https://api.github.com/repos/chengrady/SlimNote/releases/latest'
 const APP_VERSION = String(packageJson.version || '1.0.0')
 
 const sidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
 const lastExpandedSidebarWidth = ref(settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH)
+const rightSidebarWidth = ref(settingsStore.settings.rightSidebarWidth || DEFAULT_RIGHT_SIDEBAR_WIDTH)
+const lastExpandedRightSidebarWidth = ref(settingsStore.settings.rightSidebarWidth || DEFAULT_RIGHT_SIDEBAR_WIDTH)
 const activeSidebarView = ref('explorer')
 const isResizing = ref(false)
+const isRightResizing = ref(false)
 const resizePointerX = ref(0)
 const showErrorDialog = ref(false)
 const showUpdateDialog = ref(false)
 const showAppCloseConfirmDialog = ref(false)
 const showSettingsDialog = ref(false)
+const settingsInitialSection = ref('appearance')
 const settingsDialogKey = ref(0)
 const showAboutDialog = ref(false)
 const showGlobalSearchDialog = ref(false)
+const editorPanelRef = ref(null)
 const errorMessage = ref('')
 const externalChangeQueue = ref([])
 const currentExternalChange = computed(() => externalChangeQueue.value[0] || null)
 const isCheckingUpdates = ref(false)
+const isDownloadingUpdate = ref(false)
 const updateDialogTitle = ref('')
 const updateDialogSubtitle = ref('')
 const updateDialogMessage = ref('')
+const updateDialogAction = ref('')
 const updateDialogActionUrl = ref('')
 const updateDialogActionText = ref('')
+const updateDialogSecondaryAction = ref('')
+const updateDialogSecondaryText = ref('')
+const latestUpdateState = ref(null)
 const isPresentationMode = ref(false)
 const cleanups = []
 const watchedFilePaths = new Set()
 let watchedFilesSyncQueue = Promise.resolve()
 let watchedFilesSyncRequestId = 0
 let isMainEditorDisposed = false
+let isApplyingWorkbenchConstraints = false
+let clearWorkbenchConstraintPending = false
 
 const isSidebarCollapsed = computed(() => settingsStore.settings.sidebarCollapsed)
+const isRightSidebarCollapsed = computed(() => settingsStore.settings.rightSidebarCollapsed)
 const hasTabs = computed(() => editorStore.tabs.length > 0)
+const activeTab = computed(() => editorStore.getActiveTab())
 const sidebarStyle = computed(() => ({
-  width: isSidebarCollapsed.value ? '48px' : `${sidebarWidth.value}px`
+  width: isSidebarCollapsed.value ? `${SIDEBAR_COLLAPSED_WIDTH}px` : `${sidebarWidth.value}px`,
+  '--sidebar-pane-width': `${Math.max(0, sidebarWidth.value - SIDEBAR_COLLAPSED_WIDTH)}px`
+}))
+const rightSidebarStyle = computed(() => ({
+  width: `${rightSidebarWidth.value}px`
 }))
 const autoCollapseGuideStyle = computed(() => ({
   left: `${SIDEBAR_AUTO_COLLAPSE_THRESHOLD}px`
@@ -193,11 +245,9 @@ const isNearAutoCollapseThreshold = computed(() => {
   if (!isResizing.value) return false
   return resizePointerX.value <= SIDEBAR_AUTO_COLLAPSE_THRESHOLD + 48
 })
-const updateDialogCloseText = computed(() => (
-  updateDialogActionUrl.value
-    ? localizeText('稍后', 'Later')
-    : localizeText('知道了', 'OK')
-))
+const updateDialogCloseText = computed(() => localizeText('知道了', 'OK'))
+const isUpdateDialogBusy = computed(() => isCheckingUpdates.value || isDownloadingUpdate.value)
+const isUpdateDialogPrimaryDisabled = computed(() => isUpdateDialogBusy.value || !updateDialogActionText.value)
 const unsavedTabCount = computed(() => editorStore.tabs.filter(tab => tab.isDirty).length)
 const appCloseConfirmTitle = computed(() => localizeText('退出 SlimNote', 'Exit SlimNote'))
 const appCloseConfirmMessage = computed(() => {
@@ -304,28 +354,29 @@ function dispatchEditorEvent(eventName, detail) {
   emitRendererEvent(eventName, detail)
 }
 
+function addElectronListener(eventName, handler) {
+  if (typeof window === 'undefined') return
+  const listener = window.electronAPI?.[eventName]
+  if (typeof listener !== 'function') return
+  const cleanup = listener(handler)
+  if (typeof cleanup === 'function') cleanups.push(cleanup)
+}
+
+function getCurrentEditorSelection() {
+  return editorPanelRef.value?.getCurrentEditorSelection?.() || ''
+}
+
+function getCurrentCursorOffset() {
+  const offset = editorPanelRef.value?.getCurrentCursorOffset?.()
+  return Number.isFinite(offset) ? offset : 0
+}
+
+function handleAiApplyResult(payload) {
+  editorPanelRef.value?.handleAiApplyResult?.(payload)
+}
+
 function localizeText(zhText, enText) {
   return locale.value === 'zh-CN' ? zhText : enText
-}
-
-function normalizeVersionTag(version = '') {
-  return String(version || '').trim().replace(/^v/i, '')
-}
-
-function compareVersions(leftVersion = '', rightVersion = '') {
-  const leftParts = normalizeVersionTag(leftVersion).split('.')
-  const rightParts = normalizeVersionTag(rightVersion).split('.')
-  const maxLength = Math.max(leftParts.length, rightParts.length)
-
-  for (let index = 0; index < maxLength; index += 1) {
-    const leftValue = Number.parseInt(leftParts[index] || '0', 10)
-    const rightValue = Number.parseInt(rightParts[index] || '0', 10)
-
-    if (leftValue > rightValue) return 1
-    if (leftValue < rightValue) return -1
-  }
-
-  return 0
 }
 
 function formatReleaseDate(value) {
@@ -465,142 +516,294 @@ function enqueueWatchedFilesSync(filePaths = []) {
     .then(() => syncWatchedFiles(nextFilePaths, requestId))
 }
 
+function resetUpdateDialogActions() {
+  updateDialogAction.value = ''
+  updateDialogActionUrl.value = ''
+  updateDialogActionText.value = ''
+  updateDialogSecondaryAction.value = ''
+  updateDialogSecondaryText.value = ''
+}
+
+function formatBytes(value) {
+  const bytes = Number(value) || 0
+  if (bytes <= 0) return '0 B'
+
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = bytes
+  let unitIndex = 0
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+
+  return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`
+}
+
+function formatUpdateSubtitle(state = {}) {
+  const currentVersion = state.currentVersion || APP_VERSION
+  const latestVersion = state.latestVersion || currentVersion
+
+  if (latestVersion && latestVersion !== currentVersion) {
+    return localizeText(`当前 ${currentVersion} -> 最新 ${latestVersion}`, `Current ${currentVersion} -> Latest ${latestVersion}`)
+  }
+
+  return localizeText(`当前版本 ${currentVersion}`, `Current version ${currentVersion}`)
+}
+
+function formatDownloadProgress(progress = {}) {
+  const percent = Math.max(0, Math.min(100, Number(progress.percent) || 0))
+  if (!progress.total) {
+    return localizeText(`正在下载更新：${percent.toFixed(0)}%`, `Downloading update: ${percent.toFixed(0)}%`)
+  }
+
+  return localizeText(
+    `正在下载更新：${percent.toFixed(0)}%（${formatBytes(progress.transferred)} / ${formatBytes(progress.total)}）`,
+    `Downloading update: ${percent.toFixed(0)}% (${formatBytes(progress.transferred)} / ${formatBytes(progress.total)})`
+  )
+}
+
+function normalizeUpdateStatus(state = {}) {
+  if (state.status) return state.status
+  if (state.hasUpdate) return 'available'
+  if (state.ok) return 'not-available'
+  return 'error'
+}
+
+function applyUpdateState(state = {}, options = {}) {
+  const status = normalizeUpdateStatus(state)
+  const shouldStaySilent = options.silent && !showUpdateDialog.value && !['available', 'downloaded'].includes(status)
+  latestUpdateState.value = { ...state, status }
+
+  if (shouldStaySilent) return
+
+  if (['available', 'downloaded', 'downloading', 'checking', 'not-available', 'not-supported', 'error'].includes(status)) {
+    showUpdateDialog.value = true
+  }
+
+  resetUpdateDialogActions()
+  isCheckingUpdates.value = status === 'checking'
+  isDownloadingUpdate.value = status === 'downloading'
+
+  const latestVersion = state.latestVersion || state.currentVersion || APP_VERSION
+  const releaseDate = formatReleaseDate(state.releaseDate || state.publishedAt)
+
+  if (status === 'checking') {
+    updateDialogTitle.value = localizeText('检查更新', 'Check for Updates')
+    updateDialogSubtitle.value = localizeText('正在连接更新服务...', 'Connecting to update service...')
+    updateDialogMessage.value = localizeText('正在检查最新版本，请稍候。', 'Checking the latest release. Please wait.')
+    return
+  }
+
+  if (status === 'available') {
+    updateDialogTitle.value = localizeText('发现新版本', 'Update Available')
+    updateDialogSubtitle.value = formatUpdateSubtitle(state)
+    updateDialogMessage.value = releaseDate
+      ? localizeText(
+          `已发现新版本 ${latestVersion}，发布时间 ${releaseDate}。\n\n可以直接在应用内下载更新，下载完成后重启 SlimNote 即可安装。`,
+          `Version ${latestVersion} is available, published on ${releaseDate}.\n\nYou can download it in SlimNote and restart to install it.`
+        )
+      : localizeText(
+          `已发现新版本 ${latestVersion}。\n\n可以直接在应用内下载更新，下载完成后重启 SlimNote 即可安装。`,
+          `Version ${latestVersion} is available.\n\nYou can download it in SlimNote and restart to install it.`
+        )
+    updateDialogAction.value = 'download'
+    updateDialogActionText.value = localizeText('下载更新', 'Download Update')
+    updateDialogSecondaryAction.value = 'close'
+    updateDialogSecondaryText.value = localizeText('稍后', 'Later')
+    return
+  }
+
+  if (status === 'downloading') {
+    updateDialogTitle.value = localizeText('正在下载更新', 'Downloading Update')
+    updateDialogSubtitle.value = formatUpdateSubtitle(state)
+    updateDialogMessage.value = formatDownloadProgress(state.progress)
+    return
+  }
+
+  if (status === 'downloaded') {
+    updateDialogTitle.value = localizeText('更新已下载', 'Update Downloaded')
+    updateDialogSubtitle.value = formatUpdateSubtitle(state)
+    updateDialogMessage.value = localizeText(
+      '更新已经下载完成。现在重启 SlimNote 后会自动安装新版本。',
+      'The update has been downloaded. Restart SlimNote now to install it.'
+    )
+    updateDialogAction.value = 'install'
+    updateDialogActionText.value = localizeText('重启并安装', 'Restart and Install')
+    updateDialogSecondaryAction.value = 'close'
+    updateDialogSecondaryText.value = localizeText('稍后', 'Later')
+    return
+  }
+
+  if (status === 'not-available') {
+    updateDialogTitle.value = localizeText('已是最新版本', 'Up to Date')
+    updateDialogSubtitle.value = formatUpdateSubtitle(state)
+    updateDialogMessage.value = localizeText(
+      `当前已安装最新版本 ${latestVersion}。`,
+      `You're already on the latest version ${latestVersion}.`
+    )
+    updateDialogAction.value = 'close'
+    updateDialogActionText.value = updateDialogCloseText.value
+    return
+  }
+
+  if (status === 'not-supported') {
+    updateDialogTitle.value = localizeText('当前环境无法应用内更新', 'In-App Updates Unavailable')
+    updateDialogSubtitle.value = formatUpdateSubtitle(state)
+    updateDialogMessage.value = localizeText(
+      '应用内更新只在正式打包安装后的应用中可用。当前如果是开发环境或便携版，可以先到 Releases 页面确认发布包。',
+      'In-app updates are only available in packaged installed builds. In development or portable builds, check the Releases page instead.'
+    )
+    updateDialogAction.value = 'open-releases'
+    updateDialogActionUrl.value = state.releaseUrl || RELEASES_PAGE_URL
+    updateDialogActionText.value = localizeText('打开 Releases', 'Open Releases')
+    updateDialogSecondaryAction.value = 'close'
+    updateDialogSecondaryText.value = localizeText('关闭', 'Close')
+    return
+  }
+
+  updateDialogTitle.value = localizeText('更新失败', 'Update Failed')
+  updateDialogSubtitle.value = formatUpdateSubtitle(state)
+  updateDialogMessage.value = localizeText(
+    `更新请求没有完成。\n\n原因：${state.message || '未知错误'}\n\n可以稍后重试，或打开 Releases 页面手动查看。`,
+    `The update request did not complete.\n\nReason: ${state.message || 'Unknown error'}\n\nTry again later, or open the Releases page manually.`
+  )
+  updateDialogAction.value = 'open-releases'
+  updateDialogActionUrl.value = state.releaseUrl || RELEASES_PAGE_URL
+  updateDialogActionText.value = localizeText('打开 Releases', 'Open Releases')
+  updateDialogSecondaryAction.value = 'close'
+  updateDialogSecondaryText.value = localizeText('关闭', 'Close')
+}
+
 function openUpdateActionUrl() {
   if (!updateDialogActionUrl.value) {
     closeUpdateDialog()
     return
   }
 
-  window.electronAPI.openExternal(updateDialogActionUrl.value)
+  const electronAPI = typeof window === 'undefined' ? null : window.electronAPI
+  electronAPI?.openExternal?.(updateDialogActionUrl.value)
   closeUpdateDialog()
 }
 
-async function requestLatestReleaseFromWeb() {
-  const response = await fetch(LATEST_RELEASE_API_URL, {
-    headers: {
-      Accept: 'application/vnd.github+json'
-    }
-  })
-
-  if (!response.ok) {
-    let message = `GitHub API responded with status ${response.status}`
-
-    try {
-      const payload = await response.json()
-      if (payload?.message) {
-        message = payload.message
-      }
-    } catch (error) {
-      // Ignore non-JSON error payloads.
-    }
-
-    throw new Error(message)
+async function downloadUpdateInApp() {
+  const electronAPI = typeof window === 'undefined' ? null : window.electronAPI
+  if (typeof electronAPI?.downloadUpdate !== 'function') {
+    openUpdateActionUrl()
+    return
   }
 
-  return await response.json()
+  try {
+    applyUpdateState({ ...(latestUpdateState.value || {}), status: 'downloading', progress: { percent: 0 } })
+    const state = await electronAPI.downloadUpdate()
+    applyUpdateState(state)
+  } catch (error) {
+    console.error('Failed to download update:', error)
+    applyUpdateState({
+      ok: false,
+      status: 'error',
+      currentVersion: latestUpdateState.value?.currentVersion || APP_VERSION,
+      latestVersion: latestUpdateState.value?.latestVersion || APP_VERSION,
+      releaseUrl: latestUpdateState.value?.releaseUrl || RELEASES_PAGE_URL,
+      message: error?.message || 'Unable to download update.'
+    })
+  }
 }
 
-async function resolveUpdateInfo() {
-  const fallbackCurrentVersion = normalizeVersionTag(APP_VERSION)
-  const checkUpdates = window.electronAPI?.checkForUpdates
+async function installDownloadedUpdate() {
+  const electronAPI = typeof window === 'undefined' ? null : window.electronAPI
 
-  if (typeof checkUpdates === 'function') {
-    try {
-      const result = await checkUpdates()
-      if (result?.ok) {
-        return result
-      }
-    } catch (error) {
-      console.warn('IPC update check failed, falling back to renderer fetch:', error)
+  try {
+    const result = await electronAPI?.installUpdate?.()
+    if (result?.ok === false) {
+      applyUpdateState({
+        ...(latestUpdateState.value || {}),
+        ok: false,
+        status: 'error',
+        message: result.message || 'Unable to install update.'
+      })
     }
+  } catch (error) {
+    console.error('Failed to install update:', error)
+    applyUpdateState({
+      ...(latestUpdateState.value || {}),
+      ok: false,
+      status: 'error',
+      message: error?.message || 'Unable to install update.'
+    })
+  }
+}
+
+async function handleUpdateDialogPrimaryAction() {
+  if (updateDialogAction.value === 'download') {
+    await downloadUpdateInApp()
+    return
   }
 
-  const release = await requestLatestReleaseFromWeb()
-  const latestVersion = normalizeVersionTag(release?.tag_name || release?.name || '')
-
-  if (!latestVersion) {
-    throw new Error('Latest release version is missing')
+  if (updateDialogAction.value === 'install') {
+    await installDownloadedUpdate()
+    return
   }
 
-  return {
-    ok: true,
-    currentVersion: fallbackCurrentVersion,
-    latestVersion,
-    hasUpdate: compareVersions(latestVersion, fallbackCurrentVersion) > 0,
-    releaseName: release?.name || release?.tag_name || latestVersion,
-    releaseUrl: release?.html_url || RELEASES_PAGE_URL,
-    publishedAt: release?.published_at || ''
+  if (updateDialogAction.value === 'open-releases') {
+    openUpdateActionUrl()
+    return
+  }
+
+  closeUpdateDialog()
+}
+
+function handleUpdateDialogSecondaryAction() {
+  closeUpdateDialog()
+}
+
+function handleUpdateStateChanged(state) {
+  const status = normalizeUpdateStatus(state || {})
+  const shouldShowAutomatically = ['available', 'downloaded'].includes(status)
+  applyUpdateState(state, { silent: !showUpdateDialog.value && !shouldShowAutomatically })
+}
+
+async function hydrateUpdateState() {
+  const electronAPI = typeof window === 'undefined' ? null : window.electronAPI
+  if (typeof electronAPI?.getUpdateState !== 'function') return
+
+  try {
+    handleUpdateStateChanged(await electronAPI.getUpdateState())
+  } catch (error) {
+    console.warn('Failed to read update state:', error)
   }
 }
 
 async function handleCheckForUpdates() {
-  if (isCheckingUpdates.value) return
+  if (isUpdateDialogBusy.value) return
 
+  const electronAPI = typeof window === 'undefined' ? null : window.electronAPI
   showUpdateDialog.value = true
-  isCheckingUpdates.value = true
-  updateDialogTitle.value = localizeText('检查更新', 'Check for Updates')
-  updateDialogSubtitle.value = localizeText('正在连接 GitHub Releases...', 'Connecting to GitHub Releases...')
-  updateDialogMessage.value = localizeText('正在检查最新版本，请稍候。', 'Checking the latest release. Please wait.')
-  updateDialogActionUrl.value = ''
-  updateDialogActionText.value = ''
+  applyUpdateState({
+    ok: true,
+    status: 'checking',
+    source: 'manual',
+    currentVersion: latestUpdateState.value?.currentVersion || APP_VERSION,
+    latestVersion: latestUpdateState.value?.latestVersion || APP_VERSION,
+    releaseUrl: latestUpdateState.value?.releaseUrl || RELEASES_PAGE_URL
+  })
 
   try {
-    const result = await resolveUpdateInfo()
-    const currentVersion = result?.currentVersion || '1.0.0'
-
-    if (!result?.ok) {
-      updateDialogTitle.value = localizeText('检查更新失败', 'Update Check Failed')
-      updateDialogSubtitle.value = localizeText(`当前版本 ${currentVersion}`, `Current version ${currentVersion}`)
-      updateDialogMessage.value = localizeText(
-        `暂时无法连接 GitHub Releases。\n\n原因：${result?.message || '未知错误'}\n\n你可以稍后重试，或直接打开发布页手动查看。`,
-        `SlimNote could not reach GitHub Releases.\n\nReason: ${result?.message || 'Unknown error'}\n\nTry again later, or open the releases page manually.`
-      )
-      updateDialogActionUrl.value = result?.releaseUrl || RELEASES_PAGE_URL
-      updateDialogActionText.value = localizeText('打开 Releases', 'Open Releases')
-      return
+    if (typeof electronAPI?.checkForUpdates !== 'function') {
+      throw new Error('Electron update API is unavailable.')
     }
 
-    if (result.hasUpdate) {
-      const publishedAt = formatReleaseDate(result.publishedAt)
-      updateDialogTitle.value = localizeText('发现新版本', 'Update Available')
-      updateDialogSubtitle.value = localizeText(
-        `当前 ${currentVersion} -> 最新 ${result.latestVersion}`,
-        `Current ${currentVersion} -> Latest ${result.latestVersion}`
-      )
-      updateDialogMessage.value = publishedAt
-        ? localizeText(
-            `已发现新版本 ${result.latestVersion}，发布时间 ${publishedAt}。你可以前往发布页下载最新安装包。`,
-            `Version ${result.latestVersion} is available, published on ${publishedAt}. Open the release page to download the latest installer.`
-          )
-        : localizeText(
-            `已发现新版本 ${result.latestVersion}。你可以前往发布页下载最新安装包。`,
-            `Version ${result.latestVersion} is available. Open the release page to download the latest installer.`
-          )
-      updateDialogActionUrl.value = result.releaseUrl || RELEASES_PAGE_URL
-      updateDialogActionText.value = localizeText('前往下载', 'Open Download Page')
-      return
-    }
-
-    updateDialogTitle.value = localizeText('已是最新版本', 'Up to Date')
-    updateDialogSubtitle.value = localizeText(`当前版本 ${currentVersion}`, `Current version ${currentVersion}`)
-    updateDialogMessage.value = localizeText(
-      `当前已安装最新版本 ${result.latestVersion}。`,
-      `You're already on the latest version ${result.latestVersion}.`
-    )
-    updateDialogActionUrl.value = ''
-    updateDialogActionText.value = ''
+    applyUpdateState(await electronAPI.checkForUpdates())
   } catch (error) {
     console.error('Failed to check for updates:', error)
-    updateDialogTitle.value = localizeText('检查更新失败', 'Update Check Failed')
-    updateDialogSubtitle.value = ''
-    updateDialogMessage.value = localizeText(
-      `检查更新时出现异常。\n\n原因：${error?.message || '未知错误'}\n\n请稍后重试，或直接打开发布页手动查看。`,
-      `An unexpected error occurred while checking for updates.\n\nReason: ${error?.message || 'Unknown error'}\n\nPlease try again later, or open the releases page manually.`
-    )
-    updateDialogActionUrl.value = RELEASES_PAGE_URL
-    updateDialogActionText.value = localizeText('打开 Releases', 'Open Releases')
-  } finally {
-    isCheckingUpdates.value = false
+    applyUpdateState({
+      ok: false,
+      status: 'error',
+      currentVersion: latestUpdateState.value?.currentVersion || APP_VERSION,
+      latestVersion: latestUpdateState.value?.latestVersion || APP_VERSION,
+      releaseUrl: latestUpdateState.value?.releaseUrl || RELEASES_PAGE_URL,
+      message: error?.message || 'Unable to check for updates.'
+    })
   }
 }
 
@@ -627,12 +830,13 @@ function createFilePathKeySet(filePaths = []) {
 }
 
 async function takePendingOpenFiles() {
-  if (typeof window.electronAPI.consumePendingOpenFiles !== 'function') {
-    window.electronAPI.notifyRendererReady()
+  const electronAPI = typeof window === 'undefined' ? null : window.electronAPI
+  if (typeof electronAPI?.consumePendingOpenFiles !== 'function') {
+    electronAPI?.notifyRendererReady?.()
     return []
   }
 
-  const filePaths = await window.electronAPI.consumePendingOpenFiles()
+  const filePaths = await electronAPI.consumePendingOpenFiles()
   return Array.isArray(filePaths) ? filePaths.filter(Boolean) : []
 }
 
@@ -723,6 +927,9 @@ async function handleTitleBarMenuAction(action) {
     case 'toggle-sidebar':
       toggleSidebar()
       break
+    case 'toggle-right-sidebar':
+      toggleRightSidebar()
+      break
     case 'toggle-theme':
       settingsStore.toggleTheme()
       break
@@ -745,18 +952,109 @@ async function handleTitleBarMenuAction(action) {
 }
 
 // 窗口大小调整
-function openSettingsDialog() {
+function normalizeSettingsInitialSection(sectionId) {
+  return ['appearance', 'editor', 'shortcuts', 'ai', 'files'].includes(sectionId) ? sectionId : 'appearance'
+}
+
+function openSettingsDialog(sectionId = 'appearance') {
+  settingsInitialSection.value = normalizeSettingsInitialSection(sectionId)
   settingsDialogKey.value += 1
   showSettingsDialog.value = true
+}
+
+function openAiSettingsDialog() {
+  openSettingsDialog('ai')
 }
 
 function closeSettingsDialog() {
   showSettingsDialog.value = false
 }
 
+function clampNumber(value, minValue, maxValue) {
+  return Math.max(minValue, Math.min(maxValue, value))
+}
+
+function getViewportWidth() {
+  return Math.max(0, window.innerWidth || 0)
+}
+
+function getSidebarMaxWidth(rightWidth = isRightSidebarCollapsed.value ? 0 : rightSidebarWidth.value) {
+  const viewportWidth = getViewportWidth()
+  const viewportMaxWidth = Math.floor(viewportWidth * SIDEBAR_MAX_VIEWPORT_RATIO)
+  const editorReservedWidth = WORKBENCH_MIN_EDITOR_WIDTH + WORKBENCH_EDITOR_HORIZONTAL_SPACE
+  const availableWidth = viewportWidth - rightWidth - editorReservedWidth
+  return Math.max(SIDEBAR_MIN_WIDTH, Math.floor(Math.min(viewportMaxWidth, availableWidth)))
+}
+
+function getRightSidebarMaxWidth(leftWidth = isSidebarCollapsed.value ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth.value) {
+  const viewportWidth = getViewportWidth()
+  const viewportMaxWidth = Math.floor(viewportWidth * RIGHT_SIDEBAR_MAX_VIEWPORT_RATIO)
+  const editorReservedWidth = WORKBENCH_MIN_EDITOR_WIDTH + WORKBENCH_EDITOR_HORIZONTAL_SPACE
+  const availableWidth = viewportWidth - leftWidth - editorReservedWidth
+  return Math.max(RIGHT_SIDEBAR_MIN_WIDTH, Math.floor(Math.min(viewportMaxWidth, availableWidth)))
+}
+
+function clampSidebarWidth(value, rightWidth = isRightSidebarCollapsed.value ? 0 : rightSidebarWidth.value) {
+  return clampNumber(Math.round(value), SIDEBAR_MIN_WIDTH, getSidebarMaxWidth(rightWidth))
+}
+
+function clampRightSidebarWidth(value, leftWidth = isSidebarCollapsed.value ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth.value) {
+  return clampNumber(Math.round(value), RIGHT_SIDEBAR_MIN_WIDTH, getRightSidebarMaxWidth(leftWidth))
+}
+
+function getPreferredSidebarWidth() {
+  return lastExpandedSidebarWidth.value || settingsStore.settings.sidebarWidth || DEFAULT_SIDEBAR_WIDTH
+}
+
+function getPreferredRightSidebarWidth() {
+  return lastExpandedRightSidebarWidth.value || settingsStore.settings.rightSidebarWidth || DEFAULT_RIGHT_SIDEBAR_WIDTH
+}
+
+function beginWorkbenchConstraintUpdate() {
+  isApplyingWorkbenchConstraints = true
+  if (clearWorkbenchConstraintPending) return
+
+  clearWorkbenchConstraintPending = true
+  nextTick(() => {
+    isApplyingWorkbenchConstraints = false
+    clearWorkbenchConstraintPending = false
+  })
+}
+
+function clampWorkbenchWidths() {
+  beginWorkbenchConstraintUpdate()
+
+  if (!isSidebarCollapsed.value) {
+    sidebarWidth.value = clampSidebarWidth(getPreferredSidebarWidth())
+  }
+
+  if (!isRightSidebarCollapsed.value) {
+    rightSidebarWidth.value = clampRightSidebarWidth(getPreferredRightSidebarWidth())
+  }
+
+  if (!isSidebarCollapsed.value) {
+    sidebarWidth.value = clampSidebarWidth(getPreferredSidebarWidth())
+  }
+}
+
+function handleWindowResize() {
+  clampWorkbenchWidths()
+}
+
 function startResize(e) {
   if (isSidebarCollapsed.value) return
+  clampWorkbenchWidths()
   isResizing.value = true
+  isRightResizing.value = false
+  resizePointerX.value = e.clientX
+  e.preventDefault()
+}
+
+function startRightResize(e) {
+  if (isRightSidebarCollapsed.value) return
+  clampWorkbenchWidths()
+  isRightResizing.value = true
+  isResizing.value = false
   resizePointerX.value = e.clientX
   e.preventDefault()
 }
@@ -772,20 +1070,24 @@ function handleMouseMove(e) {
       return
     }
 
-    const maxWidth = Math.min(420, Math.floor(window.innerWidth * 0.42))
-    const nextWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxWidth, e.clientX))
-    sidebarWidth.value = nextWidth
+    sidebarWidth.value = clampSidebarWidth(e.clientX)
+  }
+
+  if (isRightResizing.value) {
+    resizePointerX.value = e.clientX
+    rightSidebarWidth.value = clampRightSidebarWidth(window.innerWidth - e.clientX)
   }
 }
 
 function stopResize() {
   isResizing.value = false
+  isRightResizing.value = false
   resizePointerX.value = 0
 }
 
 function collapseSidebar() {
   if (!isSidebarCollapsed.value) {
-    lastExpandedSidebarWidth.value = sidebarWidth.value
+    lastExpandedSidebarWidth.value = getPreferredSidebarWidth()
   }
 
   settingsStore.updateSettings({
@@ -795,13 +1097,14 @@ function collapseSidebar() {
 }
 
 function expandSidebar() {
-  const maxWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.floor(window.innerWidth * 0.42))
-  const restoredWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxWidth, lastExpandedSidebarWidth.value || sidebarWidth.value || SIDEBAR_MIN_WIDTH))
+  const preferredWidth = getPreferredSidebarWidth()
+  const restoredWidth = clampSidebarWidth(preferredWidth)
 
+  beginWorkbenchConstraintUpdate()
   sidebarWidth.value = restoredWidth
   settingsStore.updateSettings({
     sidebarCollapsed: false,
-    sidebarWidth: restoredWidth
+    sidebarWidth: preferredWidth
   })
 }
 
@@ -812,6 +1115,38 @@ function toggleSidebar() {
   }
 
   collapseSidebar()
+}
+
+function collapseRightSidebar() {
+  if (!isRightSidebarCollapsed.value) {
+    lastExpandedRightSidebarWidth.value = getPreferredRightSidebarWidth()
+  }
+
+  settingsStore.updateSettings({
+    rightSidebarCollapsed: true,
+    rightSidebarWidth: lastExpandedRightSidebarWidth.value
+  })
+}
+
+function expandRightSidebar() {
+  const preferredWidth = getPreferredRightSidebarWidth()
+  const restoredWidth = clampRightSidebarWidth(preferredWidth)
+
+  beginWorkbenchConstraintUpdate()
+  rightSidebarWidth.value = restoredWidth
+  settingsStore.updateSettings({
+    rightSidebarCollapsed: false,
+    rightSidebarWidth: preferredWidth
+  })
+}
+
+function toggleRightSidebar() {
+  if (isRightSidebarCollapsed.value) {
+    expandRightSidebar()
+    return
+  }
+
+  collapseRightSidebar()
 }
 
 function handleSidebarViewSelect(view) {
@@ -832,6 +1167,8 @@ function togglePresentationMode() {
 }
 
 watch(sidebarWidth, (newWidth) => {
+  if (isApplyingWorkbenchConstraints) return
+
   if (!isSidebarCollapsed.value) {
     lastExpandedSidebarWidth.value = newWidth
     settingsStore.updateSettings({ sidebarWidth: newWidth })
@@ -839,12 +1176,31 @@ watch(sidebarWidth, (newWidth) => {
 })
 
 watch(() => settingsStore.settings.sidebarWidth, (newWidth) => {
-  if (newWidth && newWidth !== sidebarWidth.value) {
-    sidebarWidth.value = newWidth
+  if (newWidth) {
+    lastExpandedSidebarWidth.value = newWidth
   }
 
   if (newWidth && !isSidebarCollapsed.value) {
-    lastExpandedSidebarWidth.value = newWidth
+    clampWorkbenchWidths()
+  }
+})
+
+watch(rightSidebarWidth, (newWidth) => {
+  if (isApplyingWorkbenchConstraints) return
+
+  if (!isRightSidebarCollapsed.value) {
+    lastExpandedRightSidebarWidth.value = newWidth
+    settingsStore.updateSettings({ rightSidebarWidth: newWidth })
+  }
+})
+
+watch(() => settingsStore.settings.rightSidebarWidth, (newWidth) => {
+  if (newWidth) {
+    lastExpandedRightSidebarWidth.value = newWidth
+  }
+
+  if (newWidth && !isRightSidebarCollapsed.value) {
+    clampWorkbenchWidths()
   }
 })
 
@@ -859,56 +1215,57 @@ watch(
 onMounted(() => {
   isMainEditorDisposed = false
   // 监听文件更改事件
-  if (window.electronAPI.onFileChanged) {
-    cleanups.push(window.electronAPI.onFileChanged((filePath) => {
-      handleExternalFileChange(filePath)
-    }))
-  }
+  addElectronListener('onFileChanged', (filePath) => {
+    handleExternalFileChange(filePath)
+  })
+
+  addElectronListener('onUpdateStateChanged', handleUpdateStateChanged)
+  hydrateUpdateState()
 
   // 监听菜单事件
-  cleanups.push(window.electronAPI.onMenuNewFile(() => {
+  addElectronListener('onMenuNewFile', () => {
     editorStore.createTab()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuOpenFile(async () => {
+  addElectronListener('onMenuOpenFile', async () => {
     await openFileFromDialog()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuOpenFolder(async () => {
+  addElectronListener('onMenuOpenFolder', async () => {
     await openFolderFromDialog()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuSave(() => {
+  addElectronListener('onMenuSave', () => {
     saveCurrentFile()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuSaveAs(() => {
+  addElectronListener('onMenuSaveAs', () => {
     saveCurrentFileAs()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuUndo(() => {
+  addElectronListener('onMenuUndo', () => {
     dispatchEditorEvent(RENDERER_EVENTS.UNDO)
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuRedo(() => {
+  addElectronListener('onMenuRedo', () => {
     dispatchEditorEvent(RENDERER_EVENTS.REDO)
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuOpenSettings(() => {
+  addElectronListener('onMenuOpenSettings', () => {
     openSettingsDialog()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuCheckForUpdates(async () => {
+  addElectronListener('onMenuCheckForUpdates', async () => {
     await handleCheckForUpdates()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuOpenAbout(() => {
+  addElectronListener('onMenuOpenAbout', () => {
     showAboutDialog.value = true
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuToggleTheme(() => {
+  addElectronListener('onMenuToggleTheme', () => {
     settingsStore.toggleTheme()
-  }))
+  })
 
   const handleKeyDown = (e) => {
     if (e.key === 'Escape' && isPresentationMode.value) {
@@ -924,31 +1281,35 @@ onMounted(() => {
     document.removeEventListener('keydown', handleKeyDown)
   })
 
-  cleanups.push(window.electronAPI.onMenuFind(() => {
+  addElectronListener('onMenuFind', () => {
     dispatchEditorEvent(RENDERER_EVENTS.FIND)
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuReplace(() => {
+  addElectronListener('onMenuReplace', () => {
     dispatchEditorEvent(RENDERER_EVENTS.REPLACE)
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuGlobalSearch(() => {
+  addElectronListener('onMenuGlobalSearch', () => {
     showGlobalSearchDialog.value = true
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuTogglePresentationMode?.(() => {
+  addElectronListener('onMenuTogglePresentationMode', () => {
     togglePresentationMode()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onMenuToggleSidebar(() => {
+  addElectronListener('onMenuToggleSidebar', () => {
     toggleSidebar()
-  }))
+  })
 
-  cleanups.push(window.electronAPI.onAppBeforeClose?.(handleAppBeforeClose))
+  addElectronListener('onMenuToggleRightSidebar', () => {
+    toggleRightSidebar()
+  })
 
-  cleanups.push(window.electronAPI.onAppOpenFile((filePath) => {
+  addElectronListener('onAppBeforeClose', handleAppBeforeClose)
+
+  addElectronListener('onAppOpenFile', (filePath) => {
     openFile(filePath)
-  }))
+  })
 
   cleanups.push(onRendererEvent(RENDERER_EVENTS.OPEN_GLOBAL_SEARCH, handleOpenGlobalSearchEvent))
   cleanups.push(onRendererEvent(RENDERER_EVENTS.OPEN_FILE, handleOpenFileEvent))
@@ -956,6 +1317,8 @@ onMounted(() => {
 
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', stopResize)
+  window.addEventListener('resize', handleWindowResize)
+  clampWorkbenchWidths()
 
   // 恢复上次打开的文件夹
   fileStore.loadLastOpenedFolder().catch((error) => {
@@ -980,6 +1343,7 @@ onUnmounted(() => {
   watchedFilePaths.clear()
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseup', stopResize)
+  window.removeEventListener('resize', handleWindowResize)
 })
 
 async function restoreLastSession(options = {}) {
@@ -1277,7 +1641,7 @@ async function saveCurrentFileAs() {
   flex-shrink: 0;
   box-sizing: border-box;
   min-width: 48px;
-  max-width: 420px;
+  max-width: none;
   border-right: none;
   background: var(--surface-panel-strong);
   box-shadow: none;
@@ -1289,14 +1653,18 @@ async function saveCurrentFileAs() {
 
 .sidebar.collapsed {
   min-width: 48px;
-  max-width: 48px;
   padding: 0;
 }
 
 .sidebar-pane {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 var(--sidebar-pane-width);
+  width: var(--sidebar-pane-width);
+  min-width: var(--sidebar-pane-width);
   overflow: hidden;
+}
+
+.sidebar.collapsed .sidebar-pane {
+  pointer-events: none;
 }
 
 .resizer {
@@ -1328,6 +1696,35 @@ async function saveCurrentFileAs() {
   transition-delay: 0.1s;
 }
 
+.right-resizer {
+  position: relative;
+  width: 6px;
+  margin-left: -3px;
+  margin-right: -3px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 120;
+  flex-shrink: 0;
+}
+
+.right-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: transparent;
+  transition: background var(--transition-fast) 0.2s;
+}
+
+.right-resizer:hover::before,
+.main-editor.right-resizing .right-resizer::before {
+  background: var(--accent-primary);
+  transition-delay: 0.1s;
+}
+
 .editor-area {
   flex: 1;
   display: flex;
@@ -1344,6 +1741,17 @@ async function saveCurrentFileAs() {
 
 .editor-area.no-tabs {
   gap: 0;
+}
+
+.workbench-right-sidebar {
+  min-width: 320px;
+  max-width: none;
+  height: 100%;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--glass-border);
+  background: var(--surface-panel-strong);
 }
 
 @media (max-width: 960px) {
@@ -1366,6 +1774,17 @@ async function saveCurrentFileAs() {
     margin-left: -3px;
     margin-right: -3px;
   }
+
+  .right-resizer {
+    width: 6px;
+    margin-left: -3px;
+    margin-right: -3px;
+  }
+
+  .workbench-right-sidebar {
+    min-width: 320px;
+    max-width: 50vw;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1386,7 +1805,20 @@ async function saveCurrentFileAs() {
   .resizer {
     width: 6px;
   }
+
+  .right-resizer {
+    display: none;
+  }
+
+  .workbench-right-sidebar {
+    display: none;
+  }
 }
+
+.main-editor.sidebar-collapsed .right-resizer {
+  margin-right: -11px;
+}
+
 .main-editor.presentation-mode :deep(.markdown-mode-toolbar),
 .main-editor.presentation-mode :deep(.markdown-format-toolbar),
 .main-editor.presentation-mode :deep(.json-toolbar),

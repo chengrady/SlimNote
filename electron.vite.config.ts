@@ -7,7 +7,8 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
-        external: ['electron', 'fs', 'path', 'chokidar', 'iconv-lite']
+        input: resolve('electron/main.js'),
+        external: ['electron', 'fs', 'path', 'chokidar', 'iconv-lite', 'electron-updater']
       }
     }
   },
@@ -15,6 +16,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
+        input: resolve('electron/preload.js'),
         external: ['electron']
       }
     }

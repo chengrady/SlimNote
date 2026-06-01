@@ -69,6 +69,8 @@ async function renderMermaidBlocksInHtml(html = '', theme = 'light') {
 	const root = doc.body.firstElementChild
 	if (!root) return html
 
+	decorateListPrefixes(root, { includeTaskListPrefix: false })
+
 	const mermaidBlocks = Array.from(root.querySelectorAll('pre code.language-mermaid, pre code.lang-mermaid'))
 	if (!mermaidBlocks.length) {
 		return root.innerHTML
@@ -100,8 +102,6 @@ async function renderMermaidBlocksInHtml(html = '', theme = 'light') {
 			pre.replaceWith(fallback)
 		}
 	}
-
-	decorateListPrefixes(root, { includeTaskListPrefix: false })
 
 	return root.innerHTML
 }
