@@ -235,7 +235,6 @@
           <div v-if="showMarkdownContextPreview" class="context-preview-panel">
             <MarkdownPreview
               ref="markdownPreviewRef"
-              class="context-markdown-preview"
               :content="activeTab.content"
               :source-path="activeTab.filePath || ''"
               :font-size="activeTab.fontSize"
@@ -460,6 +459,10 @@ const logFilterMode = ref('all')
 let activeInlineCompletionRequest = null
 let inlineCompletionSettingsLoading = null
 
+function debugInlineCompletion(stage, details = {}) {
+  console.info('[inline-completion][panel]', stage, details)
+}
+
 // JSON 编辑器增强功能状态
 const showJsonTree = ref(true)
 const showConverter = ref(false)
@@ -480,6 +483,7 @@ const fontSizeToastVisible = ref(false)
 const fontSizeToastValue = ref(14)
 const fontSizeToastDelta = ref(0)
 const fontSizeToastTick = ref(0)
+const lastSettingsFontSize = ref(Number(settingsStore.settings.fontSize) || 14)
 let fontSizeToastTimer = null
 
 function triggerEditorEvent(name, detail) {
@@ -665,6 +669,17 @@ async function ensureInlineCompletionSettingsLoaded() {
 
 function getInlineCompletionModelSelection() {
   const providers = Array.isArray(aiStore.settings?.providers) ? aiStore.settings.providers : []
+  const inlineSelection = aiStore.settings?.inlineCompletion || {}
+  const isFixedInlineCompletionModel = inlineSelection.mode === 'fixed'
+  const selectedProvider = providers.find(item => item?.id === inlineSelection.providerId)
+  const selectedModel = selectedProvider?.models?.find(item => item.id === inlineSelection.modelId && item.enabled !== false && item.model)
+  if (isFixedInlineCompletionModel && selectedProvider && selectedModel) {
+    return {
+      providerId: selectedProvider.id || '',
+      modelId: selectedModel.id || ''
+    }
+  }
+
   const provider = providers.find(item => item?.apiKeys?.some(key => key.hasApiKey)) || providers[0] || null
   const model = provider?.models?.find(item => item.enabled !== false && item.model) || provider?.models?.[0] || null
   return {
@@ -676,6 +691,7 @@ function getInlineCompletionModelSelection() {
 function clearActiveInlineCompletionRequest(requestId = '', resolvePending = true) {
   if (!activeInlineCompletionRequest) return
   if (requestId && activeInlineCompletionRequest.requestId !== requestId) return
+  debugInlineCompletion('clear-active', { requestId: activeInlineCompletionRequest.requestId, requestedId: requestId, resolvePending })
   const resolveStale = activeInlineCompletionRequest.resolveStale
   activeInlineCompletionRequest.cleanups.splice(0).forEach(cleanup => cleanup?.())
   if (activeInlineCompletionRequest.timeout) clearTimeout(activeInlineCompletionRequest.timeout)
@@ -685,9 +701,14 @@ function clearActiveInlineCompletionRequest(requestId = '', resolvePending = tru
 
 function cancelActiveInlineCompletionRequest() {
   const requestId = activeInlineCompletionRequest?.requestId
+  debugInlineCompletion('cancel-active', { requestId: requestId || '', hasActiveRequest: Boolean(requestId) })
   clearActiveInlineCompletionRequest()
   if (requestId) {
-    window.electronAPI?.stopAIInlineCompletion?.(requestId).catch?.(() => {})
+    window.electronAPI?.stopAIInlineCompletion?.(requestId).then((result) => {
+      debugInlineCompletion('ipc-stop-result', { requestId, ok: Boolean(result?.ok), message: result?.message || '' })
+    }).catch((error) => {
+      debugInlineCompletion('ipc-stop-error', { requestId, message: error?.message || String(error || '') })
+    })
   }
 }
 
@@ -701,6 +722,7 @@ function isInlineCompletionContextCurrent(anchor) {
 async function requestInlineCompletionSuggestion(options = {}) {
   const settingsReady = await ensureInlineCompletionSettingsLoaded()
   if (!settingsReady || !activeTab.value) {
+    debugInlineCompletion('request-skipped', { reason: !settingsReady ? 'settings-not-ready' : 'active-tab-missing', source: options.source || '' })
     return ''
   }
 
@@ -711,11 +733,24 @@ async function requestInlineCompletionSuggestion(options = {}) {
   const hasSelection = Boolean(options.hasSelection)
   const languageAllowed = isInlineCompletionLanguageAllowed(language, settings)
   const shouldRequest = shouldRequestInlineCompletion({ settings, content, cursorOffset, language, hasSelection, isComposing: false })
+  debugInlineCompletion('trigger-check', {
+    source: options.source || '',
+    enabled: settings.enabled,
+    language,
+    languageAllowed,
+    shouldRequest,
+    hasSelection,
+    cursorOffset,
+    contentLength: content.length,
+    delayMs: settings.delayMs,
+    maxChars: settings.maxChars
+  })
 
   if (!shouldRequest) {
     return ''
   }
   if (!window.electronAPI?.startAIInlineCompletion) {
+    debugInlineCompletion('request-skipped', { reason: 'electron-api-missing' })
     return ''
   }
 
@@ -740,10 +775,22 @@ async function requestInlineCompletionSuggestion(options = {}) {
   const requestId = createInlineCompletionRequestId()
   const { providerId, modelId } = getInlineCompletionModelSelection()
   let buffer = ''
+  debugInlineCompletion('ipc-start', {
+    requestId,
+    source: options.source || '',
+    providerId,
+    modelId,
+    language,
+    cursorOffset,
+    prefixLength: context.prefix.length,
+    suffixLength: context.suffix.length,
+    currentLineLength: context.currentLine.length
+  })
 
   return new Promise((resolve) => {
     const settle = (text = '') => {
       if (activeInlineCompletionRequest?.requestId !== requestId) {
+        debugInlineCompletion('settle-stale', { requestId })
         resolve('')
         return
       }
@@ -752,23 +799,32 @@ async function requestInlineCompletionSuggestion(options = {}) {
       const cleaned = contextCurrent
         ? cleanInlineCompletionText(text, { prefix: context.prefix, maxChars: settings.maxChars, settings })
         : ''
+      debugInlineCompletion('settle', { requestId, rawLength: text.length, cleanedLength: cleaned.length, contextCurrent })
       clearActiveInlineCompletionRequest(requestId, false)
       resolve(cleaned)
     }
 
     const cleanups = [
+      window.electronAPI.onAIInlineCompletionStatus?.((event) => {
+        if (event?.requestId === requestId) {
+          debugInlineCompletion('ipc-status', { requestId, phase: event.phase || '' })
+        }
+      }),
       window.electronAPI.onAIInlineCompletionChunk?.((event) => {
         if (event?.requestId === requestId) {
           buffer += event.text || ''
+          debugInlineCompletion('ipc-chunk', { requestId, chunkLength: (event.text || '').length, bufferLength: buffer.length })
         }
       }),
       window.electronAPI.onAIInlineCompletionComplete?.((event) => {
         if (event?.requestId === requestId) {
+          debugInlineCompletion('ipc-complete', { requestId, bufferLength: buffer.length })
           settle(buffer)
         }
       }),
       window.electronAPI.onAIInlineCompletionError?.((event) => {
         if (event?.requestId === requestId) {
+          debugInlineCompletion('ipc-error', { requestId, message: event.message || '' })
           settle('')
         }
       })
@@ -779,6 +835,7 @@ async function requestInlineCompletionSuggestion(options = {}) {
       cleanups,
       resolveStale: () => resolve(''),
       timeout: setTimeout(() => {
+        debugInlineCompletion('timeout', { requestId })
         window.electronAPI?.stopAIInlineCompletion?.(requestId).catch?.(() => {})
         settle('')
       }, Math.max(5000, Math.min(20000, settings.delayMs + 16000)))
@@ -790,8 +847,10 @@ async function requestInlineCompletionSuggestion(options = {}) {
       modelId,
       ...context
     }).then((result) => {
+      debugInlineCompletion('ipc-start-result', { requestId, ok: Boolean(result?.ok), message: result?.message || '' })
       if (!result?.ok) settle('')
-    }).catch(() => {
+    }).catch((error) => {
+      debugInlineCompletion('ipc-start-error', { requestId, message: error?.message || String(error || '') })
       settle('')
     })
   })
@@ -1439,6 +1498,23 @@ watch(() => activeTab.value?.content, () => {
   if (activeTab.value?.language === 'json') {
     selectedJsonPath.value = []
   }
+})
+
+watch(() => settingsStore.settings.fontSize, (newFontSize, oldFontSize) => {
+  const nextFontSize = Number(newFontSize)
+  const previousFontSize = Number(oldFontSize) || lastSettingsFontSize.value
+  const previousActiveFontSize = Number(activeTab.value?.fontSize) || previousFontSize
+  if (!Number.isFinite(nextFontSize) || nextFontSize === previousFontSize) return
+
+  editorStore.tabs.forEach(tab => {
+    const tabFontSize = Number(tab.fontSize)
+    if (!Number.isFinite(tabFontSize) || tabFontSize !== nextFontSize) {
+      editorStore.updateTabFontSize(tab.id, nextFontSize)
+    }
+  })
+
+  if (activeTab.value) showFontSizeToast(nextFontSize, previousActiveFontSize)
+  lastSettingsFontSize.value = nextFontSize
 })
 
 // 导出为图片
@@ -2491,8 +2567,8 @@ defineExpose({
 .context-resizer {
   position: relative;
   flex: 0 0 6px; /* Give it a wider invisible hit area */
-  margin-left: -3px;
-  margin-right: -3px;
+  margin-left: -6px;
+  margin-right: 0;
   cursor: col-resize;
   background: transparent;
   z-index: 10;

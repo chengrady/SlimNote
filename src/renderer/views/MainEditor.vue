@@ -20,7 +20,7 @@
       <div v-show="!isPresentationMode" class="sidebar" :class="{ collapsed: isSidebarCollapsed }" :style="sidebarStyle">
         <ActivityBar :active-view="activeSidebarView" :collapsed="isSidebarCollapsed" @select-view="handleSidebarViewSelect" @toggle-collapse="toggleSidebar" @open-settings="openSettingsDialog" />
         <div class="sidebar-pane" :aria-hidden="isSidebarCollapsed ? 'true' : 'false'">
-          <WorkspaceSidebar :mode="activeSidebarView" :collapsed="false" @change-mode="handleSidebarViewSelect" />
+          <WorkspaceSidebar :mode="activeSidebarView" :collapsed="isSidebarCollapsed" @change-mode="handleSidebarViewSelect" />
         </div>
       </div>
       <div v-if="!isSidebarCollapsed && !isPresentationMode" class="resizer" @mousedown="startResize"></div>
@@ -233,7 +233,7 @@ const hasTabs = computed(() => editorStore.tabs.length > 0)
 const activeTab = computed(() => editorStore.getActiveTab())
 const sidebarStyle = computed(() => ({
   width: isSidebarCollapsed.value ? `${SIDEBAR_COLLAPSED_WIDTH}px` : `${sidebarWidth.value}px`,
-  '--sidebar-pane-width': `${Math.max(0, sidebarWidth.value - SIDEBAR_COLLAPSED_WIDTH)}px`
+  '--sidebar-pane-width': isSidebarCollapsed.value ? '0px' : `${Math.max(0, sidebarWidth.value - SIDEBAR_COLLAPSED_WIDTH)}px`
 }))
 const rightSidebarStyle = computed(() => ({
   width: `${rightSidebarWidth.value}px`
@@ -1664,6 +1664,9 @@ async function saveCurrentFileAs() {
 }
 
 .sidebar.collapsed .sidebar-pane {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
   pointer-events: none;
 }
 

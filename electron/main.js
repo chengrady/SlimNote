@@ -5,7 +5,7 @@ const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
 const { createUpdateManager } = require('./updateManager')
 const { getPublicAISettings, getPrivateAISettings, updateAISettings, clearAISettings } = require('./aiSettings')
-const { streamChatCompletion } = require('./aiClient')
+const { streamChatCompletion, resolveChatEndpoint } = require('./aiClient')
 const { listAISessions, saveAISession, deleteAISession, clearAISessions } = require('./aiSessions')
 const shortcutRegistry = require('../src/shared/shortcutRegistry.json')
 
@@ -253,7 +253,8 @@ function buildInlineCompletionMessages(payload = {}) {
   const languageRules = [
     language === 'sql' ? 'For SQL, use uppercase keywords.' : '',
     ['json', 'yaml', 'toml'].includes(language) ? 'For structured data, return only syntactically plausible continuation text.' : '',
-    language === 'markdown' ? 'For Markdown, preserve lists, tables, code fences, headings, and the document language.' : ''
+    language === 'markdown' ? 'For Markdown, preserve lists, tables, code fences, headings, and the document language.' : '',
+    ['markdown', 'plaintext'].includes(language) ? 'For Markdown or plain text, when an obvious continuation can be completed coherently, return the full useful continuation across multiple lines; this includes known text, poem, quote, list, table, heading sequence, or log pattern.' : ''
   ].filter(Boolean).join('\n')
 
   const system = [
@@ -262,7 +263,7 @@ function buildInlineCompletionMessages(payload = {}) {
     'Do not explain.',
     'Do not repeat text that already appears before the cursor.',
     'Do not wrap the answer in Markdown fences.',
-    'Keep the completion short and natural.',
+    'Prefer concise completions, but include multiple lines when the cursor is clearly inside a coherent continuation.',
     'Respect the document language, syntax, indentation, and formatting.',
     languageRules
   ].filter(Boolean).join('\n')
@@ -294,9 +295,12 @@ function shouldDisableThinkingForInlineCompletion(settings = {}) {
 }
 
 function buildInlineCompletionRequestSettings(settings, payload = {}) {
-  const maxChars = clampNumber(payload.maxChars, 320, 20, 1200)
+  const maxChars = clampNumber(payload.maxChars, 600, 20, 1200)
+  const inlineCompletionURL = String(settings.inlineCompletionURL || '').trim()
   const requestSettings = {
     ...settings,
+    baseURL: inlineCompletionURL || settings.baseURL,
+    chatEndpointURL: inlineCompletionURL ? '' : settings.chatEndpointURL,
     temperature: 0.2,
     maxTokens: Math.round(clampNumber(Math.ceil(maxChars / 2), 160, 64, 512)),
     timeoutMs: Math.round(clampNumber(settings.timeoutMs, 12000, 5000, 15000))
@@ -1356,39 +1360,74 @@ function registerIpcHandlers() {
   ipcMain.handle('ai:inline-completion-start', async (event, payload = {}) => {
     const requestId = String(payload.requestId || '')
     if (!requestId) {
+      console.info('[inline-completion][main] start-rejected', { reason: 'request-id-missing' })
       return { ok: false, message: 'Invalid inline completion request' }
     }
     if (aiInlineCompletionRequests.has(requestId)) {
+      console.info('[inline-completion][main] start-rejected', { requestId, reason: 'already-running' })
       return { ok: false, message: 'Inline completion request already running' }
     }
 
     try {
+      console.info('[inline-completion][main] start', {
+        requestId,
+        providerId: payload.providerId || '',
+        modelId: payload.modelId || '',
+        language: payload.language || '',
+        editorMode: payload.editorMode || '',
+        prefixLength: String(payload.prefix || '').length,
+        suffixLength: String(payload.suffix || '').length,
+        currentLineLength: String(payload.currentLine || '').length
+      })
       const settings = buildInlineCompletionRequestSettings(
         getPrivateAISettings({ providerId: payload.providerId, modelId: payload.modelId }),
         payload
       )
+      console.info('[inline-completion][main] settings', {
+        requestId,
+        providerId: settings.providerId || '',
+        modelId: settings.modelId || '',
+        model: settings.model || '',
+        protocol: settings.protocol || '',
+        baseURL: settings.baseURL || '',
+        inlineCompletionURL: settings.inlineCompletionURL || '',
+        chatEndpointPath: settings.chatEndpointPath || '',
+        chatEndpointURL: settings.chatEndpointURL || '',
+        endpoint: resolveChatEndpoint(settings),
+        timeoutMs: settings.timeoutMs,
+        maxTokens: settings.maxTokens,
+        thinking: settings.thinking || null,
+        hasApiKey: Boolean(settings.apiKey)
+      })
       const messages = buildInlineCompletionMessages(payload)
+      console.info('[inline-completion][main] messages', { requestId, count: messages.length, systemLength: messages[0]?.content?.length || 0, userLength: messages[1]?.content?.length || 0 })
       const request = streamChatCompletion(settings, messages, {
         onStatus: (phase) => {
+          console.info('[inline-completion][main] status', { requestId, phase })
           safeSend(event.sender, 'ai:inline-completion-status', { requestId, phase })
         },
         onChunk: (text) => {
+          console.info('[inline-completion][main] chunk', { requestId, length: String(text || '').length })
           safeSend(event.sender, 'ai:inline-completion-chunk', { requestId, text })
         },
         onComplete: () => {
+          console.info('[inline-completion][main] complete', { requestId })
           safeSend(event.sender, 'ai:inline-completion-complete', { requestId })
         }
       })
 
       aiInlineCompletionRequests.set(requestId, request)
       request.done.catch((error) => {
+        console.info('[inline-completion][main] error', { requestId, message: error.message || 'AI inline completion failed' })
         safeSend(event.sender, 'ai:inline-completion-error', { requestId, message: error.message || 'AI inline completion failed' })
       }).finally(() => {
+        console.info('[inline-completion][main] finished', { requestId })
         if (aiInlineCompletionRequests.get(requestId) === request) aiInlineCompletionRequests.delete(requestId)
       })
 
       return { ok: true, requestId }
     } catch (error) {
+      console.info('[inline-completion][main] start-error', { requestId, message: error.message || 'AI inline completion failed' })
       return { ok: false, message: error.message || 'AI inline completion failed' }
     }
   })
@@ -1397,9 +1436,11 @@ function registerIpcHandlers() {
     const key = String(requestId || '')
     const request = aiInlineCompletionRequests.get(key)
     if (!request) {
+      console.info('[inline-completion][main] stop-missing', { requestId: key })
       return { ok: false, message: 'AI inline completion request not found' }
     }
 
+    console.info('[inline-completion][main] stop', { requestId: key })
     request.stop()
     aiInlineCompletionRequests.delete(key)
     return { ok: true }

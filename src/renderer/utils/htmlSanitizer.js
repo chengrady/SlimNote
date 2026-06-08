@@ -40,6 +40,7 @@ const ALLOWED_TAGS = new Set([
   'input',
   'kbd',
   'li',
+  'mark',
   'ol',
   'p',
   'pre',
@@ -68,7 +69,7 @@ const GLOBAL_ATTRIBUTES = new Set([
 
 const TAG_ATTRIBUTES = {
   a: new Set(['href', 'name', 'rel', 'target']),
-  img: new Set(['alt', 'height', 'loading', 'src', 'width']),
+  img: new Set(['alt', 'height', 'loading', 'referrerpolicy', 'src', 'width']),
   input: new Set(['checked', 'disabled', 'type']),
   ol: new Set(['start', 'type']),
   th: new Set(['align', 'colspan', 'rowspan']),

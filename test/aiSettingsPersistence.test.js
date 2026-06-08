@@ -28,7 +28,7 @@ function loadAISettingsWithTempUserData() {
 }
 
 describe('ai settings persistence', () => {
-  it('preserves inline completion color and opacity when saving full provider payloads', () => {
+  it('preserves inline completion display and accept settings when saving full provider payloads', () => {
     const { aiSettings, userDataPath } = loadAISettingsWithTempUserData()
     const current = aiSettings.getPublicAISettings()
     const payload = {
@@ -37,6 +37,7 @@ describe('ai settings persistence', () => {
       manualContext: current.manualContext,
       inlineCompletion: {
         ...current.inlineCompletion,
+        acceptMode: 'snippet',
         colorPreset: 'red',
         opacity: 0.75
       },
@@ -54,8 +55,10 @@ describe('ai settings persistence', () => {
     const result = aiSettings.updateAISettings(payload)
     const stored = JSON.parse(fs.readFileSync(path.join(userDataPath, 'ai-settings.json'), 'utf8'))
 
+    assert.equal(result.inlineCompletion.acceptMode, 'snippet')
     assert.equal(result.inlineCompletion.colorPreset, 'red')
     assert.equal(result.inlineCompletion.opacity, 0.75)
+    assert.equal(stored.inlineCompletion.acceptMode, 'snippet')
     assert.equal(stored.inlineCompletion.colorPreset, 'red')
     assert.equal(stored.inlineCompletion.opacity, 0.75)
   })

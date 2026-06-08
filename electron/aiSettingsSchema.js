@@ -34,14 +34,20 @@ const DEFAULT_INLINE_COMPLETION_LANGUAGES = [
   'csharp'
 ]
 const INLINE_COMPLETION_COLOR_PRESETS = ['gray', 'blue', 'cyan', 'green', 'red']
+const INLINE_COMPLETION_MODE_VALUES = ['auto', 'fixed']
+const INLINE_COMPLETION_ACCEPT_MODE_VALUES = ['line', 'snippet']
 
 const DEFAULT_INLINE_COMPLETION = {
   enabled: true,
+  mode: 'auto',
+  providerId: '',
+  modelId: '',
   delayMs: 500,
-  maxChars: 320,
+  maxChars: 600,
   prefixChars: 6000,
   suffixChars: 2000,
   includeLog: false,
+  acceptMode: 'line',
   colorPreset: 'cyan',
   customColor: '#22c7d9',
   opacity: 0.7,
@@ -69,6 +75,7 @@ const DEFAULT_PROVIDER = {
   name: 'API Provider',
   protocol: DEFAULT_PROTOCOL,
   baseURL: '',
+  inlineCompletionURL: '',
   chatEndpointPath: DEFAULT_CHAT_ENDPOINT_PATH,
   chatEndpointURL: '',
   keyStrategy: DEFAULT_KEY_STRATEGY,
@@ -84,6 +91,7 @@ const DEFAULT_API_CONFIG = {
   id: DEFAULT_PROVIDER_ID,
   name: DEFAULT_PROVIDER.name,
   baseURL: DEFAULT_PROVIDER.baseURL,
+  inlineCompletionURL: DEFAULT_PROVIDER.inlineCompletionURL,
   chatEndpointPath: DEFAULT_PROVIDER.chatEndpointPath,
   chatEndpointURL: DEFAULT_PROVIDER.chatEndpointURL,
   model: DEFAULT_MODEL.model,
@@ -152,6 +160,16 @@ function normalizeInlineCompletionColorPreset(value, fallback = DEFAULT_INLINE_C
   return INLINE_COMPLETION_COLOR_PRESETS.includes(normalized) ? normalized : fallback
 }
 
+function normalizeInlineCompletionMode(value, fallback = DEFAULT_INLINE_COMPLETION.mode) {
+  const normalized = normalizeString(value, fallback).toLowerCase()
+  return INLINE_COMPLETION_MODE_VALUES.includes(normalized) ? normalized : fallback
+}
+
+function normalizeInlineCompletionAcceptMode(value, fallback = DEFAULT_INLINE_COMPLETION.acceptMode) {
+  const normalized = normalizeString(value, fallback).toLowerCase()
+  return INLINE_COMPLETION_ACCEPT_MODE_VALUES.includes(normalized) ? normalized : fallback
+}
+
 function normalizeHexColor(value, fallback = DEFAULT_INLINE_COMPLETION.customColor) {
   const normalized = normalizeString(value, fallback)
   if (/^#[0-9a-f]{6}$/i.test(normalized)) return normalized.toLowerCase()
@@ -164,14 +182,18 @@ function normalizeInlineCompletion(value = {}) {
   const settings = isPlainObject(value) ? value : {}
   return {
     enabled: normalizeBoolean(settings.enabled, DEFAULT_INLINE_COMPLETION.enabled),
+    mode: normalizeInlineCompletionMode(settings.mode),
+    providerId: normalizeString(settings.providerId, DEFAULT_INLINE_COMPLETION.providerId),
+    modelId: normalizeString(settings.modelId, DEFAULT_INLINE_COMPLETION.modelId),
     delayMs: Math.round(normalizeNumber(settings.delayMs, DEFAULT_INLINE_COMPLETION.delayMs, 150, 3000)),
     maxChars: Math.round(normalizeNumber(settings.maxChars, DEFAULT_INLINE_COMPLETION.maxChars, 20, 1200)),
     prefixChars: Math.round(normalizeNumber(settings.prefixChars, DEFAULT_INLINE_COMPLETION.prefixChars, 200, 20000)),
     suffixChars: Math.round(normalizeNumber(settings.suffixChars, DEFAULT_INLINE_COMPLETION.suffixChars, 0, 8000)),
     includeLog: normalizeBoolean(settings.includeLog, DEFAULT_INLINE_COMPLETION.includeLog),
+    acceptMode: normalizeInlineCompletionAcceptMode(settings.acceptMode),
     colorPreset: normalizeInlineCompletionColorPreset(settings.colorPreset),
     customColor: normalizeHexColor(settings.customColor),
-    opacity: normalizeNumber(settings.opacity, DEFAULT_INLINE_COMPLETION.opacity, 0.35, 0.9),
+    opacity: normalizeNumber(settings.opacity, DEFAULT_INLINE_COMPLETION.opacity, 0.3, 1),
     languages: normalizeLanguages(settings.languages)
   }
 }
@@ -306,6 +328,7 @@ function normalizeProvider(value = {}, fallback = DEFAULT_PROVIDER, index = 0) {
     name: normalizeString(provider.name, safeFallback.name || `Provider ${index + 1}`) || `Provider ${index + 1}`,
     protocol: normalizeProtocol(provider.protocol, normalizeProtocol(safeFallback.protocol)),
     baseURL: normalizeString(provider.baseURL, safeFallback.baseURL),
+    inlineCompletionURL: normalizeString(provider.inlineCompletionURL, safeFallback.inlineCompletionURL),
     chatEndpointPath: normalizeString(provider.chatEndpointPath, safeFallback.chatEndpointPath) || DEFAULT_CHAT_ENDPOINT_PATH,
     chatEndpointURL: normalizeString(provider.chatEndpointURL, safeFallback.chatEndpointURL),
     keyStrategy: DEFAULT_KEY_STRATEGY,
@@ -325,6 +348,7 @@ function normalizeApiConfig(value = {}, fallback = DEFAULT_API_CONFIG) {
     id: normalizeString(config.id, safeFallback.id) || DEFAULT_PROVIDER_ID,
     name: normalizeString(config.name, safeFallback.name) || DEFAULT_API_CONFIG.name,
     baseURL: normalizeString(config.baseURL, safeFallback.baseURL),
+    inlineCompletionURL: normalizeString(config.inlineCompletionURL, safeFallback.inlineCompletionURL),
     chatEndpointPath: normalizeString(config.chatEndpointPath, safeFallback.chatEndpointPath) || DEFAULT_CHAT_ENDPOINT_PATH,
     chatEndpointURL: normalizeString(config.chatEndpointURL, safeFallback.chatEndpointURL),
     model: normalizeString(config.model, safeFallback.model),
@@ -353,6 +377,7 @@ function buildLegacyApiConfig(settings) {
     id: LEGACY_API_ID,
     name: normalizeString(settings.apiName, DEFAULT_API_CONFIG.name),
     baseURL: settings.baseURL,
+    inlineCompletionURL: settings.inlineCompletionURL,
     chatEndpointPath: settings.chatEndpointPath,
     chatEndpointURL: settings.chatEndpointURL,
     model: settings.model,
@@ -389,6 +414,7 @@ function buildProviderFromApiConfig(config = {}, index = 0) {
     name: normalizedConfig.name,
     protocol: DEFAULT_PROTOCOL,
     baseURL: normalizedConfig.baseURL,
+    inlineCompletionURL: normalizedConfig.inlineCompletionURL,
     chatEndpointPath: normalizedConfig.chatEndpointPath,
     chatEndpointURL: normalizedConfig.chatEndpointURL,
     temperature: normalizedConfig.temperature,
@@ -469,6 +495,7 @@ function buildCompatibilityApiConfig(provider, modelId = '') {
     id: provider.id,
     name: provider.name,
     baseURL: provider.baseURL,
+    inlineCompletionURL: provider.inlineCompletionURL,
     chatEndpointPath: provider.chatEndpointPath,
     chatEndpointURL: provider.chatEndpointURL,
     model: model.model,
@@ -592,6 +619,7 @@ function normalizePrivateAISettings(settings = {}) {
     apiName: activeProvider.name,
     protocol: activeProvider.protocol,
     baseURL: activeProvider.baseURL,
+    inlineCompletionURL: activeProvider.inlineCompletionURL,
     chatEndpointPath: activeProvider.chatEndpointPath,
     chatEndpointURL: activeProvider.chatEndpointURL,
     model: activeModel.model,

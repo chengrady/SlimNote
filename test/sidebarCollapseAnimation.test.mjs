@@ -8,17 +8,17 @@ const appSource = readFileSync(new URL('../src/renderer/App.vue', import.meta.ur
 describe('left sidebar collapse animation', () => {
   it('lets the inline width transition animate collapse without an immediate max-width clamp', () => {
     assert.match(source, /\.main-editor:not\(\.resizing\) \.sidebar\s*{[\s\S]*transition:\s*width var\(--transition-smooth\)/)
-    assert.match(source, /'--sidebar-pane-width': `\$\{Math\.max\(0, sidebarWidth\.value - SIDEBAR_COLLAPSED_WIDTH\)}px`/)
+    assert.match(source, /'--sidebar-pane-width': isSidebarCollapsed\.value \? '0px' : `\$\{Math\.max\(0, sidebarWidth\.value - SIDEBAR_COLLAPSED_WIDTH\)}px`/)
     assert.doesNotMatch(source, /<div v-if="!isSidebarCollapsed" class="sidebar-pane">/)
     assert.match(source, /<div class="sidebar-pane" :aria-hidden="isSidebarCollapsed \? 'true' : 'false'">/)
-    assert.match(source, /<WorkspaceSidebar :mode="activeSidebarView" :collapsed="false"/)
+    assert.match(source, /<WorkspaceSidebar :mode="activeSidebarView" :collapsed="isSidebarCollapsed"/)
     assert.match(source, /\.sidebar-pane\s*{[\s\S]*flex:\s*0 0 var\(--sidebar-pane-width\);[\s\S]*width:\s*var\(--sidebar-pane-width\);[\s\S]*min-width:\s*var\(--sidebar-pane-width\);/)
 
     const collapsedRule = source.match(/\.sidebar\.collapsed\s*{(?<body>[\s\S]*?)}/)?.groups?.body || ''
 
     assert.match(collapsedRule, /min-width:\s*48px;/)
     assert.doesNotMatch(collapsedRule, /max-width:\s*48px;/)
-    assert.match(source, /\.sidebar\.collapsed \.sidebar-pane\s*{[\s\S]*pointer-events:\s*none;/)
+    assert.match(source, /\.sidebar\.collapsed \.sidebar-pane\s*{[\s\S]*flex:\s*0 0 0;[\s\S]*width:\s*0;[\s\S]*min-width:\s*0;[\s\S]*pointer-events:\s*none;/)
   })
 
   it('loads saved settings before the editor layout mounts', () => {

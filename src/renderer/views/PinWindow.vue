@@ -18,7 +18,8 @@ import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
-import { sanitizeHtml } from '../utils/htmlSanitizer'
+import 'katex/dist/katex.min.css'
+import { enhanceMarkdownHtml, preprocessMarkdownContent } from '../utils/markdownRenderer'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -48,7 +49,7 @@ const htmlContent = computed(() => {
   if (language.value !== 'markdown') return ''
   try {
     const parser = typeof marked === 'function' ? marked : marked.parse
-    return sanitizeHtml(parser(content.value))
+    return enhanceMarkdownHtml(parser(preprocessMarkdownContent(content.value)))
   } catch (e) {
     console.error('Markdown parsing error:', e)
     return `<p>${t('pinWindow.markdownError')}</p>`
@@ -239,5 +240,63 @@ pre {
 
 :deep(.markdown-body table tr:nth-child(2n)) {
   background-color: var(--color-bg-secondary);
+}
+
+:deep(.markdown-body mark) {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(255, 214, 10, 0.35);
+  color: inherit;
+}
+
+:deep(.markdown-body dl) {
+  margin: 0 0 16px;
+}
+
+:deep(.markdown-body dt) {
+  font-weight: 700;
+}
+
+:deep(.markdown-body dd) {
+  margin: 4px 0 10px 1.5em;
+  color: var(--text-muted);
+}
+
+:deep(.markdown-body .footnotes) {
+  margin-top: 24px;
+  color: var(--text-muted);
+  font-size: 0.92em;
+}
+
+:deep(.markdown-body .markdown-alert) {
+  color: var(--color-text);
+  border-left-width: 4px;
+  border-radius: 0 8px 8px 0;
+  background: rgba(128, 128, 128, 0.08);
+}
+
+:deep(.markdown-body .markdown-alert-title) {
+  margin: 0 0 6px;
+  font-size: 0.88em;
+  font-weight: 700;
+}
+
+:deep(.markdown-body .markdown-container) {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-left: 4px solid var(--color-border);
+  border-radius: 0 8px 8px 0;
+  background: rgba(128, 128, 128, 0.08);
+}
+
+:deep(.markdown-body .markdown-container-title) {
+  margin: 0 0 6px;
+  font-size: 0.88em;
+  font-weight: 700;
+}
+
+:deep(.markdown-body .katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 </style>

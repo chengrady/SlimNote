@@ -9,6 +9,7 @@ import { useSettingsStore } from '../stores/settings'
 import { RENDERER_EVENTS, onRendererEvent } from '../utils/rendererEvents'
 import { defineCustomThemes, applyTheme, getDefaultEditorTheme } from '../utils/monacoThemes'
 import { isMonospaceFontFamily } from '../utils/fontFamilies'
+import { consumeInlineCompletionLine } from '../utils/aiInlineCompletion'
 
 const props = defineProps({
   modelValue: {
@@ -50,6 +51,11 @@ let isSyncingScroll = false
 let isComposing = false
 let inlineCompletionDisposable = null
 let inlineCompletionTriggerTimer = 0
+let cachedInlineCompletion = null
+let activeInlineCompletion = null
+let isAcceptingInlineCompletionLine = false
+let inlineCompletionHintObserver = null
+let inlineCompletionHintFrame = 0
 const rendererEventCleanups = []
 const inlineCompletionStyleVarNames = [
   '--inline-completion-color',
@@ -60,6 +66,13 @@ const inlineCompletionStyleVarNames = [
   '--vscode-editorGhostText-background',
   '--vscode-editorGhostText-border'
 ]
+const INLINE_COMPLETION_LINE_HINT_TEXT = "'Tab接受'"
+const INLINE_COMPLETION_SNIPPET_HINT_TEXT = "'Tab接受 | Shift+Tab接受全部'"
+const INLINE_COMPLETION_GHOST_TEXT_SELECTOR = '.ghost-text-decoration, .ghost-text-decoration-preview, .suggest-preview-text .ghost-text'
+
+function debugInlineCompletion(stage, details = {}) {
+  console.info('[inline-completion][monaco]', stage, details)
+}
 
 function buildMarkdownListContinuation(lineContent, column) {
   const safeColumn = Math.max(1, Number(column) || 1)
@@ -136,6 +149,7 @@ const MONOSPACE_FALLBACK = 'Consolas, "Cascadia Mono", "Courier New", monospace'
 function waitForInlineCompletionDelay(delayMs, token) {
   return new Promise((resolve) => {
     if (token?.isCancellationRequested) {
+      debugInlineCompletion('delay-cancelled', { reason: 'token-already-cancelled' })
       resolve(false)
       return
     }
@@ -147,6 +161,7 @@ function waitForInlineCompletionDelay(delayMs, token) {
     }, Math.max(0, Number(delayMs) || 0))
 
     cleanup = token?.onCancellationRequested?.(() => {
+      debugInlineCompletion('delay-cancelled', { reason: 'token-cancelled-during-delay' })
       clearTimeout(timeout)
       cleanup?.dispose?.()
       resolve(false)
@@ -157,6 +172,8 @@ function waitForInlineCompletionDelay(delayMs, token) {
 function disposeInlineCompletionProvider() {
   inlineCompletionDisposable?.dispose?.()
   inlineCompletionDisposable = null
+  cachedInlineCompletion = null
+  activeInlineCompletion = null
 }
 
 function applyInlineCompletionStyle() {
@@ -179,6 +196,65 @@ function applyInlineCompletionStyle() {
   })
 }
 
+function applyInlineCompletionHintText(lineCount = 0) {
+  if (!editorContainer.value) return
+  const hintText = lineCount > 1 ? INLINE_COMPLETION_SNIPPET_HINT_TEXT : INLINE_COMPLETION_LINE_HINT_TEXT
+  const targets = [
+    editorContainer.value,
+    ...editorContainer.value.querySelectorAll('.monaco-editor')
+  ]
+
+  targets.forEach((target) => {
+    target.style.setProperty('--inline-completion-hint-text', hintText)
+  })
+}
+
+function refreshInlineCompletionHintMarkers() {
+  if (!editorContainer.value) return
+  const ghostTexts = Array.from(editorContainer.value.querySelectorAll(INLINE_COMPLETION_GHOST_TEXT_SELECTOR))
+    .map((ghostText) => ({
+      ghostText,
+      rect: ghostText.getBoundingClientRect()
+    }))
+    .sort((a, b) => {
+      if (a.rect.top !== b.rect.top) return a.rect.top - b.rect.top
+      return a.rect.left - b.rect.left
+    })
+
+  ghostTexts.forEach(({ ghostText }, index) => {
+    ghostText.dataset.inlineCompletionHint = index === 0 ? 'primary' : 'secondary'
+  })
+}
+
+function scheduleInlineCompletionHintMarkerRefresh() {
+  if (!editorContainer.value || typeof window === 'undefined') return
+  if (inlineCompletionHintFrame) window.cancelAnimationFrame(inlineCompletionHintFrame)
+  inlineCompletionHintFrame = window.requestAnimationFrame(() => {
+    inlineCompletionHintFrame = 0
+    refreshInlineCompletionHintMarkers()
+  })
+}
+
+function startInlineCompletionHintObserver() {
+  if (!editorContainer.value || inlineCompletionHintObserver || typeof MutationObserver === 'undefined') return
+  inlineCompletionHintObserver = new MutationObserver(() => {
+    scheduleInlineCompletionHintMarkerRefresh()
+  })
+  inlineCompletionHintObserver.observe(editorContainer.value, {
+    childList: true,
+    subtree: true
+  })
+}
+
+function stopInlineCompletionHintObserver() {
+  inlineCompletionHintObserver?.disconnect?.()
+  inlineCompletionHintObserver = null
+  if (inlineCompletionHintFrame && typeof window !== 'undefined') {
+    window.cancelAnimationFrame(inlineCompletionHintFrame)
+  }
+  inlineCompletionHintFrame = 0
+}
+
 function clearInlineCompletionTrigger() {
   if (!inlineCompletionTriggerTimer) return
   clearTimeout(inlineCompletionTriggerTimer)
@@ -187,54 +263,206 @@ function clearInlineCompletionTrigger() {
 
 function triggerInlineCompletion() {
   if (!editor) {
+    debugInlineCompletion('trigger-skipped', { reason: 'editor-missing' })
     return
   }
   if (isComposing) {
+    debugInlineCompletion('trigger-skipped', { reason: 'composing' })
     return
   }
   if (!props.inlineCompletionProvider?.request) {
+    debugInlineCompletion('trigger-skipped', { reason: 'provider-missing', language: props.language })
     return
   }
+  debugInlineCompletion('trigger', { language: props.language })
   editor.trigger('slimnote-inline-completion', 'editor.action.inlineSuggest.trigger', {})
 }
 
 function scheduleInlineCompletionTrigger() {
   clearInlineCompletionTrigger()
+  debugInlineCompletion('schedule-trigger', { language: props.language })
   inlineCompletionTriggerTimer = setTimeout(() => {
     inlineCompletionTriggerTimer = 0
     triggerInlineCompletion()
   }, 0)
 }
 
+function getInlineCompletionLineCount(text) {
+  const normalized = typeof text === 'string' ? text.replace(/\r\n/g, '\n') : ''
+  return normalized ? normalized.split('\n').length : 0
+}
+
+function rememberActiveInlineCompletion(model, position, suggestion, source = 'request') {
+  const { remainingText } = consumeInlineCompletionLine(suggestion)
+  const lineCount = getInlineCompletionLineCount(suggestion)
+  activeInlineCompletion = {
+    language: props.language,
+    versionId: model.getVersionId(),
+    cursorOffset: model.getOffsetAt(position),
+    suggestion
+  }
+  applyInlineCompletionHintText(lineCount)
+  scheduleInlineCompletionHintMarkerRefresh()
+  debugInlineCompletion('active-set', {
+    source,
+    language: props.language,
+    versionId: activeInlineCompletion.versionId,
+    cursorOffset: activeInlineCompletion.cursorOffset,
+    suggestionLength: suggestion.length,
+    lineCount,
+    remainingLength: remainingText.length
+  })
+}
+
+function createInlineCompletionResult(model, position, suggestion, source = 'request') {
+  rememberActiveInlineCompletion(model, position, suggestion, source)
+  return {
+    items: [{
+      insertText: suggestion,
+      range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column)
+    }],
+    suppressSuggestions: true
+  }
+}
+
+function acceptInlineCompletionLine() {
+  const model = editor?.getModel?.()
+  const position = editor?.getPosition?.()
+  const completion = activeInlineCompletion
+  if (!model || !position || !completion?.suggestion) {
+    debugInlineCompletion('accept-tab-line-skipped', { reason: !model ? 'model-missing' : (!position ? 'position-missing' : 'active-missing') })
+    return
+  }
+
+  const versionId = model.getVersionId()
+  const cursorOffset = model.getOffsetAt(position)
+  if (completion.language !== props.language || completion.versionId !== versionId || completion.cursorOffset !== cursorOffset) {
+    debugInlineCompletion('accept-tab-line-skipped', {
+      reason: 'active-stale',
+      language: props.language,
+      activeLanguage: completion.language,
+      versionId,
+      activeVersionId: completion.versionId,
+      cursorOffset,
+      activeCursorOffset: completion.cursorOffset
+    })
+    activeInlineCompletion = null
+    scheduleInlineCompletionTrigger()
+    return
+  }
+
+  const { acceptedText, remainingText } = consumeInlineCompletionLine(completion.suggestion)
+  const acceptedInsertText = remainingText && !/[\r\n]$/.test(acceptedText) ? `${acceptedText}\n` : acceptedText
+  if (!acceptedText) {
+    debugInlineCompletion('accept-tab-line-skipped', { reason: 'accepted-empty' })
+    activeInlineCompletion = null
+    return
+  }
+
+  debugInlineCompletion('accept-tab-line-custom', {
+    acceptedLength: acceptedText.length,
+    acceptedInsertLength: acceptedInsertText.length,
+    appendedLineBreak: acceptedInsertText !== acceptedText,
+    remainingLength: remainingText.length,
+    lineCount: getInlineCompletionLineCount(completion.suggestion)
+  })
+
+  activeInlineCompletion = null
+  isAcceptingInlineCompletionLine = true
+  try {
+    editor.pushUndoStop()
+    const edited = editor.executeEdits('inline-completion-accept-line', [{
+      range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+      text: acceptedInsertText,
+      forceMoveMarkers: true
+    }])
+    if (!edited) {
+      debugInlineCompletion('accept-tab-line-skipped', { reason: 'execute-edits-failed' })
+      editor.pushUndoStop()
+      return
+    }
+    const nextPosition = model.getPositionAt(cursorOffset + acceptedInsertText.length)
+    editor.setPosition(nextPosition)
+    editor.pushUndoStop()
+    editor.focus()
+
+    if (remainingText) {
+      const nextOffset = model.getOffsetAt(nextPosition)
+      cachedInlineCompletion = {
+        language: props.language,
+        versionId: model.getVersionId(),
+        cursorOffset: nextOffset,
+        suggestion: remainingText
+      }
+      debugInlineCompletion('accept-tab-line-remaining', {
+        language: props.language,
+        versionId: cachedInlineCompletion.versionId,
+        cursorOffset: nextOffset,
+        remainingLength: remainingText.length,
+        lineCount: getInlineCompletionLineCount(remainingText)
+      })
+      scheduleInlineCompletionTrigger()
+    }
+  } finally {
+    isAcceptingInlineCompletionLine = false
+  }
+}
+
+function acceptInlineCompletionSnippet() {
+  debugInlineCompletion('accept-tab-snippet', { action: 'editor.action.inlineSuggest.commit', suggestionLength: activeInlineCompletion?.suggestion?.length || 0 })
+  activeInlineCompletion = null
+  editor?.trigger('slimnote-inline-completion', 'editor.action.inlineSuggest.commit', {})
+}
+
 function registerInlineCompletionProvider() {
   disposeInlineCompletionProvider()
   const provider = props.inlineCompletionProvider
   if (!provider?.request || !props.language) {
+    debugInlineCompletion('provider-register-skipped', { reason: !provider?.request ? 'provider-missing' : 'language-missing', language: props.language })
     return
   }
 
+  debugInlineCompletion('provider-register', { language: props.language })
   inlineCompletionDisposable = monaco.languages.registerInlineCompletionsProvider(props.language, {
     async provideInlineCompletions(model, position, _context, token) {
       if (!editor || isComposing || token?.isCancellationRequested) {
+        debugInlineCompletion('provide-skipped', { reason: !editor ? 'editor-missing' : (isComposing ? 'composing' : 'cancelled'), language: props.language })
         return { items: [] }
       }
 
       const selection = editor.getSelection()
       if (!selection?.isEmpty?.()) {
-        return { items: [] }
-      }
-
-      const delayMs = provider.getDelayMs?.() ?? 500
-      const shouldContinue = await waitForInlineCompletionDelay(delayMs, token)
-      if (!shouldContinue || isComposing || token?.isCancellationRequested) {
+        debugInlineCompletion('provide-skipped', { reason: 'selection-not-empty', language: props.language })
         return { items: [] }
       }
 
       const versionId = model.getVersionId()
       const cursorOffset = model.getOffsetAt(position)
-      const tokenCleanup = token?.onCancellationRequested?.(() => provider.cancel?.())
+      if (cachedInlineCompletion
+        && cachedInlineCompletion.language === props.language
+        && cachedInlineCompletion.versionId === versionId
+        && cachedInlineCompletion.cursorOffset === cursorOffset
+        && cachedInlineCompletion.suggestion) {
+        const suggestion = cachedInlineCompletion.suggestion
+        cachedInlineCompletion = null
+        debugInlineCompletion('cache-hit', { language: props.language, cursorOffset, versionId, suggestionLength: suggestion.length, lineCount: getInlineCompletionLineCount(suggestion) })
+        return createInlineCompletionResult(model, position, suggestion, 'cache')
+      }
+
+      const delayMs = provider.getDelayMs?.() ?? 500
+      debugInlineCompletion('delay-start', { delayMs, language: props.language, lineNumber: position.lineNumber, column: position.column })
+      const shouldContinue = await waitForInlineCompletionDelay(delayMs, token)
+      if (!shouldContinue || isComposing || token?.isCancellationRequested) {
+        debugInlineCompletion('provide-skipped', { reason: !shouldContinue ? 'delay-cancelled' : (isComposing ? 'composing-after-delay' : 'cancelled-after-delay'), language: props.language })
+        return { items: [] }
+      }
+
+      const tokenCleanup = token?.onCancellationRequested?.(() => {
+        debugInlineCompletion('request-cancelled', { reason: 'token-cancelled', language: props.language, cursorOffset, versionId })
+      })
       let suggestion = ''
       try {
+        debugInlineCompletion('request-start', { language: props.language, cursorOffset, contentLength: model.getValueLength(), versionId })
         suggestion = await provider.request({
           source: 'monaco',
           content: model.getValue(),
@@ -245,23 +473,26 @@ function registerInlineCompletionProvider() {
         }).finally(() => {
           tokenCleanup?.dispose?.()
         })
-      } catch {
+      } catch (error) {
+        debugInlineCompletion('request-error', { message: error?.message || String(error || '') })
         return { items: [] }
       }
 
       const currentPosition = editor.getPosition()
+      debugInlineCompletion('request-complete', { suggestionLength: suggestion.length, lineCount: getInlineCompletionLineCount(suggestion), cancelled: Boolean(token?.isCancellationRequested), versionChanged: model.getVersionId() !== versionId })
+      if (suggestion && token?.isCancellationRequested && model.getVersionId() === versionId) {
+        cachedInlineCompletion = { language: props.language, versionId, cursorOffset, suggestion }
+        debugInlineCompletion('cache-store', { language: props.language, cursorOffset, versionId, suggestionLength: suggestion.length, lineCount: getInlineCompletionLineCount(suggestion) })
+        scheduleInlineCompletionTrigger()
+        return { items: [] }
+      }
       if (!suggestion || token?.isCancellationRequested || model.getVersionId() !== versionId) return { items: [] }
       if (!currentPosition || currentPosition.lineNumber !== position.lineNumber || currentPosition.column !== position.column) {
+        debugInlineCompletion('provide-skipped', { reason: 'cursor-moved', currentLineNumber: currentPosition?.lineNumber, currentColumn: currentPosition?.column, lineNumber: position.lineNumber, column: position.column })
         return { items: [] }
       }
 
-      return {
-        items: [{
-          insertText: suggestion,
-          range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column)
-        }],
-        suppressSuggestions: true
-      }
+      return createInlineCompletionResult(model, position, suggestion, 'request')
     },
     freeInlineCompletions() {}
   })
@@ -469,7 +700,7 @@ onMounted(() => {
       enabled: true,
       mode: 'prefix',
       suppressSuggestions: true,
-      showToolbar: 'onHover'
+      showToolbar: 'never'
     },
     unicodeHighlight: getUnicodeHighlightOptions(settingsStore.settings.unicodeHighlight),
     bracketPairColorization: {
@@ -485,6 +716,8 @@ onMounted(() => {
   editor.onDidCompositionStart(() => {
     isComposing = true
     clearInlineCompletionTrigger()
+    cachedInlineCompletion = null
+    activeInlineCompletion = null
     props.inlineCompletionProvider?.cancel?.()
   })
 
@@ -493,6 +726,7 @@ onMounted(() => {
   })
 
   applyInlineCompletionStyle()
+  startInlineCompletionHintObserver()
   registerInlineCompletionProvider()
 
   editor.addCommand(monaco.KeyCode.Enter, () => {
@@ -502,6 +736,18 @@ onMounted(() => {
 
     editor.trigger('keyboard', 'type', { text: '\n' })
   })
+
+  editor.addCommand(
+    monaco.KeyCode.Tab,
+    acceptInlineCompletionLine,
+    'inlineSuggestionVisible && !editorTabMovesFocus && !suggestWidgetVisible'
+  )
+
+  editor.addCommand(
+    monaco.KeyMod.Shift | monaco.KeyCode.Tab,
+    acceptInlineCompletionSnippet,
+    'inlineSuggestionVisible && !editorTabMovesFocus && !suggestWidgetVisible'
+  )
 
   applyIndentationOptions(editor, settingsStore.settings.tabSize)
 
@@ -545,7 +791,11 @@ onMounted(() => {
 
   // 监听内容变化
   editor.onDidChangeModelContent(() => {
-    props.inlineCompletionProvider?.cancel?.()
+    if (!isAcceptingInlineCompletionLine) {
+      cachedInlineCompletion = null
+      activeInlineCompletion = null
+      props.inlineCompletionProvider?.cancel?.()
+    }
     const value = editor.getValue()
     emit('update:modelValue', value)
     scheduleInlineCompletionTrigger()
@@ -593,7 +843,11 @@ onMounted(() => {
 
   // 监听光标位置变化
   editor.onDidChangeCursorPosition((e) => {
-    props.inlineCompletionProvider?.cancel?.()
+    if (!isAcceptingInlineCompletionLine) {
+      cachedInlineCompletion = null
+      activeInlineCompletion = null
+      props.inlineCompletionProvider?.cancel?.()
+    }
     emit('cursor-change', { line: e.position.lineNumber, column: e.position.column })
   })
 
@@ -607,6 +861,7 @@ onMounted(() => {
 onUnmounted(() => {
   rendererEventCleanups.splice(0).forEach((cleanup) => cleanup())
   clearInlineCompletionTrigger()
+  stopInlineCompletionHintObserver()
   if (editorContainer.value) {
     editorContainer.value.removeEventListener('wheel', handleWheel)
   }
@@ -619,6 +874,8 @@ onUnmounted(() => {
 // 监听属性变化
 watch(() => props.modelValue, (newValue) => {
   if (editor && newValue !== editor.getValue()) {
+    cachedInlineCompletion = null
+    activeInlineCompletion = null
     editor.setValue(newValue)
   }
 })
@@ -808,6 +1065,7 @@ defineExpose({
 })
 
 onUnmounted(() => {
+  stopInlineCompletionHintObserver()
   if (editorContainer.value) {
     editorContainer.value.removeEventListener('wheel', handleWheel, { capture: true })
   }
@@ -837,7 +1095,8 @@ onUnmounted(() => {
 .monaco-editor-container :deep(.ghost-text-decoration::after),
 .monaco-editor-container :deep(.ghost-text-decoration-preview::after),
 .monaco-editor-container :deep(.suggest-preview-text .ghost-text::after) {
-  content: 'Tab 接受';
+  content: none;
+  display: none;
   margin-left: 8px;
   padding: 1px 5px;
   border: 1px solid var(--inline-completion-keycap-border, rgba(34, 211, 238, 0.46));
@@ -848,10 +1107,26 @@ onUnmounted(() => {
   font-size: 0.82em;
   font-weight: 600;
   line-height: 1.25;
+  opacity: 0.72;
   vertical-align: 0.06em;
 }
 
+.monaco-editor-container :deep(.ghost-text-decoration[data-inline-completion-hint="primary"]::after),
+.monaco-editor-container :deep(.ghost-text-decoration-preview[data-inline-completion-hint="primary"]::after),
+.monaco-editor-container :deep(.suggest-preview-text .ghost-text[data-inline-completion-hint="primary"]::after) {
+  content: var(--inline-completion-hint-text, 'Tab接受');
+  display: inline-block;
+}
+
+.monaco-editor-container :deep(.view-line:has(.ghost-text-decoration) ~ .view-line:has(.ghost-text-decoration) .ghost-text-decoration::after),
+.monaco-editor-container :deep(.view-line:has(.ghost-text-decoration-preview) ~ .view-line:has(.ghost-text-decoration-preview) .ghost-text-decoration-preview::after),
+.monaco-editor-container :deep(.view-line:has(.suggest-preview-text .ghost-text) ~ .view-line:has(.suggest-preview-text .ghost-text) .suggest-preview-text .ghost-text::after) {
+  content: none;
+  display: none;
+}
+
 .monaco-editor-container :deep(.inlineSuggestionsHints) {
+  display: none !important;
   border-color: var(--inline-completion-keycap-border, rgba(34, 211, 238, 0.46)) !important;
   color: var(--inline-completion-strong-color, rgba(34, 211, 238, 0.86)) !important;
   background: var(--inline-completion-keycap-bg, rgba(34, 211, 238, 0.16)) !important;

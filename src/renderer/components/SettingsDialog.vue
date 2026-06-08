@@ -210,6 +210,42 @@
                       </div>
                       <div class="ai-settings-row">
                         <div class="ai-settings-row-copy">
+                          <strong>{{ t('settings.aiInlineCompletionMode') }}</strong>
+                          <span>{{ t('settings.aiInlineCompletionModeDesc') }}</span>
+                        </div>
+                        <div class="ai-inline-completion-model-control ai-settings-row-control ai-settings-row-control--wide">
+                          <div class="ai-inline-mode-segmented" role="radiogroup" :aria-label="t('settings.aiInlineCompletionMode')">
+                            <button type="button" :class="{ active: isInlineCompletionMode('auto') }" role="radio" :aria-checked="isInlineCompletionMode('auto') ? 'true' : 'false'" :title="t('settings.aiInlineCompletionModeAutoTooltip')" @click="setInlineCompletionMode('auto')">
+                              {{ t('settings.aiInlineCompletionModeAuto') }}
+                            </button>
+                            <button type="button" :class="{ active: isInlineCompletionMode('fixed') }" role="radio" :aria-checked="isInlineCompletionMode('fixed') ? 'true' : 'false'" @click="setInlineCompletionMode('fixed')">
+                              {{ t('settings.aiInlineCompletionModeCustom') }}
+                            </button>
+                          </div>
+                          <div v-if="isInlineCompletionMode('fixed')" class="ai-inline-model-selects">
+                            <SettingsSelect
+                              v-model="inlineCompletionProviderSelectValue"
+                              :options="aiInlineCompletionProviderOptions"
+                              :disabled="!aiInlineCompletionProviderOptions.length"
+                              :aria-label="t('settings.aiInlineCompletionProvider')"
+                              :min-width="132"
+                              :max-width="220"
+                              @change="setInlineCompletionProvider"
+                            />
+                            <SettingsSelect
+                              v-model="inlineCompletionModelSelectValue"
+                              :options="aiInlineCompletionModelOptions"
+                              :disabled="!inlineCompletionProviderSelectValue || !aiInlineCompletionModelOptions.length"
+                              :aria-label="t('settings.aiInlineCompletionModel')"
+                              :min-width="132"
+                              :max-width="240"
+                              @change="setInlineCompletionModel"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div class="ai-settings-row">
+                        <div class="ai-settings-row-copy">
                           <strong>{{ t('settings.aiInlineCompletionDelay') }}</strong>
                           <span>{{ t('settings.aiInlineCompletionDelayDesc') }}</span>
                         </div>
@@ -251,16 +287,15 @@
                           <strong>{{ t('settings.aiInlineCompletionOpacity') }}</strong>
                           <span>{{ t('settings.aiInlineCompletionOpacityDesc') }}</span>
                         </div>
-                        <div class="ai-inline-opacity-control ai-settings-row-control ai-settings-row-control--wide">
+                        <div class="ai-inline-opacity-control ai-settings-row-control">
                           <div class="ai-inline-opacity-slider" :style="inlineCompletionOpacityTrackStyle">
-                            <input :value="inlineCompletionOpacityPercent" type="range" min="35" max="90" step="5" :aria-label="t('settings.aiInlineCompletionOpacity')" @input="handleInlineCompletionOpacityInput" @change="handleInlineCompletionOpacityChange">
+                            <output class="ai-inline-opacity-bubble" :style="inlineCompletionOpacityTrackStyle">{{ inlineCompletionOpacityPercent }}%</output>
+                            <input :value="inlineCompletionOpacityPercent" type="range" min="30" max="100" step="5" :aria-label="t('settings.aiInlineCompletionOpacity')" @input="handleInlineCompletionOpacityInput" @change="handleInlineCompletionOpacityChange">
                             <div class="ai-inline-opacity-scale" aria-hidden="true">
-                              <span>35</span>
-                              <span>60</span>
-                              <span>90</span>
+                              <span>30</span>
+                              <span>100</span>
                             </div>
                           </div>
-                          <output class="ai-inline-opacity-value">{{ inlineCompletionOpacityPercent }}%</output>
                         </div>
                       </div>
                       <div class="ai-settings-row">
@@ -339,6 +374,7 @@
                             <span class="ai-api-copy">
                               <span class="ai-api-title">
                                 <span>{{ provider.name || t('settings.aiProviderUnnamed') }}</span>
+                                <span v-if="isInlineCompletionProvider(provider.id)" class="ai-api-badge">{{ t('settings.aiInlineCompletionProviderBadge') }}</span>
                                 <span v-if="!provider.hasApiKey" class="ai-api-badge ai-api-badge--warn">{{ t('settings.aiMissingKey') }}</span>
                               </span>
                             </span>
@@ -379,6 +415,13 @@
                           <div class="ai-form-row">
                             <label>{{ t('settings.aiBaseURL') }}</label>
                             <input class="ui-field" type="text" :value="editingAiProvider.baseURL" autocomplete="off" @input="updateEditingAiProvider({ baseURL: $event.target.value }); saveAiSettings()" @keydown.enter.prevent="saveAiSettings()">
+                          </div>
+                          <div class="ai-form-row ai-form-row--with-hint">
+                            <label>{{ t('settings.aiInlineCompletionProviderURL') }}</label>
+                            <div class="ai-form-field-stack">
+                              <input class="ui-field" type="text" :value="editingAiProvider.inlineCompletionURL" :placeholder="t('settings.aiInlineCompletionProviderURLPlaceholder')" autocomplete="off" @input="updateEditingAiProvider({ inlineCompletionURL: $event.target.value }); saveAiSettings()" @keydown.enter.prevent="saveAiSettings()">
+                              <span>{{ t('settings.aiInlineCompletionProviderURLDesc') }}</span>
+                            </div>
                           </div>
                           <div class="ai-form-row">
                             <label>{{ t('settings.aiApiKey') }}</label>
@@ -421,11 +464,34 @@
                         </div>
                         <div class="ai-provider-detail-body ai-model-list">
                           <div class="ai-model-list-head" aria-hidden="true">
+                            <span></span>
                             <span>{{ t('settings.aiModelDisplayName') }}</span>
                             <span>{{ t('settings.aiModelId') }}</span>
                             <span>{{ t('settings.aiConnectionStatus') }}</span>
                           </div>
-                          <div v-for="model in editingAiProviderModels" :key="model.id" class="ai-model-row" :class="{ active: editingAiModel?.id === model.id }">
+                          <div
+                            v-for="model in editingAiProviderModels"
+                            :key="model.id"
+                            class="ai-model-row"
+                            :class="{
+                              active: editingAiModel?.id === model.id,
+                              'is-dragging': draggingAiModelId === model.id,
+                              'is-drop-target': dragOverAiModelId === model.id && draggingAiModelId !== model.id
+                            }"
+                            @dragover.prevent="handleAiModelDragOver(model.id)"
+                            @drop.prevent="dropAiModel(model.id)"
+                            @dragenter.prevent="handleAiModelDragOver(model.id)"
+                          >
+                            <button class="ai-model-drag-handle" type="button" draggable="true" :disabled="editingAiProviderModels.length <= 1" :title="t('settings.aiDragModel')" :aria-label="`${t('settings.aiDragModel')} ${model.name || model.model || t('settings.aiModelId')}`" @dragstart="startAiModelDrag(model.id, $event)" @dragend="endAiModelDrag">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="9" cy="6" r="1"/>
+                                <circle cx="15" cy="6" r="1"/>
+                                <circle cx="9" cy="12" r="1"/>
+                                <circle cx="15" cy="12" r="1"/>
+                                <circle cx="9" cy="18" r="1"/>
+                                <circle cx="15" cy="18" r="1"/>
+                              </svg>
+                            </button>
                             <input class="ui-field" type="text" :placeholder="t('settings.aiModelDisplayName')" :value="model.name" autocomplete="off" @focus="selectAiModel(model.id)" @input="updateAiModelById(model.id, { name: $event.target.value }); saveAiSettings()" @keydown.enter.prevent="saveAiSettings()">
                             <input class="ui-field" type="text" :placeholder="t('settings.aiModelId')" :value="model.model" autocomplete="off" @focus="selectAiModel(model.id)" @input="updateAiModelById(model.id, { model: $event.target.value }); saveAiSettings()" @keydown.enter.prevent="saveAiSettings()">
                             <span class="ai-model-inline-actions">
@@ -491,15 +557,18 @@
                         }"
                       >
                     <div class="settings-row-copy">
-                      <label v-if="isInlineCheckboxControl(row.control)" class="settings-inline-checkbox">
-                        <input type="checkbox" v-model="localSettings[getInlineCheckboxSettingKey(row.control)]" :aria-label="row.title">
-                        <span>{{ row.title }}</span>
-                      </label>
-                      <div v-else class="settings-row-title">{{ row.title }}</div>
+                      <div class="settings-row-title">{{ row.title }}</div>
                     </div>
 
-                    <div v-if="!isInlineCheckboxControl(row.control)" class="settings-row-control">
-                      <template v-if="row.control === 'language'">
+                    <div class="settings-row-control">
+                      <template v-if="isInlineCheckboxControl(row.control)">
+                        <label class="settings-toggle">
+                          <input type="checkbox" v-model="localSettings[getInlineCheckboxSettingKey(row.control)]" :aria-label="row.title">
+                          <span class="settings-toggle-track" aria-hidden="true"></span>
+                        </label>
+                      </template>
+
+                      <template v-else-if="row.control === 'language'">
                         <SettingsSelect
                           v-model="localSettings.locale"
                           :options="supportedLocales"
@@ -510,6 +579,21 @@
 
                       <template v-else-if="row.control === 'theme'">
                         <SettingsSelect v-model="localSettings.theme" :options="themeOptions" :aria-label="row.title" />
+                      </template>
+
+                      <template v-else-if="row.control === 'ui-font-size'">
+                        <input
+                          v-model="uiFontSizeInput"
+                          class="ui-field"
+                          type="number"
+                          inputmode="numeric"
+                          min="11"
+                          max="20"
+                          step="1"
+                          @change="commitUiFontSize"
+                          @blur="commitUiFontSize"
+                          @keydown.enter.prevent="commitUiFontSize"
+                        >
                       </template>
 
                       <template v-else-if="row.control === 'font-size'">
@@ -547,7 +631,7 @@
                             <div class="live-preview-title">{{ t('settings.previewTitle') }}</div>
                             <div class="live-preview-text">{{ t('settings.previewSample') }}</div>
                             <div class="live-preview-line">- {{ t('settings.previewFont', { font: currentPreviewFont }) }}</div>
-                            <div class="live-preview-line">- {{ t('settings.previewSize', { size: localSettings.fontSize }) }}</div>
+                            <div class="live-preview-line">- {{ t('settings.previewCodeSize', { size: localSettings.fontSize }) }}</div>
                           </div>
                         </div>
                       </template>
@@ -609,6 +693,23 @@
           </div>
           </section>
         </main>
+
+        <ModalDialog
+          :show="restoreDefaultsConfirmDialog.visible"
+          :title="t('settings.restoreDefaultsTitle')"
+          @close="closeRestoreDefaultsConfirmDialog"
+          @confirm="confirmRestoreDefaults"
+        >
+          <template #body>
+            <div class="settings-confirm-message">
+              {{ t('settings.restoreDefaultsConfirm') }}
+            </div>
+          </template>
+          <template #footer>
+            <button type="button" class="modal-btn" @click="closeRestoreDefaultsConfirmDialog">{{ t('common.cancel') }}</button>
+            <button type="button" class="modal-btn primary" @click="confirmRestoreDefaults">{{ t('settings.restoreDefaults') }}</button>
+          </template>
+        </ModalDialog>
 
         <ModalDialog
           :show="aiProviderDeleteDialog.visible"
@@ -733,17 +834,19 @@ const inlineCompletionOpacityPercent = computed({
   }
 })
 const inlineCompletionOpacityTrackStyle = computed(() => {
-  const min = 35
-  const max = 90
+  const min = 30
+  const max = 100
   const percent = Math.min(max, Math.max(min, inlineCompletionOpacityPercent.value))
   const progress = ((percent - min) / (max - min)) * 100
   const colorPreset = localAiSettings.value.inlineCompletion?.colorPreset || 'cyan'
   return {
     '--inline-opacity-progress': `${progress}%`,
+    '--inline-opacity-label-left': `clamp(20px, ${progress}%, calc(100% - 20px))`,
     '--inline-opacity-accent': inlineCompletionColorPreviewMap[colorPreset] || inlineCompletionColorPreviewMap.cyan
   }
 })
 const associationStatus = ref('')
+const uiFontSizeInput = ref('14')
 const fontSizeInput = ref('14')
 const unpinnedTabMaxRowsInput = ref('10')
 const shortcutCategoryFilter = ref('all')
@@ -755,6 +858,7 @@ const editingAiProviderId = ref('')
 const editingAiModelId = ref('')
 const showAiProviderPresetMenu = ref(false)
 const aiProviderCreateMenuRef = ref(null)
+const restoreDefaultsConfirmDialog = ref({ visible: false })
 const aiProviderDeleteDialog = ref({ visible: false, providerId: '', name: '' })
 const aiApiKeyInputState = createAiApiKeyInputState(() => editingAiProvider.value?.id || '')
 const aiApiKeyInputs = aiApiKeyInputState.inputs
@@ -763,6 +867,8 @@ const aiTestError = ref(false)
 const aiTesting = ref(false)
 const aiTestingModelId = ref('')
 const aiModelTestResults = ref({})
+const draggingAiModelId = ref('')
+const dragOverAiModelId = ref('')
 const associationGroups = [
   'Markdown',
   'Text',
@@ -810,7 +916,7 @@ const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase())
 const isSearching = computed(() => Boolean(normalizedSearch.value))
 const previewStyle = computed(() => ({
   fontFamily: localSettings.value.fontFamily || 'Microsoft YaHei',
-  fontSize: `${Math.max(12, (localSettings.value.fontSize || 14) - 1)}px`
+  fontSize: `${Math.max(8, localSettings.value.fontSize || 14)}px`
 }))
 
 function normalizeAiProviderMatchText(value = '') {
@@ -868,7 +974,7 @@ function setInlineCompletionColorPreset(value) {
 }
 
 function setInlineCompletionOpacityPercent(value) {
-  const nextValue = Math.min(90, Math.max(35, Number(value) || 70))
+  const nextValue = Math.min(100, Math.max(30, Number(value) || 70))
   updateLocalInlineCompletion({ opacity: nextValue / 100 })
 }
 
@@ -994,6 +1100,63 @@ const editingAiModel = computed(() => (
   || null
 ))
 
+const inlineCompletionModelRef = computed(() => resolveInlineCompletionModelRef())
+
+const inlineCompletionModelSummary = computed(() => {
+  const target = inlineCompletionModelRef.value
+  if (!target) return t('settings.aiInlineCompletionModelNotSet')
+  const providerName = target.provider.name || target.provider.id || t('settings.aiProviderUnnamed')
+  const modelName = target.model.name || target.model.model || target.model.id || t('settings.aiModelId')
+  return `${providerName} / ${modelName}`
+})
+
+const inlineCompletionModelStatus = computed(() => (
+  isInlineCompletionMode('fixed')
+    ? t('settings.aiInlineCompletionFixedUsing', { model: inlineCompletionModelSummary.value })
+    : t('settings.aiInlineCompletionAutoUsing', { model: inlineCompletionModelSummary.value })
+))
+
+const aiInlineCompletionProviderOptions = computed(() => aiProviders.value.map(provider => ({
+  value: provider.id,
+  label: provider.name || provider.id || t('settings.aiProviderUnnamed')
+})))
+
+const inlineCompletionProviderSelectValue = computed({
+  get() {
+    const providerId = localAiSettings.value.inlineCompletion?.providerId || ''
+    if (aiProviders.value.some(provider => provider.id === providerId)) return providerId
+    return inlineCompletionModelRef.value?.provider.id || aiProviders.value[0]?.id || ''
+  },
+  set(providerId) {
+    updateInlineCompletionProviderSelection(providerId)
+  }
+})
+
+const selectedInlineCompletionProvider = computed(() => (
+  aiProviders.value.find(provider => provider.id === inlineCompletionProviderSelectValue.value) || aiProviders.value[0] || null
+))
+
+const aiInlineCompletionModelOptions = computed(() => (
+  getSelectableInlineCompletionModels(selectedInlineCompletionProvider.value).map(model => ({
+    value: model.id,
+    label: model.name || model.model || model.id || t('settings.aiModelId')
+  }))
+))
+
+const inlineCompletionModelSelectValue = computed({
+  get() {
+    const inlineCompletion = localAiSettings.value.inlineCompletion || {}
+    const models = getSelectableInlineCompletionModels(selectedInlineCompletionProvider.value)
+    if (inlineCompletion.providerId === selectedInlineCompletionProvider.value?.id && models.some(model => model.id === inlineCompletion.modelId)) {
+      return inlineCompletion.modelId
+    }
+    return models[0]?.id || ''
+  },
+  set(modelId) {
+    updateInlineCompletionModelSelection(inlineCompletionProviderSelectValue.value, modelId)
+  }
+})
+
 const canDeleteEditingAiProvider = computed(() => canDeleteAiProvider(editingAiProvider.value?.id || ''))
 
 const SETTINGS_ROW_GROUPS = {
@@ -1010,17 +1173,17 @@ const SETTINGS_ROW_GROUPS = {
       titleKey: 'settings.fontAndReadingSettings',
       fallbackZh: '字体与阅读',
       fallbackEn: 'Font and Reading',
-      rowIds: ['font-size', 'font-family']
-    },
-    {
-      id: 'appearance-preview',
-      titleKey: 'settings.previewSettings',
-      fallbackZh: '即时预览',
-      fallbackEn: 'Live Preview',
-      rowIds: ['preview']
+      rowIds: ['ui-font-size']
     }
   ],
   editor: [
+    {
+      id: 'editor-font-reading',
+      titleKey: 'settings.fontAndReadingSettings',
+      fallbackZh: '字体与阅读',
+      fallbackEn: 'Font and Reading',
+      rowIds: ['font-size', 'font-family', 'preview']
+    },
     {
       id: 'editor-tabs',
       titleKey: 'settings.tabBarSettings',
@@ -1066,25 +1229,11 @@ const sectionDefinitions = computed(() => [
         aliases: ['theme', 'light', 'dark', '主题']
       },
       {
-        id: 'font-size',
-        title: t('settings.fontSize'),
-        description: localizeText('settings.fontSizeDesc', '直接输入编辑器字号，适合精确调整阅读密度。', 'Enter the editor font size directly for precise reading density control.'),
-        control: 'font-size',
-        aliases: ['font size', 'size', '字号', '字体大小']
-      },
-      {
-        id: 'font-family',
-        title: t('settings.fontFamily'),
-        description: localizeText('settings.fontFamilyDesc', '为编辑器和预览面板选择显示字体。', 'Choose the font family used by the editor and preview panel.'),
-        control: 'font-family',
-        aliases: ['font family', 'font', '字体']
-      },
-      {
-        id: 'preview',
-        title: t('settings.livePreview'),
-        description: localizeText('settings.livePreviewDesc', '实时预览当前主题、字体和字号组合效果。', 'Preview the current theme, font family and font size together.'),
-        control: 'preview',
-        aliases: ['preview', 'live preview', '预览']
+        id: 'ui-font-size',
+        title: t('settings.uiFontSize'),
+        description: localizeText('settings.uiFontSizeDesc', '调整菜单、设置页和工具栏等界面文字字号。', 'Adjust text size for menus, settings and toolbars.'),
+        control: 'ui-font-size',
+        aliases: ['ui font size', 'interface size', '界面字号']
       }
     ]
   },
@@ -1093,6 +1242,27 @@ const sectionDefinitions = computed(() => [
     title: t('settings.editor'),
     description: t('settings.editorDesc'),
     rows: [
+      {
+        id: 'font-size',
+        title: t('settings.codeFontSize'),
+        description: localizeText('settings.codeFontSizeDesc', '调整所有已打开编辑器和新建编辑器的代码字号；单个编辑器仍可临时单独缩放。', 'Adjust code font size for all open and new editors; individual editors can still be zoomed temporarily.'),
+        control: 'font-size',
+        aliases: ['code font size', 'editor font size', 'font size', 'size', '代码字号', '编辑器字号']
+      },
+      {
+        id: 'font-family',
+        title: t('settings.codeFontFamily'),
+        description: localizeText('settings.codeFontFamilyDesc', '为编辑器和代码内容选择字体，不影响界面字体。', 'Choose the font family used by editors and code content without changing the interface font.'),
+        control: 'font-family',
+        aliases: ['code font family', 'editor font', 'font family', 'font', '代码字体']
+      },
+      {
+        id: 'preview',
+        title: t('settings.livePreview'),
+        description: localizeText('settings.livePreviewDesc', '实时预览当前主题、代码字体和代码字号组合效果。', 'Preview the current theme, code font family and code font size together.'),
+        control: 'preview',
+        aliases: ['preview', 'live preview', '预览']
+      },
       {
         id: 'tab-density',
         title: t('settings.tabDensity'),
@@ -1292,6 +1462,7 @@ watch(() => props.show, async (newVal) => {
     aiTestMessage.value = ''
     aiTestError.value = false
     closeAiProviderPresetMenu()
+    restoreDefaultsConfirmDialog.value.visible = false
     aiProviderDeleteDialog.value = { visible: false, providerId: '', name: '' }
     shortcutStatusMessage.value = ''
     shortcutSaveError.value = ''
@@ -1304,6 +1475,7 @@ watch(() => props.show, async (newVal) => {
       ...settingsStore.settings,
       theme: settingsStore.settings.theme || 'light'
     }
+    syncUiFontSizeInput(localSettings.value.uiFontSize)
     syncFontSizeInput(localSettings.value.fontSize)
     syncUnpinnedTabMaxRowsInput(localSettings.value.unpinnedTabMaxRows)
     shortcutsStore.loadShortcuts()
@@ -1341,6 +1513,10 @@ watch(() => localSettings.value.fontSize, (fontSize) => {
   syncFontSizeInput(fontSize)
 })
 
+watch(() => localSettings.value.uiFontSize, (uiFontSize) => {
+  syncUiFontSizeInput(uiFontSize)
+})
+
 watch(() => localSettings.value.unpinnedTabMaxRows, (unpinnedTabMaxRows) => {
   syncUnpinnedTabMaxRowsInput(unpinnedTabMaxRows)
 })
@@ -1352,10 +1528,10 @@ watch(() => localSettings.value.theme, (theme) => {
 })
 
 watch(
-  () => [localSettings.value.fontSize, localSettings.value.fontFamily, localSettings.value.tabDensity, localSettings.value.unpinnedTabMaxRows],
-  ([fontSize, fontFamily, tabDensity, unpinnedTabMaxRows]) => {
+  () => [localSettings.value.uiFontSize, localSettings.value.fontSize, localSettings.value.fontFamily, localSettings.value.tabDensity, localSettings.value.unpinnedTabMaxRows],
+  ([uiFontSize, fontSize, fontFamily, tabDensity, unpinnedTabMaxRows]) => {
     if (props.show) {
-      settingsStore.updateSettings({ fontSize, fontFamily, tabDensity, unpinnedTabMaxRows })
+      settingsStore.updateSettings({ uiFontSize, fontSize, fontFamily, tabDensity, unpinnedTabMaxRows })
     }
   }
 )
@@ -1489,11 +1665,21 @@ function clearPendingSettingsScroll() {
 }
 
 function handleReset() {
+  restoreDefaultsConfirmDialog.value.visible = true
+}
+
+function closeRestoreDefaultsConfirmDialog() {
+  restoreDefaultsConfirmDialog.value.visible = false
+}
+
+function confirmRestoreDefaults() {
+  closeRestoreDefaultsConfirmDialog()
   settingsStore.resetSettings()
   localSettings.value = {
     ...settingsStore.settings,
     theme: settingsStore.settings.theme || 'light'
   }
+  syncUiFontSizeInput(localSettings.value.uiFontSize)
   syncFontSizeInput(localSettings.value.fontSize)
   syncUnpinnedTabMaxRowsInput(localSettings.value.unpinnedTabMaxRows)
 }
@@ -1724,6 +1910,22 @@ function hasShortcutCategory(category) {
   return category === 'all' || shortcutDefinitions.value.some(shortcut => shortcut.category === category)
 }
 
+function normalizeUiFontSize(value, fallback = localSettings.value.uiFontSize || settingsStore.DEFAULT_SETTINGS.uiFontSize) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(11, Math.min(20, parsed))
+}
+
+function syncUiFontSizeInput(value) {
+  uiFontSizeInput.value = String(normalizeUiFontSize(value, settingsStore.DEFAULT_SETTINGS.uiFontSize))
+}
+
+function commitUiFontSize() {
+  const nextUiFontSize = normalizeUiFontSize(uiFontSizeInput.value)
+  localSettings.value.uiFontSize = nextUiFontSize
+  uiFontSizeInput.value = String(nextUiFontSize)
+}
+
 function normalizeFontSize(value, fallback = localSettings.value.fontSize || settingsStore.DEFAULT_SETTINGS.fontSize) {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10)
   if (!Number.isFinite(parsed)) return fallback
@@ -1814,6 +2016,90 @@ function getNextAiModelName() {
 
 function getEditingAiProviderIndex() {
   return aiProviders.value.findIndex(provider => provider.id === editingAiProvider.value?.id)
+}
+
+function getSelectableInlineCompletionModels(provider = null) {
+  const models = Array.isArray(provider?.models) ? provider.models : []
+  return models.filter(model => model?.enabled !== false)
+}
+
+function getFirstInlineCompletionModel(provider = null) {
+  return getSelectableInlineCompletionModels(provider).find(model => model.model || model.name || model.id) || getSelectableInlineCompletionModels(provider)[0] || null
+}
+
+function updateInlineCompletionProviderSelection(providerId = '') {
+  const provider = aiProviders.value.find(item => item.id === providerId) || aiProviders.value[0] || null
+  if (!provider) return null
+  const model = getFirstInlineCompletionModel(provider)
+  const modelId = model?.id || ''
+  updateLocalInlineCompletion({ mode: 'fixed', providerId: provider.id, modelId })
+  return { providerId: provider.id, modelId }
+}
+
+function updateInlineCompletionModelSelection(providerId = '', modelId = '') {
+  const provider = aiProviders.value.find(item => item.id === providerId)
+  const model = getSelectableInlineCompletionModels(provider).find(item => item.id === modelId)
+  if (!provider || !model) return null
+  updateLocalInlineCompletion({ mode: 'fixed', providerId, modelId })
+  return { providerId, modelId }
+}
+
+function resolveInlineCompletionModelRef() {
+  const inlineCompletion = localAiSettings.value.inlineCompletion || {}
+  const selectedProvider = aiProviders.value.find(provider => provider.id === inlineCompletion.providerId)
+  const selectedModel = selectedProvider?.models?.find(model => model.id === inlineCompletion.modelId && model.enabled !== false)
+  if (inlineCompletion.mode === 'fixed' && selectedProvider && selectedModel) {
+    return { provider: selectedProvider, model: selectedModel, explicit: true }
+  }
+
+  const fallbackProvider = aiProviders.value.find(provider => provider.apiKeys?.some(key => key.hasApiKey)) || aiProviders.value[0] || null
+  const fallbackModel = fallbackProvider?.models?.find(model => model.enabled !== false && model.model) || fallbackProvider?.models?.[0] || null
+  return fallbackProvider && fallbackModel ? { provider: fallbackProvider, model: fallbackModel, explicit: false } : null
+}
+
+function isInlineCompletionProvider(providerId = '') {
+  return inlineCompletionModelRef.value?.explicit && inlineCompletionModelRef.value.provider.id === providerId
+}
+
+function isInlineCompletionMode(mode = 'auto') {
+  const normalizedMode = mode === 'fixed' ? 'fixed' : 'auto'
+  return (localAiSettings.value.inlineCompletion?.mode === 'fixed' ? 'fixed' : 'auto') === normalizedMode
+}
+
+function isInlineCompletionModel(providerId = '', modelId = '') {
+  const inlineCompletion = localAiSettings.value.inlineCompletion || {}
+  return inlineCompletion.mode === 'fixed' && inlineCompletion.providerId === providerId && inlineCompletion.modelId === modelId
+}
+
+async function setInlineCompletionMode(mode = 'auto') {
+  const normalizedMode = mode === 'fixed' ? 'fixed' : 'auto'
+  const patch = { mode: normalizedMode }
+  if (normalizedMode === 'fixed') {
+    const target = inlineCompletionModelRef.value
+    if (target) {
+      patch.providerId = target.provider.id
+      patch.modelId = target.model.id
+    }
+  }
+  updateLocalInlineCompletion(patch)
+  await saveAiSettings()
+}
+
+async function setInlineCompletionProvider(providerId = '') {
+  if (!updateInlineCompletionProviderSelection(providerId)) return
+  await saveAiSettings()
+}
+
+async function setInlineCompletionModel(providerId = '', modelId = '') {
+  if (!modelId) {
+    modelId = providerId
+    providerId = inlineCompletionProviderSelectValue.value
+  }
+  const provider = aiProviders.value.find(item => item.id === providerId)
+  const model = getSelectableInlineCompletionModels(provider).find(item => item.id === modelId)
+  if (!provider || !model) return
+  updateLocalInlineCompletion({ mode: 'fixed', providerId, modelId })
+  await saveAiSettings()
 }
 
 function selectAiProvider(id) {
@@ -1971,6 +2257,42 @@ function selectAiModel(modelId) {
   editingAiModelId.value = modelId
 }
 
+function startAiModelDrag(modelId, event) {
+  if (editingAiProviderModels.value.length <= 1) return
+  draggingAiModelId.value = modelId
+  dragOverAiModelId.value = ''
+  selectAiModel(modelId)
+  event?.dataTransfer?.setData('text/plain', modelId)
+  if (event?.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+
+function handleAiModelDragOver(modelId) {
+  if (!draggingAiModelId.value || draggingAiModelId.value === modelId) return
+  dragOverAiModelId.value = modelId
+}
+
+function endAiModelDrag() {
+  draggingAiModelId.value = ''
+  dragOverAiModelId.value = ''
+}
+
+function dropAiModel(targetModelId) {
+  const sourceModelId = draggingAiModelId.value
+  endAiModelDrag()
+  if (!sourceModelId || sourceModelId === targetModelId || !editingAiProvider.value) return
+
+  const models = [...editingAiProviderModels.value]
+  const sourceIndex = models.findIndex(model => model.id === sourceModelId)
+  const targetIndex = models.findIndex(model => model.id === targetModelId)
+  if (sourceIndex < 0 || targetIndex < 0) return
+
+  const [movedModel] = models.splice(sourceIndex, 1)
+  models.splice(targetIndex, 0, movedModel)
+  updateEditingAiProvider({ models })
+  editingAiModelId.value = sourceModelId
+  saveAiSettings()
+}
+
 function clearAiModelTestStatus(modelId) {
   if (!modelId || !aiModelTestResults.value[modelId]) return
   const {
@@ -2073,6 +2395,7 @@ function buildPlainAiSettingsPayload() {
         name: provider.name,
         protocol: provider.protocol,
         baseURL: provider.baseURL,
+        inlineCompletionURL: provider.inlineCompletionURL,
         chatEndpointPath: provider.chatEndpointPath || DEFAULT_AI_CHAT_ENDPOINT_PATH,
         chatEndpointURL: provider.chatEndpointURL,
         keyStrategy: 'fixed',
@@ -2134,8 +2457,7 @@ async function saveAiSettings(options = {}) {
       ...result.settings,
       inlineCompletion: normalizeLocalInlineCompletion({
         ...result.settings.inlineCompletion,
-        colorPreset: payload.inlineCompletion.colorPreset,
-        opacity: payload.inlineCompletion.opacity
+        ...payload.inlineCompletion
       })
     }, { responseLanguage: payload.responseLanguage })
     aiStore.settings = localAiSettings.value
@@ -2254,7 +2576,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   background: transparent;
   color: var(--text-main);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-semibold);
   line-height: 1.35;
   transition: var(--transition-interactive);
@@ -2359,7 +2681,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .settings-nav-item-title {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-semibold);
   line-height: 1.35;
   overflow: hidden;
@@ -2486,7 +2808,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   margin: 0 0 6px;
   padding: 0 12px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   font-weight: var(--ui-font-weight-semibold);
   line-height: 1.3;
 }
@@ -2514,7 +2836,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .settings-toolbar-copy h4 {
   margin: 0;
-  font-size: 19px;
+  font-size: var(--ui-font-size-xl);
   font-weight: var(--ui-font-weight-bold);
   color: var(--text-main);
 }
@@ -2568,7 +2890,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   display: inline-flex;
   align-items: center;
   gap: 0;
-  font-size: 14px;
+  font-size: var(--ui-font-size-md);
   font-weight: var(--ui-font-weight-bold);
   color: var(--text-main);
   line-height: 1.35;
@@ -2616,7 +2938,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 .settings-subsection-title {
   margin: 0;
   color: var(--text-main);
-  font-size: 14px;
+  font-size: var(--ui-font-size-md);
   font-weight: var(--ui-font-weight-bold);
   line-height: 1.35;
   letter-spacing: 0;
@@ -2652,7 +2974,6 @@ async function testAiConnection(providerId = '', modelId = '') {
 }
 
 .settings-row--checkbox {
-  grid-template-columns: minmax(0, 1fr);
   min-height: 48px;
 }
 
@@ -2679,7 +3000,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 }
 
 .settings-row-title {
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-bold);
   color: var(--text-main);
   line-height: 1.3;
@@ -2692,7 +3013,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   gap: 10px;
   color: var(--text-main);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-semibold);
   line-height: 1.3;
 }
@@ -2706,6 +3027,60 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .settings-inline-checkbox span {
   min-width: 0;
+}
+
+.settings-toggle {
+  --settings-toggle-width: 44px;
+  --settings-toggle-height: 26px;
+  width: var(--settings-toggle-width);
+  height: var(--settings-toggle-height);
+  position: relative;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.settings-toggle input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.settings-toggle-track {
+  width: var(--settings-toggle-width);
+  height: var(--settings-toggle-height);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.settings-toggle-track::after {
+  content: "";
+  width: 20px;
+  height: 20px;
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background: var(--surface-panel);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+  transition: transform var(--transition-fast);
+}
+
+.settings-toggle input:checked + .settings-toggle-track {
+  background: var(--accent-primary);
+}
+
+.settings-toggle input:checked + .settings-toggle-track::after {
+  transform: translateX(18px);
+}
+
+.settings-toggle input:focus-visible + .settings-toggle-track {
+  box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.18);
 }
 
 .settings-row-control {
@@ -2760,7 +3135,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   margin: 0;
   color: var(--text-muted);
   line-height: 1.5;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   text-align: left;
 }
 
@@ -2810,7 +3185,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   white-space: nowrap;
   transition: var(--transition-interactive);
 }
@@ -2845,7 +3220,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   background: var(--surface-panel);
   color: var(--text-main);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   transition: var(--transition-interactive);
 }
 
@@ -2864,7 +3239,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   margin: 0;
   color: var(--text-muted);
   line-height: 1.45;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .shortcut-panel-message--error {
@@ -2888,7 +3263,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   padding: 7px 14px;
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 88%, rgba(255, 255, 255, 0.04));
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   font-weight: var(--ui-font-weight-semibold);
 }
 
@@ -2917,7 +3292,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .shortcut-simple-title {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-medium);
   line-height: 1.35;
   overflow: hidden;
@@ -2942,7 +3317,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   color: var(--text-muted);
   background: color-mix(in srgb, var(--bg-primary) 88%, rgba(var(--accent-primary-rgb), 0.06));
   border: 1px solid color-mix(in srgb, var(--glass-border) 90%, rgba(255, 255, 255, 0.04));
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2969,7 +3344,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   color: var(--text-main);
   cursor: text;
   font-family: var(--font-family-mono);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-weight: var(--ui-font-weight-semibold);
   transition: var(--transition-interactive);
 }
@@ -3024,7 +3399,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   background: var(--danger, #d73a49);
   color: #fff;
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--ui-font-size-lg);
   line-height: 1;
   transition: var(--transition-interactive);
 }
@@ -3076,7 +3451,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   margin: 0;
   color: var(--danger, #d73a49);
   line-height: 1.35;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .live-preview {
@@ -3162,7 +3537,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 .ai-settings-section-title {
   margin: 0;
   color: var(--text-main);
-  font-size: 14px;
+  font-size: var(--ui-font-size-md);
   font-weight: var(--ui-font-weight-bold);
   line-height: 1.35;
   letter-spacing: 0;
@@ -3179,7 +3554,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   min-height: 64px;
   padding: 12px 16px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 420px);
   align-items: center;
   gap: 24px;
   background: var(--surface-panel);
@@ -3202,14 +3577,14 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .ai-settings-row-copy strong {
   color: var(--text-main);
-  font-size: 14px;
+  font-size: var(--ui-font-size-md);
   font-weight: var(--ui-font-weight-semibold);
   line-height: 1.35;
 }
 
 .ai-settings-row-copy span {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   line-height: 1.45;
 }
 
@@ -3273,6 +3648,72 @@ async function testAiConnection(providerId = '', modelId = '') {
   box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.18);
 }
 
+.ai-inline-completion-model-control {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.ai-inline-model-selects {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-inline-mode-segmented {
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, rgba(255, 255, 255, 0.04));
+  border-radius: 8px;
+  display: inline-flex;
+  justify-self: end;
+  background: color-mix(in srgb, var(--surface-panel) 86%, transparent);
+}
+
+.ai-inline-mode-segmented.ai-settings-row-control {
+  width: auto;
+  max-width: none;
+}
+
+.ai-inline-mode-segmented button {
+  min-width: 74px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: var(--ui-font-size-sm);
+  font-weight: var(--ui-font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-interactive);
+}
+
+.ai-inline-mode-segmented button.active {
+  color: #fff;
+  background: var(--accent-primary);
+}
+
+.ai-inline-mode-segmented button:hover,
+.ai-inline-mode-segmented button:focus-visible {
+  color: var(--text-main);
+  background: var(--surface-hover);
+}
+
+.ai-inline-mode-segmented button.active:hover,
+.ai-inline-mode-segmented button.active:focus-visible {
+  color: #fff;
+  background: var(--accent-primary);
+}
+
+.ai-inline-mode-segmented button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.16);
+}
+
 .ai-panel-head {
   min-height: 50px;
   padding: 11px 14px;
@@ -3286,14 +3727,14 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .ai-panel-head strong {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-semibold);
   line-height: 1.35;
 }
 
 .ai-panel-head > span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   white-space: nowrap;
 }
 
@@ -3387,7 +3828,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   background: color-mix(in srgb, var(--provider-accent, var(--accent-primary)) 11%, var(--surface-panel));
   border: 1px solid color-mix(in srgb, var(--provider-accent, var(--accent-primary)) 18%, var(--glass-border));
   box-shadow: 0 8px 18px color-mix(in srgb, var(--provider-accent, var(--accent-primary)) 14%, transparent);
-  font-size: 10px;
+  font-size: var(--ui-font-size-2xs);
   font-weight: var(--ui-font-weight-bold);
   letter-spacing: 0;
 }
@@ -3424,12 +3865,12 @@ async function testAiConnection(providerId = '', modelId = '') {
 }
 
 .ai-provider-preset-copy strong {
-  font-size: 13px;
+  font-size: var(--field-font-size);
 }
 
 .ai-provider-preset-copy span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .ai-config-layout {
@@ -3482,7 +3923,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .ai-provider-detail-section-head strong {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-semibold);
   line-height: 1.35;
 }
@@ -3537,7 +3978,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-bold);
 }
 
@@ -3598,7 +4039,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   align-items: center;
   color: var(--accent-primary);
   background: rgba(var(--accent-primary-rgb), 0.12);
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   font-weight: var(--ui-font-weight-bold);
   white-space: nowrap;
 }
@@ -3638,14 +4079,31 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .ai-form-row label {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: var(--ui-font-weight-semibold);
+}
+
+.ai-form-row--with-hint {
+  align-items: start;
+}
+
+.ai-form-field-stack {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.ai-form-field-stack > span {
+  color: var(--text-muted);
+  font-size: var(--ui-font-size-sm);
+  line-height: 1.35;
 }
 
 .ai-inline-color-control {
   min-width: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -3669,7 +4127,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   color: var(--text-muted);
   background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   cursor: pointer;
   transition: var(--transition-interactive);
 }
@@ -3701,17 +4159,45 @@ async function testAiConnection(providerId = '', modelId = '') {
 .ai-inline-opacity-control {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 54px;
+  grid-template-columns: minmax(220px, 1fr);
   align-items: start;
   justify-self: end;
   gap: 12px;
-  width: min(100%, 360px);
+  width: 100%;
+}
+
+.ai-inline-opacity-control.ai-settings-row-control {
+  max-width: 360px;
 }
 
 .ai-inline-opacity-slider {
   min-width: 0;
+  position: relative;
+  padding-top: 26px;
   display: grid;
   gap: 6px;
+}
+
+.ai-inline-opacity-bubble {
+  min-width: 38px;
+  height: 22px;
+  position: absolute;
+  top: 0;
+  left: var(--inline-opacity-label-left);
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--inline-opacity-accent) 36%, var(--glass-border));
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-main);
+  background: var(--surface-panel);
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.1);
+  font-size: var(--ui-font-size-xs);
+  font-weight: var(--ui-font-weight-semibold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .ai-inline-opacity-control input[type="range"] {
@@ -3724,8 +4210,10 @@ async function testAiConnection(providerId = '', modelId = '') {
   cursor: pointer;
 }
 
+.ai-inline-opacity-control input[type="range"]:focus,
 .ai-inline-opacity-control input[type="range"]:focus-visible {
   outline: none;
+  box-shadow: none;
 }
 
 .ai-inline-opacity-control input[type="range"]::-webkit-slider-runnable-track {
@@ -3753,13 +4241,6 @@ async function testAiConnection(providerId = '', modelId = '') {
     0 2px 5px rgba(15, 23, 42, 0.14);
 }
 
-.ai-inline-opacity-control input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--inline-opacity-accent) 46%, var(--glass-border)),
-    0 0 0 4px color-mix(in srgb, var(--inline-opacity-accent) 18%, transparent),
-    0 2px 5px rgba(15, 23, 42, 0.14);
-}
-
 .ai-inline-opacity-control input[type="range"]::-moz-range-track {
   height: 6px;
   border-radius: 999px;
@@ -3784,28 +4265,17 @@ async function testAiConnection(providerId = '', modelId = '') {
     0 2px 5px rgba(15, 23, 42, 0.14);
 }
 
+.ai-inline-opacity-control input[type="range"]::-moz-focus-outer {
+  border: 0;
+}
+
 .ai-inline-opacity-scale {
   display: flex;
   justify-content: space-between;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--ui-font-size-2xs);
   line-height: 1;
   opacity: 0.76;
-  font-variant-numeric: tabular-nums;
-}
-
-.ai-inline-opacity-value {
-  min-width: 52px;
-  height: 28px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(255, 255, 255, 0.04));
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-main);
-  background: color-mix(in srgb, var(--bg-primary) 88%, rgba(var(--accent-primary-rgb), 0.04));
-  font-size: 12px;
-  font-weight: var(--ui-font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3837,17 +4307,17 @@ async function testAiConnection(providerId = '', modelId = '') {
 .ai-model-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(90px, 0.95fr) minmax(110px, 1fr) 88px;
+  grid-template-columns: 28px minmax(78px, 0.9fr) minmax(96px, 1fr) 88px;
   gap: 8px;
 }
 
 .ai-model-list-head {
   padding: 0 8px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
-.ai-model-list-head span:nth-child(3) {
+.ai-model-list-head span:nth-child(4) {
   justify-self: end;
   width: 88px;
   text-align: center;
@@ -3865,6 +4335,46 @@ async function testAiConnection(providerId = '', modelId = '') {
 .ai-model-row.active {
   border-color: color-mix(in srgb, var(--accent-primary) 56%, var(--glass-border));
   background: color-mix(in srgb, rgba(var(--accent-primary-rgb), 0.1) 72%, var(--surface-panel));
+}
+
+.ai-model-row.is-dragging {
+  opacity: 0.58;
+}
+
+.ai-model-row.is-drop-target {
+  border-color: color-mix(in srgb, var(--accent-primary) 66%, var(--glass-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.ai-model-drag-handle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--icon-button-radius, 6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: grab;
+  transition: var(--transition-interactive);
+}
+
+.ai-model-drag-handle:hover:not(:disabled),
+.ai-model-drag-handle:focus-visible {
+  border-color: var(--interactive-hover-border);
+  color: var(--text-main);
+  background: var(--surface-hover);
+}
+
+.ai-model-drag-handle:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.ai-model-drag-handle:disabled {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .ai-model-inline-actions {
@@ -3972,7 +4482,7 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .settings-empty-title {
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--ui-font-size-lg);
   font-weight: var(--ui-font-weight-semibold);
 }
 
@@ -4087,6 +4597,14 @@ async function testAiConnection(providerId = '', modelId = '') {
   .settings-row--preview {
     gap: 12px;
     padding: 10px 12px;
+  }
+
+  .settings-row--checkbox {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-row--checkbox .settings-row-control {
+    justify-content: flex-end;
   }
 
   .settings-row-control,

@@ -3,7 +3,7 @@ import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import { DEFAULT_LIST_PREFIX_CLASS, buildStructuredPlainText, decorateListPrefixes, getListDepth, stripDecoratedListPrefixes } from './markdownListFormat'
 import { getDirectoryFileUrl } from './fileUrlUtils'
-import { sanitizeHtml } from './htmlSanitizer'
+import { enhanceMarkdownHtml, preprocessMarkdownContent } from './markdownRenderer'
 
 function escapeHtml(value = '') {
 	return String(value)
@@ -29,7 +29,7 @@ function configureMarked() {
 
 function buildMarkdownHtml(content = '') {
 	configureMarked()
-	return sanitizeHtml(marked.parse(content || ''))
+	return enhanceMarkdownHtml(marked.parse(preprocessMarkdownContent(content || '')))
 }
 
 function getMermaidTheme(theme = 'light') {

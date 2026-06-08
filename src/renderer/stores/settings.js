@@ -4,6 +4,7 @@ import { setLocale } from '../locales'
 
 const DEFAULT_SETTINGS = {
   theme: 'light',
+  uiFontSize: 14,
   fontSize: 14,
   fontFamily: 'Microsoft YaHei',
   tabSize: 4,
@@ -12,7 +13,7 @@ const DEFAULT_SETTINGS = {
   wordWrap: true,
   unicodeHighlight: false,
   lineNumbers: true,
-  minimap: true,
+  minimap: false,
   sidebarCollapsed: false,
   rightSidebarCollapsed: false,
   sidebarWidth: 280,
@@ -24,6 +25,8 @@ const DEFAULT_SETTINGS = {
 
 const MIN_FONT_SIZE = 8
 const MAX_FONT_SIZE = 72
+const MIN_UI_FONT_SIZE = 11
+const MAX_UI_FONT_SIZE = 20
 const MIN_SIDEBAR_WIDTH = 220
 const MAX_SIDEBAR_WIDTH = 1200
 const MIN_RIGHT_SIDEBAR_WIDTH = 320
@@ -35,6 +38,12 @@ function normalizeFontSize(value, fallback = DEFAULT_SETTINGS.fontSize) {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10)
   if (!Number.isFinite(parsed)) return fallback
   return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, parsed))
+}
+
+function normalizeUiFontSize(value, fallback = DEFAULT_SETTINGS.uiFontSize) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(MIN_UI_FONT_SIZE, Math.min(MAX_UI_FONT_SIZE, parsed))
 }
 
 function normalizeUnpinnedTabMaxRows(value, fallback = DEFAULT_SETTINGS.unpinnedTabMaxRows) {
@@ -61,6 +70,7 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value = {
           ...settings.value,
           ...parsed,
+          uiFontSize: normalizeUiFontSize(parsed.uiFontSize, settings.value.uiFontSize),
           fontSize: normalizeFontSize(parsed.fontSize, settings.value.fontSize),
           sidebarWidth: normalizeWidth(parsed.sidebarWidth, settings.value.sidebarWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH),
           rightSidebarWidth: normalizeWidth(parsed.rightSidebarWidth, settings.value.rightSidebarWidth, MIN_RIGHT_SIDEBAR_WIDTH, MAX_RIGHT_SIDEBAR_WIDTH),
@@ -83,12 +93,14 @@ export const useSettingsStore = defineStore('settings', () => {
     const nextTabDensity = newSettings.tabDensity ?? settings.value.tabDensity
     const nextSidebarWidth = newSettings.sidebarWidth ?? settings.value.sidebarWidth
     const nextRightSidebarWidth = newSettings.rightSidebarWidth ?? settings.value.rightSidebarWidth
+    const nextUiFontSize = normalizeUiFontSize(newSettings.uiFontSize ?? settings.value.uiFontSize, DEFAULT_SETTINGS.uiFontSize)
     const nextFontSize = normalizeFontSize(newSettings.fontSize ?? settings.value.fontSize, DEFAULT_SETTINGS.fontSize)
     const nextUnpinnedTabMaxRows = normalizeUnpinnedTabMaxRows(newSettings.unpinnedTabMaxRows ?? settings.value.unpinnedTabMaxRows)
 
     settings.value = {
       ...settings.value,
       ...newSettings,
+      uiFontSize: nextUiFontSize,
       fontSize: nextFontSize,
       sidebarWidth: normalizeWidth(nextSidebarWidth, DEFAULT_SETTINGS.sidebarWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH),
       rightSidebarWidth: normalizeWidth(nextRightSidebarWidth, DEFAULT_SETTINGS.rightSidebarWidth, MIN_RIGHT_SIDEBAR_WIDTH, MAX_RIGHT_SIDEBAR_WIDTH),
@@ -109,6 +121,15 @@ export const useSettingsStore = defineStore('settings', () => {
   function applyTheme() {
     const html = document.documentElement
     const theme = settings.value.theme
+    const uiFontSize = normalizeUiFontSize(settings.value.uiFontSize, DEFAULT_SETTINGS.uiFontSize)
+    html.style.setProperty('--app-ui-font-size', `${uiFontSize}px`)
+    html.style.setProperty('--ui-font-size-2xs', `${Math.max(MIN_UI_FONT_SIZE - 1, uiFontSize - 4)}px`)
+    html.style.setProperty('--ui-font-size-xs', `${Math.max(MIN_UI_FONT_SIZE - 1, uiFontSize - 3)}px`)
+    html.style.setProperty('--ui-font-size-sm', `${Math.max(MIN_UI_FONT_SIZE, uiFontSize - 2)}px`)
+    html.style.setProperty('--ui-font-size-md', `${uiFontSize}px`)
+    html.style.setProperty('--ui-font-size-lg', `${uiFontSize + 1}px`)
+    html.style.setProperty('--ui-font-size-xl', `${uiFontSize + 5}px`)
+    html.style.setProperty('--field-font-size', `${Math.max(MIN_UI_FONT_SIZE, uiFontSize - 1)}px`)
     if (theme === 'dark') {
       html.setAttribute('data-theme', 'dark')
     } else {

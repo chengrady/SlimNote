@@ -18,6 +18,7 @@ export const DEFAULT_INLINE_COMPLETION_LANGUAGES = [
   'cpp',
   'csharp'
 ]
+export const INLINE_COMPLETION_ACCEPT_MODE_VALUES = ['line', 'snippet']
 
 export const INLINE_COMPLETION_COLOR_PRESETS = {
   gray: { light: '#64748b', dark: '#94a3b8' },
@@ -30,10 +31,11 @@ export const INLINE_COMPLETION_COLOR_PRESETS = {
 export const DEFAULT_INLINE_COMPLETION_SETTINGS = {
   enabled: true,
   delayMs: 500,
-  maxChars: 320,
+  maxChars: 600,
   prefixChars: 6000,
   suffixChars: 2000,
   includeLog: false,
+  acceptMode: 'line',
   colorPreset: 'cyan',
   customColor: '#22c7d9',
   opacity: 0.7,
@@ -79,6 +81,11 @@ function normalizeLanguage(language) {
 function normalizeLanguages(languages, fallback = DEFAULT_INLINE_COMPLETION_LANGUAGES) {
   const source = Array.isArray(languages) && languages.length ? languages : fallback
   return Array.from(new Set(source.map(normalizeLanguage).filter(Boolean)))
+}
+
+function normalizeAcceptMode(value, fallback = DEFAULT_INLINE_COMPLETION_SETTINGS.acceptMode) {
+  const normalized = String(value || fallback).trim().toLowerCase()
+  return INLINE_COMPLETION_ACCEPT_MODE_VALUES.includes(normalized) ? normalized : fallback
 }
 
 function getLineBeforeCurrentLine(beforeCursor) {
@@ -142,10 +149,32 @@ export function normalizeInlineCompletionSettings(settings = {}) {
     prefixChars: normalizeInteger(source.prefixChars, fallback.prefixChars, MIN_CONTEXT_CHARS, MAX_PREFIX_CHARS),
     suffixChars: normalizeInteger(source.suffixChars, fallback.suffixChars, 0, MAX_SUFFIX_CHARS),
     includeLog: normalizeBoolean(source.includeLog, fallback.includeLog),
+    acceptMode: normalizeAcceptMode(source.acceptMode, fallback.acceptMode),
     colorPreset: normalizeColorPreset(source.colorPreset, fallback.colorPreset),
     customColor: normalizeHexColor(source.customColor, fallback.customColor),
-    opacity: normalizeNumber(source.opacity, fallback.opacity, 0.35, 0.9),
+    opacity: normalizeNumber(source.opacity, fallback.opacity, 0.3, 1),
     languages: normalizeLanguages(source.languages, fallback.languages)
+  }
+}
+
+export function resolveInlineCompletionAcceptText(text, settings = {}) {
+  const suggestion = typeof text === 'string' ? text : ''
+  if (!suggestion) return ''
+  const normalizedSettings = normalizeInlineCompletionSettings(settings)
+  if (normalizedSettings.acceptMode === 'snippet') return suggestion
+  const normalizedSuggestion = suggestion.replace(/\r\n/g, '\n')
+  const lineBreakIndex = normalizedSuggestion.indexOf('\n')
+  return lineBreakIndex === -1 ? normalizedSuggestion : normalizedSuggestion.slice(0, lineBreakIndex)
+}
+
+export function consumeInlineCompletionLine(text) {
+  const suggestion = typeof text === 'string' ? text.replace(/\r\n/g, '\n') : ''
+  if (!suggestion) return { acceptedText: '', remainingText: '' }
+  const lineBreakIndex = suggestion.indexOf('\n')
+  if (lineBreakIndex === -1) return { acceptedText: suggestion, remainingText: '' }
+  return {
+    acceptedText: suggestion.slice(0, lineBreakIndex + 1),
+    remainingText: suggestion.slice(lineBreakIndex + 1)
   }
 }
 

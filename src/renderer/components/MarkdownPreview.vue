@@ -1,6 +1,7 @@
 <template>
   <div
     ref="previewContainer"
+    v-bind="attrs"
     class="markdown-preview"
     :style="previewStyle"
     tabindex="0"
@@ -51,20 +52,24 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useAttrs, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css' // Or another style
+import 'katex/dist/katex.min.css'
 import { useSettingsStore } from '../stores/settings'
 import { resolveRelativeFilePath } from '../utils/fileUrlUtils'
-import { sanitizeHtml } from '../utils/htmlSanitizer'
+import { enhanceMarkdownHtml, preprocessMarkdownContent } from '../utils/markdownRenderer'
 import { buildStructuredPlainText, decorateListPrefixes, stripDecoratedListPrefixes } from '../utils/markdownListFormat'
 import { buildMarkdownFragmentClipboardPayload } from '../utils/markdownPdf'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
+const attrs = useAttrs()
+
+defineOptions({ inheritAttrs: false })
 
 const emit = defineEmits(['active-heading-change', 'heading-click', 'scroll', 'copy-error', 'open-file', 'change-font-size'])
 
@@ -729,7 +734,8 @@ const htmlContent = computed(() => {
   try {
     // 兼容不同版本的 marked
     const parser = typeof marked === 'function' ? marked : marked.parse
-    return sanitizeHtml(parser(props.content, {
+    const markdownContent = preprocessMarkdownContent(props.content)
+    return enhanceMarkdownHtml(parser(markdownContent, {
       gfm: true,
       breaks: true,
       renderer: createHeadingRenderer(),
@@ -1010,6 +1016,123 @@ onUnmounted(() => {
   margin: 0 0 16px 0;
   background: rgba(var(--accent-primary-rgb), 0.04);
   border-radius: 0 8px 8px 0;
+}
+
+.markdown-preview-content :deep(.markdown-alert) {
+  color: var(--text-main);
+  border-left-width: 4px;
+}
+
+.markdown-preview-content :deep(.markdown-alert-note) {
+  border-left-color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.markdown-preview-content :deep(.markdown-alert-tip) {
+  border-left-color: #16a34a;
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.markdown-preview-content :deep(.markdown-alert-important) {
+  border-left-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.markdown-preview-content :deep(.markdown-alert-warning) {
+  border-left-color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.markdown-preview-content :deep(.markdown-alert-caution) {
+  border-left-color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.markdown-preview-content :deep(.markdown-alert-title) {
+  margin: 0 0 6px;
+  font-size: 0.88em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.markdown-preview-content :deep(.markdown-container) {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-left: 4px solid rgba(var(--accent-primary-rgb), 0.32);
+  border-radius: 0 8px 8px 0;
+  background: rgba(var(--accent-primary-rgb), 0.06);
+}
+
+.markdown-preview-content :deep(.markdown-container-info),
+.markdown-preview-content :deep(.markdown-container-note) {
+  border-left-color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.markdown-preview-content :deep(.markdown-container-tip) {
+  border-left-color: #16a34a;
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.markdown-preview-content :deep(.markdown-container-important) {
+  border-left-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.markdown-preview-content :deep(.markdown-container-warning) {
+  border-left-color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.markdown-preview-content :deep(.markdown-container-caution) {
+  border-left-color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.markdown-preview-content :deep(.markdown-container-title) {
+  margin: 0 0 6px;
+  font-size: 0.88em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.markdown-preview-content :deep(.footnotes) {
+  margin-top: 24px;
+  color: var(--text-muted);
+  font-size: 0.92em;
+}
+
+.markdown-preview-content :deep(.footnotes ol) {
+  padding-left: 2.2em;
+}
+
+.markdown-preview-content :deep(.footnote-ref) {
+  margin-left: 2px;
+}
+
+.markdown-preview-content :deep(dl) {
+  margin: 0 0 16px;
+}
+
+.markdown-preview-content :deep(dt) {
+  font-weight: 700;
+}
+
+.markdown-preview-content :deep(dd) {
+  margin: 4px 0 10px 1.5em;
+  color: var(--text-muted);
+}
+
+.markdown-preview-content :deep(mark) {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(255, 214, 10, 0.35);
+  color: inherit;
+}
+
+.markdown-preview-content :deep(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .markdown-preview-content :deep(ul),

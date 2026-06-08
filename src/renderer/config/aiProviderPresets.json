@@ -10,6 +10,7 @@
     },
     "protocol": "openai-compatible",
     "baseURL": "https://api.openai.com/v1",
+    "inlineCompletionURL": "https://api.openai.com/v1",
     "chatEndpointPath": "/chat/completions",
     "sourceUrls": [
       "https://platform.openai.com/docs/api-reference",
@@ -53,6 +54,7 @@
     },
     "protocol": "anthropic",
     "baseURL": "https://api.anthropic.com",
+    "inlineCompletionURL": "https://api.anthropic.com",
     "chatEndpointPath": "/v1/messages",
     "sourceUrls": [
       "https://docs.anthropic.com/en/api/messages",
@@ -90,6 +92,7 @@
     },
     "protocol": "openai-compatible",
     "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+    "inlineCompletionURL": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
     "chatEndpointPath": "/chat/completions",
     "sourceUrls": [
       "https://docs.bigmodel.cn/cn/guide/start/openai_sdk",
@@ -133,6 +136,7 @@
     },
     "protocol": "openai-compatible",
     "baseURL": "https://api.minimax.io/v1",
+    "inlineCompletionURL": "https://api.minimax.io/v1",
     "chatEndpointPath": "/chat/completions",
     "sourceUrls": [
       "https://platform.minimax.io/docs",
@@ -176,6 +180,7 @@
     },
     "protocol": "openai-compatible",
     "baseURL": "https://api.deepseek.com",
+    "inlineCompletionURL": "https://api.deepseek.com",
     "chatEndpointPath": "/chat/completions",
     "sourceUrls": [
       "https://api-docs.deepseek.com/",
@@ -207,6 +212,7 @@
     },
     "protocol": "openai-compatible",
     "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "inlineCompletionURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "chatEndpointPath": "/chat/completions",
     "sourceUrls": [
       "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
@@ -250,6 +256,7 @@
     },
     "protocol": "openai-compatible",
     "baseURL": "https://api.mimo-v2.com/v1",
+    "inlineCompletionURL": "https://api.mimo-v2.com/v1",
     "chatEndpointPath": "/chat/completions",
     "sourceUrls": [
       "https://mimo-v2.com/docs",
@@ -293,6 +300,7 @@
     },
     "protocol": "openai-compatible",
     "baseURL": "",
+    "inlineCompletionURL": "",
     "chatEndpointPath": "/chat/completions",
     "sourceUrls": [
       "https://platform.openai.com/docs/api-reference/chat"

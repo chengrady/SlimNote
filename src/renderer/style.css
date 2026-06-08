@@ -45,8 +45,13 @@
   --space-6: 24px;
 
   /* UI typography */
+  --app-ui-font-size: 14px;
+  --ui-font-size-2xs: 10px;
   --ui-font-size-xs: 11px;
   --ui-font-size-sm: 12px;
+  --ui-font-size-md: 14px;
+  --ui-font-size-lg: 15px;
+  --ui-font-size-xl: 19px;
   --ui-font-weight-medium: 500;
   --ui-font-weight-semibold: 600;
   --ui-font-weight-bold: 700;
@@ -75,8 +80,8 @@
   --panel-title-gap: 3px;
   --panel-title-line-height: 1.25;
   --panel-subtitle-line-height: 1.4;
-  --section-title-size: 13px;
-  --section-meta-size: 11px;
+  --section-title-size: var(--field-font-size);
+  --section-meta-size: var(--ui-font-size-xs);
 
   /* Toolbar rhythm */
   --toolbar-height: 36px;
@@ -335,7 +340,7 @@ html, body, #app {
   width: 100%;
   height: 100%;
   font-family: var(--font-family-ui);
-  font-size: 14px;
+  font-size: var(--app-ui-font-size, 14px);
   color: var(--text-main);
   background: var(--bg-deep);
   overflow: hidden;

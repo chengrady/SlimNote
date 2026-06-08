@@ -24,6 +24,7 @@ import { $prose, getMarkdown, insert, replaceAll } from '@milkdown/kit/utils'
 import '@milkdown/crepe/theme/common/style.css'
 import '@milkdown/crepe/theme/frame.css'
 import { useSettingsStore } from '../stores/settings'
+import { consumeInlineCompletionLine } from '../utils/aiInlineCompletion'
 
 const props = defineProps({
   modelValue: {
@@ -55,6 +56,7 @@ const editorRef = ref()
 let crepeEditor = null
 let isEditorReady = false // Track if editor is fully initialized
 let isApplyingExternalUpdate = false
+let isAcceptingInlineCompletion = false
 let isComposing = false
 let inlineCompletionTimer = 0
 let inlineCompletionRequestSerial = 0
@@ -63,6 +65,10 @@ const inlineCompletionText = ref('')
 const inlineCompletionPluginKey = new PluginKey('slimnote-inline-completion')
 
 const isDarkTheme = computed(() => settingsStore.settings.theme === 'dark')
+
+function debugInlineCompletion(stage, details = {}) {
+  console.info('[inline-completion][milkdown]', stage, details)
+}
 
 function isPrimarySelectAll(event) {
   return (event.ctrlKey || event.metaKey) && !event.altKey && String(event.key || '').toLowerCase() === 'a'
@@ -109,7 +115,7 @@ function createInlineCompletionPlugin() {
           ghost.textContent = value.text
           const hint = document.createElement('span')
           hint.className = 'milkdown-inline-completion-hint'
-          hint.textContent = 'Tab 接受'
+          hint.textContent = 'Tab 逐行 / Shift+Tab 整段'
           wrapper.append(ghost, hint)
           return wrapper
         }, {
@@ -168,6 +174,48 @@ function cancelInlineCompletion(options = {}) {
   if (options.stopRequest !== false) props.inlineCompletionProvider?.cancel?.()
 }
 
+function focusMilkdownEditor() {
+  applyEditableRootPreferences()
+  crepeEditor?.editor?.action((ctx) => {
+    ctx.get(editorViewCtx).focus()
+  })
+}
+
+function insertInlineCompletionText(text) {
+  isAcceptingInlineCompletion = true
+  try {
+    crepeEditor?.editor?.action(insert(text, !/[\r\n]/.test(text)))
+  } finally {
+    isAcceptingInlineCompletion = false
+  }
+  focusMilkdownEditor()
+}
+
+function acceptInlineCompletionLine() {
+  const { acceptedText, remainingText } = consumeInlineCompletionLine(inlineCompletionText.value)
+  if (!acceptedText) {
+    cancelInlineCompletion({ stopRequest: false })
+    return
+  }
+
+  cancelInlineCompletion({ stopRequest: false })
+  insertInlineCompletionText(acceptedText)
+  if (remainingText) {
+    setInlineCompletionDecoration(remainingText, getCurrentProsePosition())
+  }
+}
+
+function acceptInlineCompletionSnippet() {
+  const text = inlineCompletionText.value
+  if (!text) {
+    cancelInlineCompletion({ stopRequest: false })
+    return
+  }
+
+  cancelInlineCompletion({ stopRequest: false })
+  insertInlineCompletionText(text)
+}
+
 function isSelectionInsideEditor() {
   const editableRoot = getEditableRoot()
   const selection = window.getSelection()
@@ -208,16 +256,10 @@ function getSelectionHtml(selection) {
 }
 
 function handleKeydown(event) {
-  if (inlineCompletionText.value && event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing && event.keyCode !== 229) {
+  if (inlineCompletionText.value && event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing && event.keyCode !== 229) {
     event.preventDefault()
     event.stopPropagation()
-    const text = inlineCompletionText.value
-    cancelInlineCompletion({ stopRequest: false })
-    crepeEditor?.editor?.action(insert(text, !/[\r\n]/.test(text)))
-    applyEditableRootPreferences()
-    crepeEditor?.editor?.action((ctx) => {
-      ctx.get(editorViewCtx).focus()
-    })
+    event.shiftKey ? acceptInlineCompletionSnippet() : acceptInlineCompletionLine()
     return
   }
 
@@ -320,15 +362,24 @@ function isNestedCodeEditorFocused() {
 
 function scheduleInlineCompletion(markdown = getCurrentMarkdown()) {
   const provider = props.inlineCompletionProvider
-  if (!provider?.request || isComposing || isApplyingExternalUpdate || isNestedCodeEditorFocused()) return
+  if (!provider?.request || isComposing || isApplyingExternalUpdate || isNestedCodeEditorFocused()) {
+    debugInlineCompletion('schedule-skipped', {
+      reason: !provider?.request ? 'provider-missing' : (isComposing ? 'composing' : (isApplyingExternalUpdate ? 'external-update' : 'nested-code-editor-focused'))
+    })
+    return
+  }
 
   if (inlineCompletionTimer) clearTimeout(inlineCompletionTimer)
   clearInlineCompletionDecoration()
 
   const delayMs = provider.getDelayMs?.() ?? 500
+  debugInlineCompletion('schedule', { delayMs, contentLength: typeof markdown === 'string' ? markdown.length : 0 })
   inlineCompletionTimer = setTimeout(async () => {
     inlineCompletionTimer = 0
-    if (!crepeEditor || !isEditorReady || isComposing || isNestedCodeEditorFocused()) return
+    if (!crepeEditor || !isEditorReady || isComposing || isNestedCodeEditorFocused()) {
+      debugInlineCompletion('request-skipped', { reason: !crepeEditor ? 'editor-missing' : (!isEditorReady ? 'not-ready' : (isComposing ? 'composing' : 'nested-code-editor-focused')) })
+      return
+    }
 
     const serial = ++inlineCompletionRequestSerial
     const cursorOffset = getCursorOffset()
@@ -337,6 +388,7 @@ function scheduleInlineCompletion(markdown = getCurrentMarkdown()) {
     inlineCompletionAnchor = { cursorOffset, prosePosition, content: requestContent }
 
     try {
+      debugInlineCompletion('request-start', { serial, cursorOffset, prosePosition, contentLength: requestContent.length })
       const suggestion = await provider.request({
         source: 'milkdown',
         content: requestContent,
@@ -345,10 +397,16 @@ function scheduleInlineCompletion(markdown = getCurrentMarkdown()) {
         editorMode: 'wysiwyg'
       })
 
+      debugInlineCompletion('request-complete', { serial, suggestionLength: suggestion?.length || 0 })
       if (serial !== inlineCompletionRequestSerial || !suggestion) return
-      if (getCursorOffset() !== cursorOffset || getCurrentProsePosition() !== prosePosition || getCurrentMarkdown() !== requestContent) return
+      if (getCursorOffset() !== cursorOffset || getCurrentProsePosition() !== prosePosition || getCurrentMarkdown() !== requestContent) {
+        debugInlineCompletion('decoration-skipped', { reason: 'context-changed', serial })
+        return
+      }
+      debugInlineCompletion('decoration-ready', { serial, acceptLength: suggestion.length })
       setInlineCompletionDecoration(suggestion, prosePosition)
     } catch (err) {
+      debugInlineCompletion('request-error', { message: err?.message || String(err || '') })
       console.warn('Milkdown inline completion failed:', err)
     }
   }, Math.max(0, Number(delayMs) || 0))
@@ -378,6 +436,10 @@ onMounted(async () => {
       manager.markdownUpdated((ctx, markdown, prevMarkdown) => {
         if (isApplyingExternalUpdate) return
         if (markdown !== prevMarkdown) {
+          if (isAcceptingInlineCompletion) {
+            emit('update:modelValue', markdown)
+            return
+          }
           cancelInlineCompletion()
           emit('update:modelValue', markdown)
           scheduleInlineCompletion(markdown)

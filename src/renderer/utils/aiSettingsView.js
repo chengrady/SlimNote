@@ -30,14 +30,20 @@ export const DEFAULT_INLINE_COMPLETION_LANGUAGES = [
   'csharp'
 ]
 export const INLINE_COMPLETION_COLOR_PRESETS = ['gray', 'blue', 'cyan', 'green', 'red']
+export const INLINE_COMPLETION_MODE_VALUES = ['auto', 'fixed']
+export const INLINE_COMPLETION_ACCEPT_MODE_VALUES = ['line', 'snippet']
 
 export const DEFAULT_INLINE_COMPLETION = {
   enabled: true,
+  mode: 'auto',
+  providerId: '',
+  modelId: '',
   delayMs: 500,
-  maxChars: 320,
+  maxChars: 600,
   prefixChars: 6000,
   suffixChars: 2000,
   includeLog: false,
+  acceptMode: 'line',
   colorPreset: 'cyan',
   customColor: '#22c7d9',
   opacity: 0.7,
@@ -74,6 +80,7 @@ export const DEFAULT_AI_PROVIDER = {
   name: 'API Provider',
   protocol: 'openai-compatible',
   baseURL: '',
+  inlineCompletionURL: '',
   chatEndpointPath: DEFAULT_AI_CHAT_ENDPOINT_PATH,
   chatEndpointURL: '',
   keyStrategy: 'fixed',
@@ -91,6 +98,7 @@ export const DEFAULT_AI_API_CONFIG = {
   id: DEFAULT_AI_PROVIDER_ID,
   name: DEFAULT_AI_PROVIDER.name,
   baseURL: DEFAULT_AI_PROVIDER.baseURL,
+  inlineCompletionURL: DEFAULT_AI_PROVIDER.inlineCompletionURL,
   chatEndpointPath: DEFAULT_AI_PROVIDER.chatEndpointPath,
   chatEndpointURL: DEFAULT_AI_PROVIDER.chatEndpointURL,
   model: DEFAULT_AI_MODEL.model,
@@ -136,6 +144,16 @@ function normalizeInlineCompletionColorPreset(value, fallback = DEFAULT_INLINE_C
   return INLINE_COMPLETION_COLOR_PRESETS.includes(normalized) ? normalized : fallback
 }
 
+function normalizeInlineCompletionMode(value, fallback = DEFAULT_INLINE_COMPLETION.mode) {
+  const normalized = normalizeString(value, fallback).toLowerCase()
+  return INLINE_COMPLETION_MODE_VALUES.includes(normalized) ? normalized : fallback
+}
+
+function normalizeInlineCompletionAcceptMode(value, fallback = DEFAULT_INLINE_COMPLETION.acceptMode) {
+  const normalized = normalizeString(value, fallback).toLowerCase()
+  return INLINE_COMPLETION_ACCEPT_MODE_VALUES.includes(normalized) ? normalized : fallback
+}
+
 function normalizeHexColor(value, fallback = DEFAULT_INLINE_COMPLETION.customColor) {
   const normalized = normalizeString(value, fallback)
   if (/^#[0-9a-f]{6}$/i.test(normalized)) return normalized.toLowerCase()
@@ -148,14 +166,18 @@ export function normalizeLocalInlineCompletion(value = {}) {
   const safeValue = isPlainObject(value) ? value : {}
   return {
     enabled: normalizeBoolean(safeValue.enabled, DEFAULT_INLINE_COMPLETION.enabled),
+    mode: normalizeInlineCompletionMode(safeValue.mode),
+    providerId: normalizeString(safeValue.providerId, DEFAULT_INLINE_COMPLETION.providerId),
+    modelId: normalizeString(safeValue.modelId, DEFAULT_INLINE_COMPLETION.modelId),
     delayMs: Math.round(normalizeNumber(safeValue.delayMs, DEFAULT_INLINE_COMPLETION.delayMs, 150, 3000)),
     maxChars: Math.round(normalizeNumber(safeValue.maxChars, DEFAULT_INLINE_COMPLETION.maxChars, 20, 1200)),
     prefixChars: Math.round(normalizeNumber(safeValue.prefixChars, DEFAULT_INLINE_COMPLETION.prefixChars, 200, 20000)),
     suffixChars: Math.round(normalizeNumber(safeValue.suffixChars, DEFAULT_INLINE_COMPLETION.suffixChars, 0, 8000)),
     includeLog: normalizeBoolean(safeValue.includeLog, DEFAULT_INLINE_COMPLETION.includeLog),
+    acceptMode: normalizeInlineCompletionAcceptMode(safeValue.acceptMode),
     colorPreset: normalizeInlineCompletionColorPreset(safeValue.colorPreset),
     customColor: normalizeHexColor(safeValue.customColor),
-    opacity: normalizeNumber(safeValue.opacity, DEFAULT_INLINE_COMPLETION.opacity, 0.35, 0.9),
+    opacity: normalizeNumber(safeValue.opacity, DEFAULT_INLINE_COMPLETION.opacity, 0.3, 1),
     languages: normalizeLanguages(safeValue.languages)
   }
 }
@@ -280,6 +302,7 @@ export function createAiProviderFromPreset(presetId, options = {}) {
     name: normalizeString(options.name, preset.name) || preset.name,
     protocol: preset.protocol,
     baseURL: preset.baseURL,
+    inlineCompletionURL: preset.inlineCompletionURL || '',
     chatEndpointPath: preset.chatEndpointPath || DEFAULT_AI_CHAT_ENDPOINT_PATH,
     chatEndpointURL: preset.chatEndpointURL || '',
     activeApiKeyId: keyId,
@@ -303,6 +326,7 @@ export function normalizeLocalAiProvider(provider = {}, fallback = DEFAULT_AI_PR
     name: normalizeString(safeProvider.name, safeFallback.name || `Provider ${index + 1}`) || `Provider ${index + 1}`,
     protocol: normalizeProtocol(safeProvider.protocol, normalizeProtocol(safeFallback.protocol)),
     baseURL: normalizeString(safeProvider.baseURL, safeFallback.baseURL),
+    inlineCompletionURL: normalizeString(safeProvider.inlineCompletionURL, safeFallback.inlineCompletionURL),
     chatEndpointPath: normalizeString(safeProvider.chatEndpointPath, safeFallback.chatEndpointPath) || DEFAULT_AI_CHAT_ENDPOINT_PATH,
     chatEndpointURL: normalizeString(safeProvider.chatEndpointURL, safeFallback.chatEndpointURL),
     keyStrategy: DEFAULT_AI_PROVIDER.keyStrategy,
@@ -324,6 +348,7 @@ export function normalizeLocalAiApiConfig(config = {}, fallback = DEFAULT_AI_API
     id: normalizeString(safeConfig.id, safeFallback.id) || DEFAULT_AI_API_ID,
     name: normalizeString(safeConfig.name, safeFallback.name) || DEFAULT_AI_API_CONFIG.name,
     baseURL: normalizeString(safeConfig.baseURL, safeFallback.baseURL),
+    inlineCompletionURL: normalizeString(safeConfig.inlineCompletionURL, safeFallback.inlineCompletionURL),
     chatEndpointPath: normalizeString(safeConfig.chatEndpointPath, safeFallback.chatEndpointPath) || DEFAULT_AI_CHAT_ENDPOINT_PATH,
     chatEndpointURL: normalizeString(safeConfig.chatEndpointURL, safeFallback.chatEndpointURL),
     model: normalizeString(safeConfig.model, safeFallback.model),
@@ -346,6 +371,7 @@ function buildProviderFromLegacyConfig(config = {}, index = 0) {
     id: normalizedConfig.id,
     name: normalizedConfig.name,
     baseURL: normalizedConfig.baseURL,
+    inlineCompletionURL: normalizedConfig.inlineCompletionURL,
     chatEndpointPath: normalizedConfig.chatEndpointPath,
     chatEndpointURL: normalizedConfig.chatEndpointURL,
     temperature: normalizedConfig.temperature,
@@ -373,6 +399,7 @@ function buildLegacyApiConfig(settings) {
     id: DEFAULT_AI_API_ID,
     name: settings.apiName || DEFAULT_AI_API_CONFIG.name,
     baseURL: settings.baseURL,
+    inlineCompletionURL: settings.inlineCompletionURL,
     chatEndpointPath: settings.chatEndpointPath,
     chatEndpointURL: settings.chatEndpointURL,
     model: settings.model,
@@ -437,6 +464,7 @@ function buildCompatibilityApiConfig(provider, modelId = '') {
     id: provider.id,
     name: provider.name,
     baseURL: provider.baseURL,
+    inlineCompletionURL: provider.inlineCompletionURL,
     chatEndpointPath: provider.chatEndpointPath,
     chatEndpointURL: provider.chatEndpointURL,
     model: model.model,
@@ -477,6 +505,7 @@ export function resolveLocalAiModelSelection(settings = {}, selection = {}) {
     providerName: provider.name,
     modelName: model.name,
     baseURL: provider.baseURL,
+    inlineCompletionURL: provider.inlineCompletionURL,
     chatEndpointPath: provider.chatEndpointPath,
     chatEndpointURL: provider.chatEndpointURL,
     modelValue: model.model,

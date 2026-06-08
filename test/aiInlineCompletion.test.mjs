@@ -6,13 +6,16 @@ import {
   buildInlineCompletionStyleVars,
   buildInlineCompletionContext,
   cleanInlineCompletionText,
+  consumeInlineCompletionLine,
   normalizeInlineCompletionSettings,
+  resolveInlineCompletionAcceptText,
   shouldRequestInlineCompletion
 } from '../src/renderer/utils/aiInlineCompletion.js'
 
 describe('ai inline completion helpers', () => {
   it('enables inline completion by default', () => {
     assert.equal(normalizeInlineCompletionSettings().enabled, true)
+    assert.equal(normalizeInlineCompletionSettings().maxChars, 600)
     assert.equal(normalizeInlineCompletionSettings().colorPreset, 'cyan')
     assert.equal(normalizeInlineCompletionSettings().opacity, 0.7)
   })
@@ -27,7 +30,7 @@ describe('ai inline completion helpers', () => {
       includeLog: true,
       colorPreset: 'red',
       customColor: '#0ff',
-      opacity: 0.99,
+      opacity: 1.2,
       languages: ['Markdown', 'markdown', 'SQL']
     })
 
@@ -39,8 +42,23 @@ describe('ai inline completion helpers', () => {
     assert.equal(settings.includeLog, true)
     assert.equal(settings.colorPreset, 'red')
     assert.equal(settings.customColor, '#00ffff')
-    assert.equal(settings.opacity, 0.9)
+    assert.equal(settings.opacity, 1)
+    assert.equal(settings.acceptMode, 'line')
     assert.deepEqual(settings.languages, ['markdown', 'sql'])
+  })
+
+  it('supports line-by-line or snippet inline completion acceptance', () => {
+    const suggestion = '### 2026年6月3日\n1. 京东到付码通道映射全量发布；\n2. 排查部分线上问题；'
+
+    assert.equal(resolveInlineCompletionAcceptText(suggestion), '### 2026年6月3日')
+    assert.equal(resolveInlineCompletionAcceptText(suggestion, { acceptMode: 'line' }), '### 2026年6月3日')
+    assert.equal(resolveInlineCompletionAcceptText(suggestion, { acceptMode: 'snippet' }), suggestion)
+    assert.deepEqual(consumeInlineCompletionLine(suggestion), {
+      acceptedText: '### 2026年6月3日\n',
+      remainingText: '1. 京东到付码通道映射全量发布；\n2. 排查部分线上问题；'
+    })
+    assert.equal(normalizeInlineCompletionSettings({ acceptMode: 'snippet' }).acceptMode, 'snippet')
+    assert.equal(normalizeInlineCompletionSettings({ acceptMode: 'unknown' }).acceptMode, 'line')
   })
 
   it('builds theme-aware inline completion style variables', () => {
@@ -122,6 +140,10 @@ describe('ai inline completion wiring', () => {
     assert.match(mainSource, /ai:inline-completion-stop/)
     assert.match(mainSource, /buildInlineCompletionRequestSettings/)
     assert.match(mainSource, /shouldDisableThinkingForInlineCompletion/)
+    assert.doesNotMatch(mainSource, /Keep the completion short and natural\./)
+    assert.match(mainSource, /obvious continuation can be completed coherently/)
+    assert.match(mainSource, /known text, poem, quote, list, table, heading sequence, or log pattern/)
+    assert.match(mainSource, /const maxChars = clampNumber\(payload\.maxChars, 600, 20, 1200\)/)
     assert.match(preloadSource, /startAIInlineCompletion/)
     assert.match(preloadSource, /onAIInlineCompletionChunk/)
   })
@@ -132,12 +154,50 @@ describe('ai inline completion wiring', () => {
 
     assert.match(monacoSource, /registerInlineCompletionsProvider/)
     assert.match(monacoSource, /editor\.action\.inlineSuggest\.trigger/)
+    assert.match(monacoSource, /monaco\.KeyCode\.Tab[\s\S]*acceptInlineCompletionLine/)
+    assert.match(monacoSource, /monaco\.KeyMod\.Shift \| monaco\.KeyCode\.Tab[\s\S]*acceptInlineCompletionSnippet/)
+    assert.doesNotMatch(monacoSource, /editor\.action\.inlineSuggest\.acceptNextLine/)
+    assert.match(monacoSource, /editor\.action\.inlineSuggest\.commit/)
+    assert.match(monacoSource, /acceptedInsertText/)
+    assert.match(monacoSource, /remainingText && !\/\[\\r\\n\]\$\/\.test\(acceptedText\)/)
+    assert.match(monacoSource, /Tab接受 \| Shift\+Tab接受全部/)
+    assert.match(monacoSource, /INLINE_COMPLETION_LINE_HINT_TEXT = "'Tab接受'"/)
+    assert.match(monacoSource, /lineCount > 1 \? INLINE_COMPLETION_SNIPPET_HINT_TEXT : INLINE_COMPLETION_LINE_HINT_TEXT/)
+    assert.match(monacoSource, /--inline-completion-hint-text/)
+    assert.match(monacoSource, /content: var\(--inline-completion-hint-text, 'Tab接受'\)/)
+    assert.match(monacoSource, /MutationObserver/)
+    assert.match(monacoSource, /getBoundingClientRect\(\)/)
+    assert.match(monacoSource, /a\.rect\.top - b\.rect\.top/)
+    assert.match(monacoSource, /a\.rect\.left - b\.rect\.left/)
+    assert.match(monacoSource, /dataset\.inlineCompletionHint = index === 0 \? 'primary' : 'secondary'/)
+    assert.match(monacoSource, /data-inline-completion-hint="primary"/)
+    assert.match(monacoSource, /opacity: 0\.72/)
+    assert.match(monacoSource, /showToolbar: 'never'/)
+    assert.match(monacoSource, /view-line:has\(\.ghost-text-decoration\)/)
+    assert.match(monacoSource, /content: none/)
+    assert.match(monacoSource, /\.inlineSuggestionsHints[\s\S]*display: none !important/)
+    assert.doesNotMatch(monacoSource, /getAcceptMode/)
     assert.match(monacoSource, /onDidCompositionStart/)
     assert.match(monacoSource, /inlineCompletionProvider/)
     assert.match(monacoSource, /function applyInlineCompletionStyle\(\)/)
     assert.match(monacoSource, /--vscode-editorGhostText-foreground/)
     assert.match(milkdownSource, /PluginKey\('slimnote-inline-completion'\)/)
     assert.match(milkdownSource, /event\.key === 'Tab'/)
+    assert.match(milkdownSource, /event\.shiftKey \? acceptInlineCompletionSnippet\(\) : acceptInlineCompletionLine\(\)/)
+    assert.match(milkdownSource, /consumeInlineCompletionLine/)
+    assert.match(milkdownSource, /remainingText/)
+    assert.doesNotMatch(milkdownSource, /resolveAcceptText/)
     assert.match(milkdownSource, /event\.key === 'Escape'/)
+  })
+
+  it('keeps Monaco token cancellation from aborting active AI requests', () => {
+    const monacoSource = readFileSync(new URL('../src/renderer/components/MonacoEditor.vue', import.meta.url), 'utf8')
+    const requestCancellationBlock = monacoSource.match(/const tokenCleanup = token\?\.onCancellationRequested\?\.\(\(\) => \{[\s\S]*?\n      \}\)/)?.[0] || ''
+
+    assert.match(requestCancellationBlock, /request-cancelled/)
+    assert.doesNotMatch(requestCancellationBlock, /provider\.cancel\?\.\(\)/)
+    assert.match(monacoSource, /cachedInlineCompletion/)
+    assert.match(monacoSource, /insertText: suggestion/)
+    assert.doesNotMatch(monacoSource, /insertText: acceptText/)
   })
 })

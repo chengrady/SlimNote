@@ -34,6 +34,7 @@ describe('ai provider presets', () => {
 
     assert.equal(zhipu.icon.label, 'GLM')
     assert.equal(zhipu.icon.accent, '#3859ff')
+    assert.equal(zhipu.inlineCompletionURL, 'https://open.bigmodel.cn/api/paas/v4/chat/completions')
     assert.equal(typeof zhipu.icon.path, 'string')
     assert.doesNotMatch(zhipu.icon.path, /M24\.51,28\.51/)
   })
@@ -58,6 +59,7 @@ describe('ai provider presets', () => {
     assert.equal(provider.name, 'DeepSeek')
     assert.equal(provider.protocol, 'openai-compatible')
     assert.equal(provider.baseURL, 'https://api.deepseek.com')
+    assert.equal(provider.inlineCompletionURL, 'https://api.deepseek.com')
     assert.equal(provider.chatEndpointPath, '/chat/completions')
     assert.deepEqual(provider.apiKeys.map(key => key.id), ['deepseek-team-key'])
     assert.equal(provider.apiKeys[0].hasApiKey, false)

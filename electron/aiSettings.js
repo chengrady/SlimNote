@@ -118,7 +118,7 @@ function buildRetainedApiKey(storedKey = {}) {
 }
 
 function hasLegacyApiPayload(payload) {
-  return ['baseURL', 'chatEndpointPath', 'chatEndpointURL', 'model', 'temperature', 'maxTokens', 'timeoutMs', 'apiKey'].some(key => Object.prototype.hasOwnProperty.call(payload, key))
+  return ['baseURL', 'inlineCompletionURL', 'chatEndpointPath', 'chatEndpointURL', 'model', 'temperature', 'maxTokens', 'timeoutMs', 'apiKey'].some(key => Object.prototype.hasOwnProperty.call(payload, key))
 }
 
 function buildLegacyProviderPayload(storedSettings, payload) {
@@ -137,6 +137,7 @@ function buildLegacyProviderPayload(storedSettings, payload) {
       ...provider,
       name: Object.prototype.hasOwnProperty.call(payload, 'apiName') ? payload.apiName : provider.name,
       baseURL: Object.prototype.hasOwnProperty.call(payload, 'baseURL') ? payload.baseURL : provider.baseURL,
+      inlineCompletionURL: Object.prototype.hasOwnProperty.call(payload, 'inlineCompletionURL') ? payload.inlineCompletionURL : provider.inlineCompletionURL,
       chatEndpointPath: Object.prototype.hasOwnProperty.call(payload, 'chatEndpointPath') ? payload.chatEndpointPath : provider.chatEndpointPath,
       chatEndpointURL: Object.prototype.hasOwnProperty.call(payload, 'chatEndpointURL') ? payload.chatEndpointURL : provider.chatEndpointURL,
       temperature: Object.prototype.hasOwnProperty.call(payload, 'temperature') ? payload.temperature : provider.temperature,
@@ -184,6 +185,7 @@ function buildIncomingSettings(storedSettings, payload) {
         id: normalizeString(config?.id, `provider-${index + 1}`),
         name: config?.name,
         baseURL: config?.baseURL,
+        inlineCompletionURL: config?.inlineCompletionURL,
         chatEndpointPath: config?.chatEndpointPath,
         chatEndpointURL: config?.chatEndpointURL,
         apiKeys: [{
@@ -302,6 +304,7 @@ function buildPublicCompatibilityApiConfigs(settings) {
       id: provider.id,
       name: provider.name || '',
       baseURL: provider.baseURL || '',
+      inlineCompletionURL: provider.inlineCompletionURL || '',
       chatEndpointPath: provider.chatEndpointPath || '/chat/completions',
       chatEndpointURL: provider.chatEndpointURL || '',
       model: model.model || '',
@@ -322,6 +325,7 @@ function attachActiveApiCompatibility(publicSettings) {
     providerName: provider.name || '',
     modelName: model.name || '',
     baseURL: provider.baseURL || '',
+    inlineCompletionURL: provider.inlineCompletionURL || '',
     chatEndpointPath: provider.chatEndpointPath || '',
     chatEndpointURL: provider.chatEndpointURL || '',
     model: model.model || '',

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
 
 const {
+  resolveChatEndpoint,
   buildChatHeaders,
   buildChatPayload,
   extractStreamParts,
@@ -9,6 +10,13 @@ const {
 } = require('../electron/aiClient')
 
 describe('ai client protocol adapters', () => {
+  it('keeps full chat completion URLs from inline completion provider presets', () => {
+    assert.equal(resolveChatEndpoint({
+      baseURL: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+      chatEndpointPath: '/chat/completions'
+    }), 'https://open.bigmodel.cn/api/paas/v4/chat/completions')
+  })
+
   it('builds Anthropic messages payload and headers', () => {
     const settings = {
       protocol: 'anthropic',

@@ -16,6 +16,8 @@ describe('ai settings schema', () => {
     const settings = normalizeAISettings({})
 
     assert.equal(settings.inlineCompletion.enabled, true)
+    assert.equal(settings.inlineCompletion.mode, 'auto')
+    assert.equal(settings.inlineCompletion.maxChars, 600)
     assert.equal(settings.inlineCompletion.colorPreset, 'cyan')
     assert.equal(settings.inlineCompletion.opacity, 0.7)
   })
@@ -103,11 +105,13 @@ describe('ai settings schema', () => {
     const settings = normalizeAISettings({
       inlineCompletion: {
         enabled: true,
+        mode: 'manual',
         delayMs: 20,
         maxChars: 9999,
         prefixChars: 10,
         suffixChars: 99999,
         includeLog: true,
+        acceptMode: 'snippet',
         colorPreset: 'red',
         customColor: '#0ff',
         opacity: 1,
@@ -117,16 +121,46 @@ describe('ai settings schema', () => {
 
     assert.deepEqual(settings.inlineCompletion, {
       enabled: true,
+      mode: 'auto',
+      providerId: '',
+      modelId: '',
       delayMs: 150,
       maxChars: 1200,
       prefixChars: 200,
       suffixChars: 8000,
       includeLog: true,
+      acceptMode: 'snippet',
       colorPreset: 'red',
       customColor: '#00ffff',
-      opacity: 0.9,
+      opacity: 1,
       languages: ['markdown', 'sql']
     })
+  })
+
+  it('keeps inline completion model selection and provider URL override separate', () => {
+    const settings = normalizeAISettings({
+      inlineCompletion: {
+        mode: 'fixed',
+        providerId: ' siliconflow ',
+        modelId: ' qwen3-coder '
+      },
+      providers: [
+        {
+          id: ' siliconflow ',
+          name: 'SiliconFlow',
+          baseURL: ' https://api.siliconflow.cn/v1 ',
+          inlineCompletionURL: ' https://inline.siliconflow.test/v1 ',
+          models: [
+            { id: ' qwen3-coder ', name: 'Qwen3 Coder', model: 'Qwen/Qwen3-Coder' }
+          ]
+        }
+      ]
+    })
+
+    assert.equal(settings.inlineCompletion.mode, 'fixed')
+    assert.equal(settings.inlineCompletion.providerId, 'siliconflow')
+    assert.equal(settings.inlineCompletion.modelId, 'qwen3-coder')
+    assert.equal(settings.providers[0].inlineCompletionURL, 'https://inline.siliconflow.test/v1')
   })
 
   it('keeps one empty API key and all models', () => {
@@ -232,6 +266,7 @@ describe('ai settings schema', () => {
           id: 'glm',
           name: '智谱 GLM',
           baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+          inlineCompletionURL: 'https://inline.bigmodel.test/v4',
           activeApiKeyId: 'glm-team',
           apiKeys: [
             { id: 'glm-personal', name: 'Personal', apiKey: 'sk-glm-personal' },
@@ -253,6 +288,7 @@ describe('ai settings schema', () => {
     assert.equal(settings.providerName, '智谱 GLM')
     assert.equal(settings.modelName, 'GLM 4 Plus')
     assert.equal(settings.baseURL, 'https://open.bigmodel.cn/api/paas/v4')
+    assert.equal(settings.inlineCompletionURL, 'https://inline.bigmodel.test/v4')
     assert.equal(settings.model, 'glm-4-plus')
     assert.equal(settings.temperature, 0.3)
     assert.equal(settings.maxTokens, 12000)

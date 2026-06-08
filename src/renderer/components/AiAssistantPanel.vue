@@ -2044,7 +2044,8 @@ async function copyMessageResult(content = '') {
   try {
     await navigator.clipboard.writeText(content)
   } catch (error) {
-    appendError(`Failed to copy AI result: ${error?.message || error}`)
+    const message = String(error?.message || error || '').trim()
+    appendError(message ? t('ai.copyFailedWithReason', { message }) : t('ai.copyFailed'))
   }
 }
 
@@ -2097,6 +2098,12 @@ function scrollConversationToBottom() {
     const element = panelBodyRef.value
     if (element) element.scrollTop = element.scrollHeight
   })
+}
+
+function isConversationNearBottom(threshold = 48) {
+  const element = panelBodyRef.value
+  if (!element) return true
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold
 }
 
 async function startNewConversation() {
@@ -2361,6 +2368,7 @@ async function sendChat(action = null) {
     aiStore.isGenerating = true
     aiStore.activeRequestId = requestId
     userInput.value = ''
+    scrollConversationToBottom()
 
     const result = await electronAPI.startAIChat({
       requestId,
@@ -2410,9 +2418,11 @@ function handleReasoning(payload = {}) {
 
 function handleChunk(payload = {}) {
   if (payload.requestId !== aiStore.activeRequestId || !currentAssistantMessageId.value) return
+  const shouldFollowScroll = isConversationNearBottom()
   const message = aiStore.messages.find(item => item.id === currentAssistantMessageId.value)
   aiStore.updateAssistantMessage(currentAssistantMessageId.value, `${message?.content || ''}${payload.text || ''}`)
   if (payload.text) updateAssistantProcess(currentAssistantMessageId.value, { phase: 'generating' })
+  if (payload.text && shouldFollowScroll) scrollConversationToBottom()
 }
 
 async function handleComplete(payload = {}) {
@@ -2549,7 +2559,7 @@ watch(() => aiStore.settings?.providers, () => {
 
 .ai-panel-title {
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -2652,7 +2662,7 @@ watch(() => aiStore.settings?.providers, () => {
   align-items: baseline;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -2734,7 +2744,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--ui-font-size-md);
 }
 
 .ai-session-history-search-wrap .ai-session-history-search {
@@ -2820,7 +2830,7 @@ watch(() => aiStore.settings?.providers, () => {
   width: 100%;
   overflow: hidden;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: 600;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -2831,7 +2841,7 @@ watch(() => aiStore.settings?.providers, () => {
   width: 100%;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2899,7 +2909,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -2925,7 +2935,7 @@ watch(() => aiStore.settings?.providers, () => {
 .ai-session-history-empty {
   padding: 18px 10px 16px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.45;
   text-align: center;
 }
@@ -2946,7 +2956,7 @@ watch(() => aiStore.settings?.providers, () => {
   border-radius: var(--field-radius, 6px);
   color: #ff8a80;
   background: rgba(244, 67, 54, 0.1);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.45;
   word-break: break-word;
 }
@@ -2999,7 +3009,7 @@ watch(() => aiStore.settings?.providers, () => {
 }
 
 .ai-message-markdown-preview :deep(.markdown-preview-content) {
-  font-size: 13px;
+  font-size: var(--field-font-size);
 }
 
 .ai-message-markdown-preview :deep(.markdown-preview-content > :first-child) {
@@ -3036,7 +3046,7 @@ watch(() => aiStore.settings?.providers, () => {
   margin: 0;
   color: var(--text-main);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
@@ -3052,7 +3062,7 @@ watch(() => aiStore.settings?.providers, () => {
 .ai-reasoning-details {
   width: 100%;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.5;
 }
 
@@ -3071,7 +3081,7 @@ watch(() => aiStore.settings?.providers, () => {
   max-width: 100%;
   min-height: 26px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.5;
   user-select: none;
 }
@@ -3103,7 +3113,7 @@ watch(() => aiStore.settings?.providers, () => {
   width: 12px;
   height: 12px;
   color: var(--text-tertiary, var(--text-muted));
-  font-size: 16px;
+  font-size: var(--ui-font-size-lg);
   line-height: 1;
   transition: transform var(--transition-fast), color var(--transition-fast);
 }
@@ -3139,7 +3149,7 @@ watch(() => aiStore.settings?.providers, () => {
 }
 
 .ai-reasoning-markdown-preview :deep(.markdown-preview-content) {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .ai-reasoning-markdown-preview :deep(.markdown-preview-content > :first-child) {
@@ -3175,7 +3185,7 @@ watch(() => aiStore.settings?.providers, () => {
 
 .ai-reasoning-length {
   color: var(--text-tertiary, var(--text-muted));
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
 }
 
 .ai-message-actions {
@@ -3309,7 +3319,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   cursor: pointer;
 }
 
@@ -3325,7 +3335,7 @@ watch(() => aiStore.settings?.providers, () => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--ui-font-size-2xs);
 }
 
 .ai-context-chip.is-selected .ai-context-chip-status {
@@ -3474,7 +3484,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   white-space: nowrap;
   cursor: pointer;
   transition: var(--transition-interactive);
@@ -3564,7 +3574,7 @@ watch(() => aiStore.settings?.providers, () => {
   gap: 10px;
   padding: 0 8px 4px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -3589,7 +3599,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   text-align: left;
   cursor: pointer;
   transition: var(--transition-interactive);
@@ -3683,7 +3693,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: color-mix(in srgb, var(--provider-accent, var(--accent-primary)) 11%, var(--surface-panel));
   border: 1px solid color-mix(in srgb, var(--provider-accent, var(--accent-primary)) 18%, var(--glass-border));
   box-shadow: 0 6px 14px color-mix(in srgb, var(--provider-accent, var(--accent-primary)) 12%, transparent);
-  font-size: 8px;
+  font-size: var(--ui-font-size-2xs);
   font-weight: var(--ui-font-weight-bold);
   letter-spacing: 0;
 }
@@ -3722,7 +3732,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: var(--bg-primary);
   color: var(--text-main);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   outline: none;
 }
 
@@ -3739,7 +3749,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   text-align: left;
   cursor: pointer;
 }
@@ -3775,7 +3785,7 @@ watch(() => aiStore.settings?.providers, () => {
 
 .ai-context-menu-badge {
   color: #b58900;
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -3800,7 +3810,7 @@ watch(() => aiStore.settings?.providers, () => {
   border-radius: 999px;
   background: rgba(var(--accent-primary-rgb), 0.06);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3820,7 +3830,7 @@ watch(() => aiStore.settings?.providers, () => {
   min-height: 24px;
   padding: 0 8px 4px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--ui-font-size-xs);
   font-weight: 600;
 }
 
@@ -3944,7 +3954,7 @@ watch(() => aiStore.settings?.providers, () => {
 
 .ai-context-usage-heading {
   min-width: 0;
-  font-size: 19px;
+  font-size: var(--ui-font-size-xl);
   font-weight: 750;
   line-height: 1.2;
   overflow: hidden;
@@ -3955,7 +3965,7 @@ watch(() => aiStore.settings?.providers, () => {
 .ai-context-usage-percent {
   flex: 0 0 auto;
   color: var(--ai-context-usage-color);
-  font-size: 25px;
+  font-size: calc(var(--ui-font-size-xl) + 6px);
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -3967,7 +3977,7 @@ watch(() => aiStore.settings?.providers, () => {
   justify-content: space-between;
   gap: 12px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: 500;
 }
 
@@ -4004,7 +4014,7 @@ watch(() => aiStore.settings?.providers, () => {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px 12px;
-  font-size: 14px;
+  font-size: var(--ui-font-size-md);
 }
 
 .ai-context-usage-row-label {
@@ -4060,7 +4070,7 @@ watch(() => aiStore.settings?.providers, () => {
 
 .ai-context-usage-note {
   color: var(--ai-context-usage-color);
-  font-size: 13px;
+  font-size: var(--field-font-size);
   font-weight: 650;
   line-height: 1.7;
 }
@@ -4089,7 +4099,7 @@ watch(() => aiStore.settings?.providers, () => {
   border: 1px solid var(--glass-border);
   background: var(--surface-panel);
   color: var(--text-main);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: var(--ai-composer-control-line-height);
   cursor: pointer;
   transition: var(--transition-interactive);
@@ -4171,7 +4181,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   text-align: left;
   cursor: pointer;
 }
@@ -4232,7 +4242,7 @@ watch(() => aiStore.settings?.providers, () => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.5;
   outline: none;
 }
