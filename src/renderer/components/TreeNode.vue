@@ -257,6 +257,7 @@ async function copyValue() {
   position: relative;
   font-size: inherit;
   user-select: none;
+  --json-tree-disclosure-space: 22px;
 }
 
 .node-header,
@@ -320,6 +321,7 @@ async function copyValue() {
   width: 16px;
   font-size: 10px;
   color: var(--text-muted, #888);
+  margin-left: calc(var(--json-tree-disclosure-space) * -1);
   margin-right: 6px;
   flex-shrink: 0;
   text-align: center;

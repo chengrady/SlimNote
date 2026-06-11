@@ -8,6 +8,57 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 格式参考 Keep a Changelog，并尽量按照语义化版本的方式维护。
 
+## [1.7.0] - 2026-06-11
+
+### Added / 新增
+
+- Added a global theme picker with nine built-in themes, covering the app shell, Monaco editor, Markdown editor, preview, PDF export, and browser HTML preview.
+- 新增全局主题选择器，内置 9 套主题，并覆盖应用外壳、Monaco 编辑器、Markdown 编辑器、预览、PDF 导出和浏览器 HTML 预览。
+
+- Added automatic saving for named files with a configurable second-based delay.
+- 新增已命名文件的自动保存能力，并支持按秒配置停止编辑后的保存延迟。
+
+- Added a Markdown browser preview action that opens rendered HTML in the system browser through a dedicated local preview server.
+- 新增 Markdown 浏览器预览操作，可通过专用本地预览服务在系统浏览器中打开渲染后的 HTML。
+
+- Added workspace search preloading so collapsed folders can participate in Explorer filtering.
+- 新增工作区搜索预加载能力，让折叠目录也能参与资源管理器筛选。
+
+### Changed / 调整
+
+- Improved update checking to run automatically at startup and on a shorter recurring interval, with a title bar indicator when an update is available or downloaded.
+- 优化更新检查流程，支持启动后自动检查和更短间隔的周期检查，并在发现或下载更新后通过标题栏入口提示。
+
+- Improved Markdown source editing by formatting multi-line selections into unordered, ordered, or task lists while preserving line endings.
+- 优化 Markdown 源码编辑，支持把多行选区格式化为无序、有序或任务列表，并保留原有换行格式。
+
+- Improved editor comfort with additional Monaco/Milkdown viewport spacing, cleaner JSON tree alignment, and theme-aware editor colors.
+- 优化编辑器舒适度，增加 Monaco/Milkdown 视口留白，改进 JSON 树对齐，并让编辑器颜色跟随当前主题。
+
+- Improved Markdown PDF and browser export styling so Mermaid backgrounds, code blocks, tables, quotes, and selection colors stay consistent with the selected theme.
+- 优化 Markdown PDF 和浏览器导出样式，使 Mermaid 背景、代码块、表格、引用和选区颜色与当前主题保持一致。
+
+### Fixed / 修复
+
+- Prevented local saves and auto-saves from being reported back as external file changes.
+- 修复本地保存和自动保存可能被误判为外部文件变更的问题。
+
+- Fixed workspace filtering so the empty result message waits until descendant folders finish loading.
+- 修复工作区筛选中子目录尚未加载完成时过早显示无匹配结果的问题。
+
+- Improved update-manager testability by allowing an injected updater client while preserving the packaged app behavior.
+- 改进更新管理器的可测试性，支持注入 updater 客户端，同时保持打包应用中的原有行为。
+
+### Build / 构建
+
+- Bumped the app version to `1.7.0`.
+- 将应用版本提升到 `1.7.0`。
+
+### Docs / 文档
+
+- Updated `README.md` to reflect the current theme, auto-save, Markdown preview/export, workspace search, and update-notification experience.
+- 更新 `README.md`，同步当前主题、自动保存、Markdown 预览/导出、工作区搜索和更新提示体验。
+
 ## [1.6.0] - 2026-06-01
 
 ### Added / 新增

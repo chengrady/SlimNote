@@ -251,7 +251,7 @@ watch(parsedData, (value) => {
 .tree-content {
   flex: 1;
   overflow: auto;
-  padding: 10px 10px 14px 8px;
+  padding: 10px 10px 14px 20px;
   background: transparent;
 }
 

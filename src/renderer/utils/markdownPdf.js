@@ -4,6 +4,7 @@ import mermaid from 'mermaid'
 import { DEFAULT_LIST_PREFIX_CLASS, buildStructuredPlainText, decorateListPrefixes, getListDepth, stripDecoratedListPrefixes } from './markdownListFormat'
 import { getDirectoryFileUrl } from './fileUrlUtils'
 import { enhanceMarkdownHtml, preprocessMarkdownContent } from './markdownRenderer'
+import { buildMarkdownThemeCssVariables, resolveMarkdownTheme } from './markdownThemes'
 
 function escapeHtml(value = '') {
 	return String(value)
@@ -32,8 +33,16 @@ function buildMarkdownHtml(content = '') {
 	return enhanceMarkdownHtml(marked.parse(preprocessMarkdownContent(content || '')))
 }
 
-function getMermaidTheme(theme = 'light') {
-	return theme === 'dark' ? 'dark' : 'default'
+function resolveDocumentMarkdownTheme(theme = 'clean-paper') {
+	if (theme && typeof theme === 'object' && theme.colors) {
+		return theme
+	}
+
+	return resolveMarkdownTheme(theme, theme === 'dark' ? 'dark' : 'light')
+}
+
+function getMermaidTheme(theme = 'clean-paper') {
+	return resolveDocumentMarkdownTheme(theme).mode === 'dark' ? 'dark' : 'default'
 }
 
 function normalizeTextForCompare(value = '') {
@@ -59,7 +68,7 @@ function shouldRenderDocumentHeader(content = '', title = '') {
 	return normalizeTextForCompare(leadingHeading) !== normalizedTitle
 }
 
-async function renderMermaidBlocksInHtml(html = '', theme = 'light') {
+async function renderMermaidBlocksInHtml(html = '', theme = 'clean-paper') {
 	if (!html || typeof DOMParser === 'undefined' || typeof document === 'undefined') {
 		return html
 	}
@@ -116,6 +125,15 @@ function buildPdfPreparationScript() {
 			const MIN_SINGLE_PAGE_SCALE = 0.58
 			const OUTPUT_SCALE = 2
 			const MERMAID_PAGE_SLICE_CHROME_PX = 36
+
+			function getCssValue(name, fallback) {
+				const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+				return value || fallback
+			}
+
+			function getMermaidCanvasBackground() {
+				return getCssValue('--mermaid-bg', getCssValue('--surface-bg', '#ffffff'))
+			}
 
 			function mmToPx(mm) {
 				return mm * MM_TO_PX
@@ -174,7 +192,7 @@ function buildPdfPreparationScript() {
 				canvas.height = Math.max(1, Math.round(targetHeight * OUTPUT_SCALE))
 				const context = canvas.getContext('2d')
 				context.scale(OUTPUT_SCALE, OUTPUT_SCALE)
-				context.fillStyle = '#ffffff'
+				context.fillStyle = getMermaidCanvasBackground()
 				context.fillRect(0, 0, targetWidth, targetHeight)
 				context.drawImage(image, 0, 0, targetWidth, targetHeight)
 				return canvas
@@ -202,7 +220,7 @@ function buildPdfPreparationScript() {
 					sliceCanvas.width = fullCanvas.width
 					sliceCanvas.height = Math.max(1, Math.round(currentSliceHeight * OUTPUT_SCALE))
 					const sliceContext = sliceCanvas.getContext('2d')
-					sliceContext.fillStyle = '#ffffff'
+					sliceContext.fillStyle = getMermaidCanvasBackground()
 					sliceContext.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
 					sliceContext.drawImage(
 						fullCanvas,
@@ -572,9 +590,282 @@ export function buildMarkdownClipboardPayload({ content = '', sourcePath = '' } 
 	return buildMarkdownFragmentClipboardPayload({ html, sourcePath })
 }
 
-export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown Document', theme = 'light', sourcePath = '' } = {}) {
-	const pdfTheme = 'light'
-	const html = await renderMermaidBlocksInHtml(buildMarkdownHtml(content || ''), pdfTheme)
+export async function buildMarkdownBrowserDocument({ content = '', title = 'Markdown Preview', theme = 'clean-paper', sourcePath = '' } = {}) {
+	const resolvedTheme = resolveDocumentMarkdownTheme(theme)
+	const html = await renderMermaidBlocksInHtml(buildMarkdownHtml(content || ''), resolvedTheme)
+	const safeTitle = escapeHtml(title || 'Markdown Preview')
+	const baseHref = getDirectoryFileUrl(sourcePath)
+	const isDark = resolvedTheme.mode === 'dark'
+
+	return `<!DOCTYPE html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>${safeTitle}</title>
+		${baseHref ? `<base href="${baseHref}">` : ''}
+		<style>
+			:root {
+				color-scheme: ${isDark ? 'dark' : 'light'};
+				${buildMarkdownThemeCssVariables(resolvedTheme)}
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				background: var(--page-bg);
+				color: var(--text-main);
+				font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+				line-height: 1.72;
+				font-size: 16px;
+			}
+
+			body {
+				padding: 40px 20px 64px;
+			}
+
+			.markdown-body {
+				width: min(920px, 100%);
+				margin: 0 auto;
+				padding: 0;
+				color: var(--text-main);
+			}
+
+			.markdown-body > :first-child {
+				margin-top: 0;
+			}
+
+			.markdown-body > :last-child {
+				margin-bottom: 0;
+			}
+
+			.markdown-body h1,
+			.markdown-body h2,
+			.markdown-body h3,
+			.markdown-body h4,
+			.markdown-body h5,
+			.markdown-body h6 {
+				color: var(--heading-color);
+				margin: 1.45em 0 0.65em;
+				line-height: 1.3;
+			}
+
+			.markdown-body h1 { font-size: 2.2em; }
+			.markdown-body h2 { font-size: 1.65em; }
+			.markdown-body h3 { font-size: 1.35em; }
+			.markdown-body h4 { font-size: 1.1em; }
+			.markdown-body h5 { font-size: 0.95em; }
+			.markdown-body h6 {
+				font-size: 0.9em;
+				color: var(--text-muted);
+			}
+
+			.markdown-body h1,
+			.markdown-body h2 {
+				padding-bottom: 0.35em;
+				border-bottom: 1px solid var(--border-color);
+			}
+
+			.markdown-body p,
+			.markdown-body ul,
+			.markdown-body ol,
+			.markdown-body blockquote,
+			.markdown-body table,
+			.markdown-body pre {
+				margin: 0 0 1em;
+			}
+
+			.markdown-body ul,
+			.markdown-body ol {
+				padding-left: 4px;
+				list-style: none;
+			}
+
+			.markdown-body li + li {
+				margin-top: 0.35em;
+			}
+
+			.markdown-body li ul,
+			.markdown-body li ol {
+				margin-left: 44px;
+				margin-top: 6px;
+				margin-bottom: 8px;
+				padding-left: 12px;
+				border-left: 2px solid var(--border-color);
+			}
+
+			.markdown-body .${DEFAULT_LIST_PREFIX_CLASS} {
+				display: inline;
+				white-space: pre-wrap;
+				font-variant-numeric: tabular-nums;
+			}
+
+			.markdown-body a {
+				color: var(--accent);
+				text-decoration: none;
+			}
+
+			.markdown-body a:hover {
+				text-decoration: underline;
+			}
+
+			.markdown-body img {
+				max-width: 100%;
+				display: block;
+				margin: 14px auto;
+				border-radius: 8px;
+			}
+
+			.markdown-body code {
+				font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+				background: var(--code-bg);
+				border: 1px solid var(--border-color);
+				border-radius: 6px;
+				padding: 0.15em 0.4em;
+				font-size: 0.92em;
+				color: var(--inline-code);
+			}
+
+			.markdown-body pre {
+				background: var(--code-bg);
+				border: 1px solid var(--border-color);
+				border-radius: 8px;
+				padding: 14px 16px;
+				overflow: auto;
+				tab-size: 2;
+				color: var(--code-text);
+			}
+
+			.markdown-body pre code {
+				background: transparent;
+				border: 0;
+				padding: 0;
+				font-size: 0.9em;
+			}
+
+			.markdown-body .mermaid-block,
+			.markdown-body .mermaid-error-block {
+				margin: 0 0 1em;
+				padding: 12px 10px;
+				background: var(--mermaid-bg);
+				border: 1px solid var(--border-color);
+				border-radius: 8px;
+				overflow: auto;
+				text-align: center;
+			}
+
+			.markdown-body .mermaid-block svg {
+				display: block;
+				width: auto;
+				max-width: 100%;
+				height: auto;
+				margin: 0 auto;
+			}
+
+			.markdown-body .mermaid-error-title,
+			.markdown-body .mermaid-error-message {
+				margin-bottom: 10px;
+				font-weight: 600;
+				color: #d14343;
+			}
+
+			.markdown-body blockquote {
+				padding: 10px 14px;
+				margin-left: 0;
+				border-left: 4px solid var(--accent);
+				background: var(--quote-bg);
+				border-radius: 0 8px 8px 0;
+				color: var(--text-main);
+			}
+
+			.markdown-body .markdown-alert-title,
+			.markdown-body .markdown-container-title {
+				margin-bottom: 0.35em;
+				font-weight: 700;
+			}
+
+			.markdown-body .markdown-container {
+				margin: 0 0 1em;
+				padding: 10px 14px;
+				border: 1px solid var(--border-color);
+				border-left: 4px solid var(--accent);
+				border-radius: 8px;
+				background: var(--quote-bg);
+			}
+
+			.markdown-body table {
+				width: 100%;
+				border-collapse: collapse;
+				border: 1px solid var(--border-color);
+				overflow: hidden;
+				border-radius: 8px;
+				table-layout: auto;
+				font-size: 0.92em;
+			}
+
+			.markdown-body th,
+			.markdown-body td {
+				border: 1px solid var(--border-color);
+				padding: 8px 10px;
+				text-align: left;
+				vertical-align: top;
+				word-break: break-word;
+				overflow-wrap: anywhere;
+			}
+
+			.markdown-body tbody tr:nth-child(even) {
+				background: var(--table-stripe);
+			}
+
+			.markdown-body hr {
+				border: none;
+				border-top: 1px solid var(--border-color);
+				margin: 1.5em 0;
+			}
+
+			.markdown-body mark {
+				background: var(--mark-bg);
+				color: inherit;
+			}
+
+			::selection {
+				background: var(--selection-bg);
+			}
+
+			.hljs {
+				background: transparent;
+				color: inherit;
+			}
+
+			@media (max-width: 720px) {
+				body {
+					padding: 24px 14px 44px;
+				}
+
+				.markdown-body {
+					font-size: 15px;
+				}
+
+				.markdown-body h1 {
+					font-size: 1.8em;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<article class="markdown-body">${html}</article>
+	</body>
+</html>`
+}
+
+export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown Document', theme = 'clean-paper', sourcePath = '' } = {}) {
+	const resolvedTheme = resolveDocumentMarkdownTheme(theme)
+	const html = await renderMermaidBlocksInHtml(buildMarkdownHtml(content || ''), resolvedTheme)
 	const safeTitle = escapeHtml(title)
 	const baseHref = getDirectoryFileUrl(sourcePath)
 	const renderDocumentHeader = shouldRenderDocumentHeader(content, title)
@@ -594,16 +885,8 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 		${baseHref ? `<base href="${baseHref}">` : ''}
 		<style>
 			:root {
-				color-scheme: light;
-				--page-bg: #ffffff;
-				--surface-bg: #ffffff;
-				--text-main: #1f2937;
-				--text-muted: #6b7280;
-				--border-color: rgba(15, 23, 42, 0.1);
-				--accent: #2563eb;
-				--code-bg: #f6f8fb;
-				--quote-bg: rgba(37, 99, 235, 0.06);
-				--table-stripe: rgba(15, 23, 42, 0.02);
+				color-scheme: ${resolvedTheme.mode === 'dark' ? 'dark' : 'light'};
+				${buildMarkdownThemeCssVariables(resolvedTheme)}
 			}
 
 			@page {
@@ -679,7 +962,7 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 			.markdown-body h4,
 			.markdown-body h5,
 			.markdown-body h6 {
-				color: var(--text-main);
+				color: var(--heading-color);
 				page-break-after: avoid;
 				break-after: avoid-page;
 				margin: 1.4em 0 0.6em;
@@ -761,6 +1044,7 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 				border-radius: 6px;
 				padding: 0.15em 0.4em;
 				font-size: 0.92em;
+				color: var(--inline-code);
 			}
 
 			.markdown-body pre {
@@ -773,6 +1057,7 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 				word-break: break-word;
 				overflow-wrap: anywhere;
 				tab-size: 2;
+				color: var(--code-text);
 			}
 
 			.markdown-body pre code {
@@ -789,7 +1074,7 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 			.markdown-body .mermaid-error-block {
 				margin: 0 0 1em;
 				padding: 10px 8px;
-				background: #ffffff;
+				background: var(--mermaid-bg);
 				border: 1px solid var(--border-color);
 				border-radius: 12px;
 				overflow: hidden;
@@ -807,7 +1092,7 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 			.markdown-body .mermaid-page-slice {
 				margin: 0 0 12px;
 				padding: 10px 8px;
-				background: #ffffff;
+				background: var(--mermaid-bg);
 				border: 1px solid var(--border-color);
 				border-radius: 12px;
 				overflow: hidden;
@@ -908,6 +1193,11 @@ export async function buildMarkdownPdfDocument({ content = '', title = 'Markdown
 
 			.hljs {
 				background: transparent;
+				color: inherit;
+			}
+
+			.markdown-body mark {
+				background: var(--mark-bg);
 				color: inherit;
 			}
 		</style>

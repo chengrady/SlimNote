@@ -3,7 +3,7 @@
     ref="editorRef"
     class="milkdown-editor-container"
     :class="{ 'dark-theme': isDarkTheme }"
-    :style="inlineCompletionStyle"
+    :style="editorStyle"
     tabindex="0"
     @keydown.capture="handleKeydown"
     @keyup.capture="handleKeyup"
@@ -25,6 +25,7 @@ import '@milkdown/crepe/theme/common/style.css'
 import '@milkdown/crepe/theme/frame.css'
 import { useSettingsStore } from '../stores/settings'
 import { consumeInlineCompletionLine } from '../utils/aiInlineCompletion'
+import { buildMarkdownThemeStyleVars, resolveMarkdownTheme } from '../utils/markdownThemes'
 
 const props = defineProps({
   modelValue: {
@@ -38,6 +39,10 @@ const props = defineProps({
   fontSize: {
     type: Number,
     default: 14
+  },
+  markdownTheme: {
+    type: Object,
+    default: null
   },
   inlineCompletionProvider: {
     type: Object,
@@ -61,10 +66,16 @@ let isComposing = false
 let inlineCompletionTimer = 0
 let inlineCompletionRequestSerial = 0
 let inlineCompletionAnchor = null
+let pendingExternalMarkdown = null
 const inlineCompletionText = ref('')
 const inlineCompletionPluginKey = new PluginKey('slimnote-inline-completion')
 
-const isDarkTheme = computed(() => settingsStore.settings.theme === 'dark')
+const resolvedMarkdownTheme = computed(() => props.markdownTheme || settingsStore.effectiveTheme || resolveMarkdownTheme(undefined, settingsStore.settings.theme))
+const isDarkTheme = computed(() => resolvedMarkdownTheme.value?.mode === 'dark')
+const editorStyle = computed(() => ({
+  ...buildMarkdownThemeStyleVars(resolvedMarkdownTheme.value),
+  ...props.inlineCompletionStyle
+}))
 
 function debugInlineCompletion(stage, details = {}) {
   console.info('[inline-completion][milkdown]', stage, details)
@@ -419,6 +430,27 @@ function replaceMarkdownContent(markdown) {
   applyEditableRootPreferences()
 }
 
+function applyExternalMarkdown(value) {
+  const nextMarkdown = typeof value === 'string' ? value : ''
+  if (!crepeEditor || !isEditorReady) {
+    pendingExternalMarkdown = nextMarkdown
+    return
+  }
+
+  pendingExternalMarkdown = null
+  if (nextMarkdown === getCurrentMarkdown()) return
+
+  cancelInlineCompletion()
+  isApplyingExternalUpdate = true
+  try {
+    replaceMarkdownContent(nextMarkdown)
+  } finally {
+    queueMicrotask(() => {
+      isApplyingExternalUpdate = false
+    })
+  }
+}
+
 onMounted(async () => {
   if (!editorRef.value) return
 
@@ -450,6 +482,7 @@ onMounted(async () => {
       manager.mounted(() => {
         isEditorReady = true
         applyEditableRootPreferences()
+        applyExternalMarkdown(pendingExternalMarkdown ?? props.modelValue)
       })
     })
 
@@ -471,24 +504,12 @@ onUnmounted(() => {
 
 // Watch for external value changes
 watch(() => props.modelValue, (value) => {
-  if (!crepeEditor || !isEditorReady || isApplyingExternalUpdate) return
-
-  const nextMarkdown = typeof value === 'string' ? value : ''
-  if (nextMarkdown === getCurrentMarkdown()) return
-
-  cancelInlineCompletion()
-  isApplyingExternalUpdate = true
-  try {
-    replaceMarkdownContent(nextMarkdown)
-  } finally {
-    queueMicrotask(() => {
-      isApplyingExternalUpdate = false
-    })
-  }
+  if (isApplyingExternalUpdate) return
+  applyExternalMarkdown(value)
 })
 
 // Watch for theme changes
-watch(() => settingsStore.settings.theme, () => {
+watch(() => resolvedMarkdownTheme.value?.mode, () => {
   // Re-apply theme class
   if (editorRef.value) {
     const container = editorRef.value
@@ -539,35 +560,39 @@ defineExpose({
   font-size: v-bind('props.fontSize + "px"');
   line-height: 1.6;
   padding: 0;
-  color: var(--text-main);
-  background: var(--bg-primary);
+  color: var(--md-text);
+  background: var(--md-bg);
   user-select: text;
   scrollbar-gutter: stable;
 }
 
 .milkdown-editor-container.dark-theme {
-  color: var(--text-main);
-  background: var(--bg-primary);
+  color: var(--md-text);
+  background: var(--md-bg);
+}
+
+.milkdown-editor-container :deep(.milkdown) {
+  --crepe-color-background: var(--md-bg);
+  --crepe-color-on-background: var(--md-text);
+  --crepe-color-surface: var(--md-surface);
+  --crepe-color-surface-low: var(--md-code-bg);
+  --crepe-color-on-surface: var(--md-text);
+  --crepe-color-on-surface-variant: var(--md-muted);
+  --crepe-color-outline: var(--md-border);
+  --crepe-color-primary: var(--md-accent);
+  --crepe-color-secondary: var(--md-code-bg);
+  --crepe-color-on-secondary: var(--md-text);
+  --crepe-color-inverse: var(--md-text);
+  --crepe-color-on-inverse: var(--md-bg);
+  --crepe-color-inline-code: var(--md-inline-code);
+  --crepe-color-error: #d14343;
+  --crepe-color-hover: var(--md-quote-bg);
+  --crepe-color-selected: var(--md-selection-bg);
+  --crepe-color-inline-area: var(--md-code-bg);
 }
 
 .milkdown-editor-container.dark-theme :deep(.milkdown) {
-  --crepe-color-background: #1a1a1a;
-  --crepe-color-on-background: #e6e6e6;
-  --crepe-color-surface: #121212;
-  --crepe-color-surface-low: #1c1c1c;
-  --crepe-color-on-surface: #d1d1d1;
-  --crepe-color-on-surface-variant: #a9a9a9;
-  --crepe-color-outline: #757575;
-  --crepe-color-primary: #b5b5b5;
-  --crepe-color-secondary: #4d4d4d;
-  --crepe-color-on-secondary: #d6d6d6;
-  --crepe-color-inverse: #e5e5e5;
-  --crepe-color-on-inverse: #2a2a2a;
-  --crepe-color-inline-code: #ff6666;
   --crepe-color-error: #ff6666;
-  --crepe-color-hover: #232323;
-  --crepe-color-selected: #2f2f2f;
-  --crepe-color-inline-area: #2b2b2b;
 }
 
 /* Milkdown editor styles */
@@ -592,10 +617,10 @@ defineExpose({
 
 .milkdown-editor-container :deep(.ProseMirror) {
   min-height: 100%;
-  padding: clamp(20px, 2.8vw, 36px);
+  padding: clamp(28px, 3vw, 42px) clamp(20px, 2.8vw, 36px) clamp(40px, 4vw, 60px);
   font-family: inherit;
   line-height: 1.6;
-  color: var(--text-main);
+  color: var(--md-text);
 }
 
 .milkdown-editor-container :deep(.ProseMirror > :first-child) {
@@ -619,7 +644,7 @@ defineExpose({
 .milkdown-editor-container.dark-theme :deep(.cm-activeLine),
 .milkdown-editor-container.dark-theme :deep(.cm-activeLineGutter) {
   background: transparent !important;
-  color: var(--text-main) !important;
+  color: var(--md-text) !important;
 }
 
 .milkdown-editor-container.dark-theme :deep(pre),
@@ -641,22 +666,22 @@ defineExpose({
 .milkdown-editor-container.dark-theme :deep(.code-fence .cm-scroller),
 .milkdown-editor-container.dark-theme :deep(.code-fence .cm-content),
 .milkdown-editor-container.dark-theme :deep(.code-fence .cm-line) {
-  background: color-mix(in srgb, var(--bg-secondary) 92%, rgba(255, 255, 255, 0.03)) !important;
-  color: var(--text-main) !important;
+  background: var(--md-code-bg) !important;
+  color: var(--md-code-text) !important;
 }
 
 .milkdown-editor-container.dark-theme :deep(.code-block-wrapper .cm-gutters),
 .milkdown-editor-container.dark-theme :deep(.milkdown .milkdown-code-block .cm-gutters),
 .milkdown-editor-container.dark-theme :deep(.code-fence .cm-gutters) {
-  background: color-mix(in srgb, var(--bg-secondary) 88%, rgba(255, 255, 255, 0.04)) !important;
-  color: var(--text-muted) !important;
-  border-right: 1px solid var(--glass-border) !important;
+  background: var(--md-code-bg) !important;
+  color: var(--md-muted) !important;
+  border-right: 1px solid var(--md-border) !important;
 }
 
 .milkdown-editor-container.dark-theme :deep(.code-block-wrapper .cm-activeLine),
 .milkdown-editor-container.dark-theme :deep(.milkdown .milkdown-code-block .cm-activeLine),
 .milkdown-editor-container.dark-theme :deep(.code-fence .cm-activeLine) {
-  background: color-mix(in srgb, var(--bg-secondary) 92%, rgba(255, 255, 255, 0.03)) !important;
+  background: var(--md-quote-bg) !important;
 }
 
 .milkdown-editor-container.dark-theme :deep(.code-block-wrapper .cm-activeLineGutter),
@@ -666,17 +691,17 @@ defineExpose({
 .milkdown-editor-container.dark-theme :deep(.milkdown .milkdown-code-block .cm-gutterElement),
 .milkdown-editor-container.dark-theme :deep(.milkdown .milkdown-code-block .cm-lineNumbers .cm-gutterElement),
 .milkdown-editor-container.dark-theme :deep(.code-fence .cm-gutterElement) {
-  background: color-mix(in srgb, var(--bg-secondary) 88%, rgba(255, 255, 255, 0.04)) !important;
+  background: var(--md-code-bg) !important;
 }
 
 .milkdown-editor-container.dark-theme :deep(.code-block-wrapper .cm-cursor),
 .milkdown-editor-container.dark-theme :deep(.code-fence .cm-cursor) {
-  border-left-color: var(--text-main) !important;
+  border-left-color: var(--md-text) !important;
 }
 
 .milkdown-editor-container.dark-theme :deep(.ProseMirror),
 .milkdown-editor-container.dark-theme :deep(.milkdown .editor) {
-  caret-color: var(--text-main);
+  caret-color: var(--md-text);
 }
 
 .milkdown-editor-container.dark-theme :deep(button),
@@ -684,9 +709,9 @@ defineExpose({
 .milkdown-editor-container.dark-theme :deep(input),
 .milkdown-editor-container.dark-theme :deep(textarea),
 .milkdown-editor-container.dark-theme :deep(select) {
-  background: var(--bg-secondary);
-  color: var(--text-main);
-  border-color: var(--glass-border);
+  background: var(--md-surface);
+  color: var(--md-text);
+  border-color: var(--md-border);
 }
 
 /* Headings */
@@ -700,20 +725,20 @@ defineExpose({
   margin-bottom: var(--space-4);
   font-weight: 600;
   line-height: 1.25;
-  color: var(--text-main);
+  color: var(--md-heading);
   padding: 0;
   font-family: inherit;
 }
 
 .milkdown-editor-container :deep(.milkdown .ProseMirror h1) {
   font-size: 2em;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--md-border);
   padding-bottom: 0.3em;
 }
 
 .milkdown-editor-container :deep(.milkdown .ProseMirror h2) {
   font-size: 1.5em;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--md-border);
   padding-bottom: 0.3em;
 }
 
@@ -727,7 +752,7 @@ defineExpose({
 
 .milkdown-editor-container :deep(.milkdown .ProseMirror h6) {
   font-size: 0.85em;
-  color: var(--text-muted);
+  color: var(--md-muted);
 }
 
 /* Paragraphs */
@@ -740,7 +765,7 @@ defineExpose({
 
 /* Links */
 .milkdown-editor-container :deep(a) {
-  color: var(--accent-primary);
+  color: var(--md-accent);
   text-decoration: none;
 }
 
@@ -766,7 +791,7 @@ defineExpose({
 }
 
 .milkdown-editor-container :deep(.milkdown .ProseMirror ol li::marker) {
-  color: var(--text-main);
+  color: var(--md-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -782,9 +807,9 @@ defineExpose({
 .milkdown-editor-container :deep(.milkdown .ProseMirror blockquote) {
   margin: 0 0 var(--space-4) 0;
   padding: 0 1em;
-  border-left: 0.25em solid rgba(var(--accent-primary-rgb), 0.28);
-  color: var(--text-muted);
-  background: rgba(var(--accent-primary-rgb), 0.04);
+  border-left: 0.25em solid rgba(var(--md-accent-rgb), 0.36);
+  color: var(--md-muted);
+  background: var(--md-quote-bg);
   border-radius: 0 8px 8px 0;
   box-sizing: border-box;
 }
@@ -797,7 +822,8 @@ defineExpose({
 .milkdown-editor-container :deep(code) {
   font-family: var(--font-family-mono, 'Consolas', 'Monaco', 'Courier New', monospace);
   font-size: 85%;
-  background-color: rgba(128, 128, 128, 0.15);
+  background-color: var(--md-code-bg);
+  color: var(--md-inline-code);
   padding: 0.2em 0.4em;
   margin: 0;
   border-radius: 6px;
@@ -807,7 +833,8 @@ defineExpose({
   font-family: var(--font-family-mono, 'Consolas', 'Monaco', 'Courier New', monospace);
   font-size: 14px;
   line-height: 1.45;
-  background-color: var(--btn-bg);
+  background-color: var(--md-code-bg);
+  color: var(--md-code-text);
   padding: 16px;
   border-radius: 6px;
   overflow-x: auto;
@@ -827,11 +854,11 @@ defineExpose({
 /* Horizontal rules */
 .milkdown-editor-container :deep(.milkdown .ProseMirror hr) {
   border: none;
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid var(--md-border);
   margin: var(--space-5) 0;
   padding: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+  background: linear-gradient(90deg, transparent, var(--md-border), transparent);
 }
 
 /* Tables */
@@ -844,18 +871,18 @@ defineExpose({
 
 .milkdown-editor-container :deep(.milkdown .ProseMirror th),
 .milkdown-editor-container :deep(.milkdown .ProseMirror td) {
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--md-border);
   padding: 6px 13px;
   text-align: left;
 }
 
 .milkdown-editor-container :deep(.milkdown .ProseMirror th) {
   font-weight: bold;
-  background: color-mix(in srgb, var(--bg-secondary) 90%, rgba(var(--accent-primary-rgb), 0.05));
+  background: var(--md-quote-bg);
 }
 
 .milkdown-editor-container :deep(.milkdown .ProseMirror table tr:nth-child(2n)) {
-  background-color: color-mix(in srgb, var(--bg-secondary) 88%, rgba(var(--accent-primary-rgb), 0.03));
+  background-color: var(--md-table-stripe);
 }
 
 /* Images */
@@ -871,13 +898,13 @@ defineExpose({
 
 /* Selection */
 .milkdown-editor-container :deep(::selection) {
-  background: rgba(0, 242, 255, 0.3);
+  background: var(--md-selection-bg);
 }
 
 /* Placeholder */
 .milkdown-editor-container :deep(.milkdown p.is-empty:first-child::before) {
   content: attr(data-placeholder);
-  color: var(--text-muted, #888);
+  color: var(--md-muted, #888);
   pointer-events: none;
   position: absolute;
   height: 0;
@@ -886,16 +913,16 @@ defineExpose({
 /* Dark theme specific styles */
 .milkdown-editor-container.dark-theme :deep(code),
 .milkdown-editor-container.dark-theme :deep(pre) {
-  background: color-mix(in srgb, var(--bg-secondary) 92%, rgba(255, 255, 255, 0.03));
+  background: var(--md-code-bg);
 }
 
 .milkdown-editor-container.dark-theme :deep(th) {
-  background: color-mix(in srgb, var(--bg-secondary) 88%, rgba(255, 255, 255, 0.05));
+  background: var(--md-quote-bg);
 }
 
 .milkdown-editor-container.dark-theme :deep(th),
 .milkdown-editor-container.dark-theme :deep(td) {
-  border-color: var(--glass-border);
+  border-color: var(--md-border);
 }
 
 /* Math formulas with KaTeX */
@@ -911,7 +938,7 @@ defineExpose({
 
 /* Dark theme KaTeX adjustments */
 .milkdown-editor-container.dark-theme :deep(.katex) {
-  color: #e0e0e0;
+  color: var(--md-text);
 }
 
 /* Focus state */
@@ -955,8 +982,8 @@ defineExpose({
   top: 0.5em;
   right: 0.5em;
   font-size: 0.75em;
-  color: var(--text-muted, #888);
-  background: color-mix(in srgb, var(--bg-secondary) 90%, rgba(var(--accent-primary-rgb), 0.05));
+  color: var(--md-muted, #888);
+  background: var(--md-quote-bg);
   padding: 0.2em 0.5em;
   border-radius: 3px;
   pointer-events: none;

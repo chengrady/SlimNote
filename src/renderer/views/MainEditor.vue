@@ -4,6 +4,7 @@
       v-show="!isPresentationMode"
       :left-sidebar-collapsed="isSidebarCollapsed"
       :right-sidebar-collapsed="isRightSidebarCollapsed"
+      :show-update-entry="hasPendingUpdateNotice"
       @open-settings="openSettingsDialog"
       @menu-action="handleTitleBarMenuAction"
     />
@@ -159,6 +160,7 @@ import { getFileExtension } from '../utils/fileSupport'
 import { getDirectoryPath, getPathFileName } from '../utils/pathUtils'
 import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/rendererEvents'
 import { isShortcutEvent } from '../utils/shortcuts'
+import { createAutoSaveScheduler } from '../utils/autoSaveScheduler'
 import packageJson from '../../../package.json'
 
 const EditorPanel = defineAsyncComponent(() => import('../components/EditorPanel.vue'))
@@ -221,11 +223,21 @@ const latestUpdateState = ref(null)
 const isPresentationMode = ref(false)
 const cleanups = []
 const watchedFilePaths = new Set()
+const selfWriteSnapshots = new Map()
 let watchedFilesSyncQueue = Promise.resolve()
 let watchedFilesSyncRequestId = 0
 let isMainEditorDisposed = false
 let isApplyingWorkbenchConstraints = false
 let clearWorkbenchConstraintPending = false
+const SELF_WRITE_SUPPRESSION_TTL_MS = 5000
+
+const autoSaveScheduler = createAutoSaveScheduler({
+  getTabs: () => editorStore.tabs,
+  getSettings: () => settingsStore.settings,
+  writeFile: writeFileWithSelfChangeSuppression,
+  markSaved: (tabId) => editorStore.saveTab(tabId),
+  handleError: handleAutoSaveError
+})
 
 const isSidebarCollapsed = computed(() => settingsStore.settings.sidebarCollapsed)
 const isRightSidebarCollapsed = computed(() => settingsStore.settings.rightSidebarCollapsed)
@@ -248,6 +260,7 @@ const isNearAutoCollapseThreshold = computed(() => {
 const updateDialogCloseText = computed(() => localizeText('知道了', 'OK'))
 const isUpdateDialogBusy = computed(() => isCheckingUpdates.value || isDownloadingUpdate.value)
 const isUpdateDialogPrimaryDisabled = computed(() => isUpdateDialogBusy.value || !updateDialogActionText.value)
+const hasPendingUpdateNotice = computed(() => ['available', 'downloaded'].includes(latestUpdateState.value?.status))
 const unsavedTabCount = computed(() => editorStore.tabs.filter(tab => tab.isDirty).length)
 const appCloseConfirmTitle = computed(() => localizeText('退出 SlimNote', 'Exit SlimNote'))
 const appCloseConfirmMessage = computed(() => {
@@ -437,6 +450,7 @@ const handleExternalFileChange = async (filePath) => {
     const result = await window.electronAPI.readFile(filePath)
     const latestTab = editorStore.findTabByPath(filePath)
     if (!latestTab) return
+    if (consumeSelfWrite(filePath, result.content)) return
     if (result.content === latestTab.content && result.encoding === latestTab.encoding) return
 
     externalChangeQueue.value.push({
@@ -758,9 +772,7 @@ function handleUpdateDialogSecondaryAction() {
 }
 
 function handleUpdateStateChanged(state) {
-  const status = normalizeUpdateStatus(state || {})
-  const shouldShowAutomatically = ['available', 'downloaded'].includes(status)
-  applyUpdateState(state, { silent: !showUpdateDialog.value && !shouldShowAutomatically })
+  applyUpdateState(state, { silent: !showUpdateDialog.value })
 }
 
 async function hydrateUpdateState() {
@@ -807,6 +819,15 @@ async function handleCheckForUpdates() {
   }
 }
 
+async function openUpdateDialogFromIndicator() {
+  if (latestUpdateState.value) {
+    applyUpdateState(latestUpdateState.value)
+    return
+  }
+
+  await handleCheckForUpdates()
+}
+
 async function openFileFromDialog() {
   const result = await window.electronAPI.openFileDialog()
   if (!result.canceled && result.filePaths.length > 0) {
@@ -823,6 +844,74 @@ async function openFolderFromDialog() {
 
 function filePathKey(filePath) {
   return String(filePath || '').replace(/\//g, '\\').toLowerCase()
+}
+
+function pruneSelfWriteSnapshots(key) {
+  const now = Date.now()
+  const snapshots = (selfWriteSnapshots.get(key) || []).filter(snapshot => snapshot.expiresAt > now)
+  if (snapshots.length > 0) {
+    selfWriteSnapshots.set(key, snapshots)
+  } else {
+    selfWriteSnapshots.delete(key)
+  }
+  return snapshots
+}
+
+function rememberSelfWrite(filePath, content) {
+  const key = filePathKey(filePath)
+  if (!key) return
+
+  const snapshots = pruneSelfWriteSnapshots(key)
+  snapshots.push({
+    content,
+    expiresAt: Date.now() + SELF_WRITE_SUPPRESSION_TTL_MS
+  })
+  selfWriteSnapshots.set(key, snapshots.slice(-5))
+}
+
+function forgetSelfWrite(filePath, content) {
+  const key = filePathKey(filePath)
+  if (!key) return
+
+  const snapshots = pruneSelfWriteSnapshots(key).filter(snapshot => snapshot.content !== content)
+  if (snapshots.length > 0) {
+    selfWriteSnapshots.set(key, snapshots)
+  } else {
+    selfWriteSnapshots.delete(key)
+  }
+}
+
+function consumeSelfWrite(filePath, content) {
+  const key = filePathKey(filePath)
+  if (!key) return false
+
+  const snapshots = pruneSelfWriteSnapshots(key)
+  const index = snapshots.findIndex(snapshot => snapshot.content === content)
+  if (index === -1) return false
+
+  snapshots.splice(index, 1)
+  if (snapshots.length > 0) {
+    selfWriteSnapshots.set(key, snapshots)
+  } else {
+    selfWriteSnapshots.delete(key)
+  }
+  return true
+}
+
+async function writeFileWithSelfChangeSuppression(filePath, content, encoding) {
+  rememberSelfWrite(filePath, content)
+  try {
+    await window.electronAPI.writeFile(filePath, content, encoding)
+  } catch (error) {
+    forgetSelfWrite(filePath, content)
+    throw error
+  }
+}
+
+function handleAutoSaveError(error) {
+  console.error('Failed to auto save file:', error)
+  errorMessage.value = '自动保存文件失败: ' + (error?.message || error)
+  showErrorDialog.value = true
 }
 
 function createFilePathKeySet(filePaths = []) {
@@ -899,6 +988,9 @@ async function handleTitleBarMenuAction(action) {
       break
     case 'check-for-updates':
       await handleCheckForUpdates()
+      break
+    case 'open-update-dialog':
+      await openUpdateDialogFromIndicator()
       break
     case 'open-about':
       showAboutDialog.value = true
@@ -1212,6 +1304,24 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => ({
+    autoSave: settingsStore.settings.autoSave,
+    autoSaveDelay: settingsStore.settings.autoSaveDelay,
+    tabs: editorStore.tabs.map(tab => ({
+      id: tab.id,
+      filePath: tab.filePath,
+      content: tab.content,
+      encoding: tab.encoding,
+      isDirty: tab.isDirty
+    }))
+  }),
+  () => {
+    autoSaveScheduler.schedule()
+  },
+  { deep: true, immediate: true }
+)
+
 onMounted(() => {
   isMainEditorDisposed = false
   // 监听文件更改事件
@@ -1331,6 +1441,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   isMainEditorDisposed = true
+  autoSaveScheduler.dispose()
+  selfWriteSnapshots.clear()
   watchedFilesSyncRequestId += 1
   cleanups.forEach(cleanup => {
     if (typeof cleanup === 'function') {
@@ -1497,7 +1609,7 @@ async function saveTabById(tabId) {
 
   try {
     if (tab.filePath) {
-      await window.electronAPI.writeFile(tab.filePath, tab.content, tab.encoding)
+      await writeFileWithSelfChangeSuppression(tab.filePath, tab.content, tab.encoding)
       editorStore.saveTab(tab.id)
     } else {
       const result = await showSaveDialogForTab(tab)
@@ -1505,7 +1617,7 @@ async function saveTabById(tabId) {
         return false
       }
 
-      await window.electronAPI.writeFile(result.filePath, tab.content, tab.encoding)
+      await writeFileWithSelfChangeSuppression(result.filePath, tab.content, tab.encoding)
       applySavedFilePath(tab, result.filePath)
     }
     return true
@@ -1537,7 +1649,7 @@ async function saveCurrentFileAs() {
   try {
     const result = await showSaveDialogForTab(tab)
     if (!result.canceled && result.filePath) {
-      await window.electronAPI.writeFile(result.filePath, tab.content, tab.encoding)
+      await writeFileWithSelfChangeSuppression(result.filePath, tab.content, tab.encoding)
       applySavedFilePath(tab, result.filePath)
     }
   } catch (error) {

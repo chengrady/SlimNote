@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     defaultPath
   }),
   exportMarkdownPdf: (payload) => ipcRenderer.invoke('export-markdown-pdf', payload),
+  openMarkdownHtmlInBrowser: (payload) => ipcRenderer.invoke('open-markdown-html-in-browser', payload),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   getUpdateState: () => ipcRenderer.invoke('get-update-state'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),

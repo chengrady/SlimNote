@@ -22,6 +22,7 @@
         @set-split-focus="setMarkdownSplitFocus"
         @copy-plain="copyMarkdownAsPlainText"
         @copy-rich="copyMarkdownAsRichContent"
+        @open-browser="openMarkdownInBrowser"
         @export-pdf="exportMarkdownAsPdf"
       />
       <JsonToolbar
@@ -95,6 +96,7 @@
               :modelValue="activeTab.content"
               :theme="settingsStore.settings.theme"
               :fontSize="activeTab.fontSize"
+              :markdown-theme="activeMarkdownTheme"
               :inline-completion-provider="inlineCompletionProvider"
               :inline-completion-style="inlineCompletionStyle"
               @update:modelValue="handleContentChange"
@@ -167,6 +169,7 @@
                 :content="activeTab.content"
                 :source-path="activeTab.filePath || ''"
                 :font-size="activeTab.fontSize"
+                :markdown-theme="activeMarkdownTheme"
                 @scroll="handlePreviewScroll"
                 @active-heading-change="handleActiveHeadingChange"
                 @heading-click="handlePreviewHeadingClick"
@@ -238,6 +241,7 @@
               :content="activeTab.content"
               :source-path="activeTab.filePath || ''"
               :font-size="activeTab.fontSize"
+              :markdown-theme="activeMarkdownTheme"
               @scroll="handlePreviewScroll"
               @active-heading-change="handleActiveHeadingChange"
               @heading-click="handlePreviewHeadingClick"
@@ -381,7 +385,8 @@ import JsonStatsBar from './JsonStatsBar.vue'
 import WelcomeWorkbench from './WelcomeWorkbench.vue'
 import { repairAndFormat } from '../utils/jsonRepair'
 import { exportCodeToImage, downloadImage } from '../utils/exportImage'
-import { buildMarkdownClipboardPayload, buildMarkdownPdfDocument } from '../utils/markdownPdf'
+import { buildMarkdownBrowserDocument, buildMarkdownClipboardPayload, buildMarkdownPdfDocument } from '../utils/markdownPdf'
+import { formatMarkdownSourceListBlock, getMarkdownSelectedLineRange } from '../utils/markdownSourceFormat'
 import { detectLanguageFromContent, getLanguageDisplayName } from '../utils/contentTypeDetection'
 import { canApplyAiEdits } from '../utils/aiContext'
 import {
@@ -397,6 +402,11 @@ import { getPathFileName as getFileName } from '../utils/pathUtils'
 import { RENDERER_EVENTS, emitRendererEvent, onRendererEvent } from '../utils/rendererEvents'
 import { isShortcutEvent } from '../utils/shortcuts'
 import { formatSql, minifySql, transformSqlKeywords } from '../utils/sqlFormatter'
+import {
+  DEFAULT_MARKDOWN_THEME_REF,
+  normalizeMarkdownThemeRef,
+  resolveMarkdownTheme
+} from '../utils/markdownThemes'
 
 const props = defineProps({
   isPresentationMode: {
@@ -570,6 +580,8 @@ const templates = [
 ]
 
 const activeTab = computed(() => editorStore.getActiveTab())
+const activeMarkdownThemeRef = computed(() => normalizeMarkdownThemeRef(settingsStore.settings.themeRef || DEFAULT_MARKDOWN_THEME_REF))
+const activeMarkdownTheme = computed(() => settingsStore.effectiveTheme || resolveMarkdownTheme(activeMarkdownThemeRef.value, settingsStore.settings.theme))
 const recentQuickFiles = computed(() => fileStore.recentFiles.slice(0, 4))
 const lastOpenedFolder = computed(() => localStorage.getItem('lastOpenedFolder') || '')
 const currentContextType = computed(() => {
@@ -1798,7 +1810,7 @@ async function exportMarkdownAsPdf() {
     const html = await buildMarkdownPdfDocument({
       content: activeTab.value.content,
       title: '',
-      theme: settingsStore.settings.theme,
+      theme: activeMarkdownTheme.value,
       sourcePath: activeTab.value.filePath || ''
     })
 
@@ -1808,6 +1820,36 @@ async function exportMarkdownAsPdf() {
     })
   } catch (e) {
     errorMessage.value = `导出 PDF 失败: ${e.message}`
+    showErrorDialog.value = true
+  }
+}
+
+async function openMarkdownInBrowser() {
+  if (!activeTab.value || activeTab.value.language !== 'markdown') return
+
+  try {
+    const baseName = getFileName(activeTab.value.filePath || activeTab.value.title || 'markdown')
+    const title = baseName.replace(/\.[^.]+$/, '') || 'Markdown'
+    const html = await buildMarkdownBrowserDocument({
+      content: activeTab.value.content,
+      title,
+      theme: activeMarkdownTheme.value,
+      sourcePath: activeTab.value.filePath || ''
+    })
+    const openInBrowser = window.electronAPI?.openMarkdownHtmlInBrowser
+    if (typeof openInBrowser !== 'function') {
+      throw new Error('openMarkdownHtmlInBrowser API 不可用')
+    }
+
+    await openInBrowser({
+      html,
+      title
+    })
+  } catch (e) {
+    const message = String(e?.message || e || '')
+    errorMessage.value = /No handler registered for 'open-markdown-html-in-browser'/.test(message)
+      ? '在浏览器打开 Markdown 需要重启应用后生效，请完全退出 SlimNote 后重新打开。'
+      : `在浏览器打开 Markdown 失败: ${message}`
     showErrorDialog.value = true
   }
 }
@@ -1976,12 +2018,57 @@ function insertMarkdown(prefix, suffix = '') {
   }
 }
 
+function applyMarkdownSourceList(type, fallbackPrefix) {
+  if (editorMode.value === 'wysiwyg') {
+    insertMarkdown(fallbackPrefix)
+    return
+  }
+
+  const editor = monacoEditorRef.value?.getEditor?.()
+  const model = editor?.getModel?.()
+  const selection = editor?.getSelection?.()
+  const lineRange = getMarkdownSelectedLineRange(selection, model)
+
+  if (!editor || !model || !lineRange) {
+    insertMarkdown(fallbackPrefix)
+    return
+  }
+
+  const originalText = model.getValueInRange(lineRange)
+  const formatted = formatMarkdownSourceListBlock(originalText, type)
+  if (!formatted.changed) {
+    editor.focus()
+    return
+  }
+
+  const startOffset = model.getOffsetAt({
+    lineNumber: lineRange.startLineNumber,
+    column: lineRange.startColumn
+  })
+
+  editor.pushUndoStop()
+  editor.executeEdits(`markdown-${type}-list`, [{
+    range: lineRange,
+    text: formatted.text,
+    forceMoveMarkers: true
+  }])
+  const endPosition = model.getPositionAt(startOffset + formatted.text.length)
+  editor.setSelection({
+    startLineNumber: lineRange.startLineNumber,
+    startColumn: lineRange.startColumn,
+    endLineNumber: endPosition.lineNumber,
+    endColumn: endPosition.column
+  })
+  editor.pushUndoStop()
+  editor.focus()
+}
+
 function mdBold() { insertMarkdown('**', '**') }
 function mdItalic() { insertMarkdown('*', '*') }
 function mdHeading(level) { insertMarkdown('#'.repeat(level) + ' ') }
-function mdUnorderedList() { insertMarkdown('- ') }
-function mdOrderedList() { insertMarkdown('1. ') }
-function mdCheckList() { insertMarkdown('- [ ] ') }
+function mdUnorderedList() { applyMarkdownSourceList('unordered', '- ') }
+function mdOrderedList() { applyMarkdownSourceList('ordered', '1. ') }
+function mdCheckList() { applyMarkdownSourceList('task', '- [ ] ') }
 function mdCodeBlock() { insertMarkdown('```\n', '\n```') }
 function mdQuote() { insertMarkdown('> ') }
 function mdLink() { insertMarkdown('[', '](url)') }
@@ -2641,7 +2728,7 @@ defineExpose({
 .context-preview-panel :deep(.markdown-preview) {
   height: 100%;
   border-left: none;
-  background: transparent;
+  background: var(--md-bg);
 }
 
 .log-context-panel {

@@ -551,6 +551,7 @@
                         class="settings-row"
                         :class="{
                           'settings-row--checkbox': isInlineCheckboxControl(row.control),
+                          'settings-row--theme': row.control === 'theme',
                           'settings-row--preview': row.control === 'preview',
                           'settings-row--associations': row.control === 'associations',
                           'settings-row--action': row.control === 'system-association' || row.control === 'ai-test'
@@ -578,7 +579,28 @@
                       </template>
 
                       <template v-else-if="row.control === 'theme'">
-                        <SettingsSelect v-model="localSettings.theme" :options="themeOptions" :aria-label="row.title" />
+                        <div class="settings-theme-picker" role="radiogroup" :aria-label="row.title">
+                          <button
+                            v-for="theme in themeCardOptions"
+                            :key="theme.id"
+                            class="settings-theme-option"
+                            :class="{ active: activeSettingsThemeRef === theme.id }"
+                            :style="getThemeOptionStyle(theme)"
+                            type="button"
+                            role="radio"
+                            :aria-checked="activeSettingsThemeRef === theme.id ? 'true' : 'false'"
+                            @click="selectSettingsTheme(theme.id)"
+                          >
+                            <span class="settings-theme-dot" aria-hidden="true"></span>
+                            <span class="settings-theme-option-copy">
+                              <span class="settings-theme-option-title">{{ theme.name }}</span>
+                              <span class="settings-theme-option-desc">{{ theme.description }}</span>
+                            </span>
+                            <svg v-if="activeSettingsThemeRef === theme.id" class="settings-theme-option-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          </button>
+                        </div>
                       </template>
 
                       <template v-else-if="row.control === 'ui-font-size'">
@@ -621,7 +643,7 @@
                       </template>
 
                       <template v-else-if="row.control === 'preview'">
-                        <div class="live-preview" :class="localSettings.theme" :style="previewStyle">
+                        <div class="live-preview" :style="previewStyle">
                           <div class="live-preview-toolbar">
                             <span class="live-preview-dot"></span>
                             <span class="live-preview-dot"></span>
@@ -652,6 +674,21 @@
                           @change="commitUnpinnedTabMaxRows"
                           @blur="commitUnpinnedTabMaxRows"
                           @keydown.enter.prevent="commitUnpinnedTabMaxRows"
+                        >
+                      </template>
+
+                      <template v-else-if="row.control === 'auto-save-delay'">
+                        <input
+                          v-model="autoSaveDelayInput"
+                          class="ui-field"
+                          type="number"
+                          inputmode="numeric"
+                          min="1"
+                          max="60"
+                          step="1"
+                          @change="commitAutoSaveDelay"
+                          @blur="commitAutoSaveDelay"
+                          @keydown.enter.prevent="commitAutoSaveDelay"
                         >
                       </template>
 
@@ -740,6 +777,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useShortcutsStore } from '../stores/shortcuts'
 import { getSupportedLocales } from '../locales'
 import { FONT_FAMILIES, findFontFamilyOption, getFontOptionStyle } from '../utils/fontFamilies'
+import { buildAppThemeStyleVars, getMarkdownThemeOptions, normalizeMarkdownThemeRef, resolveMarkdownTheme } from '../utils/markdownThemes'
 import {
   SHORTCUT_CATEGORY_ORDER,
   buildShortcutConflictMap,
@@ -754,6 +792,7 @@ import {
 } from '../utils/shortcuts'
 import { createSequentialLatestRunner } from '../utils/latestAsyncQueue'
 import { createAiApiKeyInputState } from '../utils/aiApiKeyInputs'
+import { normalizeAutoSaveDelaySeconds } from '../utils/autoSaveScheduler'
 import {
   AI_PROVIDER_PRESETS,
   AI_PROVIDER_PROTOCOL_VALUES,
@@ -848,6 +887,7 @@ const inlineCompletionOpacityTrackStyle = computed(() => {
 const associationStatus = ref('')
 const uiFontSizeInput = ref('14')
 const fontSizeInput = ref('14')
+const autoSaveDelayInput = ref('10')
 const unpinnedTabMaxRowsInput = ref('10')
 const shortcutCategoryFilter = ref('all')
 const recordingShortcutId = ref('')
@@ -885,6 +925,7 @@ let aiTestRequestId = 0
 const aiSettingsSaveRunner = createSequentialLatestRunner()
 const SETTINGS_SCROLL_LOCK_MS = 900
 const inlineCheckboxSettingKeys = {
+  'auto-save': 'autoSave',
   'word-wrap': 'wordWrap',
   'unicode-highlight': 'unicodeHighlight',
   'line-numbers': 'lineNumbers',
@@ -914,7 +955,9 @@ const searchPlaceholder = computed(() => {
 })
 const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase())
 const isSearching = computed(() => Boolean(normalizedSearch.value))
+const localResolvedTheme = computed(() => resolveMarkdownTheme(normalizeMarkdownThemeRef(localSettings.value.themeRef || settingsStore.settings.themeRef), settingsStore.effectiveThemeMode || settingsStore.settings.theme))
 const previewStyle = computed(() => ({
+  ...buildAppThemeStyleVars(localResolvedTheme.value),
   fontFamily: localSettings.value.fontFamily || 'Microsoft YaHei',
   fontSize: `${Math.max(8, localSettings.value.fontSize || 14)}px`
 }))
@@ -955,6 +998,22 @@ function getInlineCompletionColorSwatchStyle(option = {}) {
   }
 }
 
+function getThemeOptionStyle(theme = {}) {
+  const colors = theme.colors || {}
+  return {
+    '--settings-theme-option-bg': colors.pageBg || 'var(--surface-panel)',
+    '--settings-theme-option-surface': colors.surfaceBg || 'var(--surface-panel-strong)',
+    '--settings-theme-option-text': colors.textMain || 'var(--text-main)',
+    '--settings-theme-option-muted': colors.textMuted || 'var(--text-muted)',
+    '--settings-theme-option-accent': colors.accent || 'var(--accent-primary)',
+    '--settings-theme-option-border': colors.border || 'var(--glass-border)'
+  }
+}
+
+function selectSettingsTheme(themeRef) {
+  localSettings.value.themeRef = normalizeMarkdownThemeRef(themeRef)
+}
+
 function updateLocalInlineCompletion(patch = {}) {
   const inlineCompletion = normalizeLocalInlineCompletion({
     ...normalizeLocalInlineCompletion(localAiSettings.value.inlineCompletion),
@@ -989,11 +1048,10 @@ function handleInlineCompletionOpacityChange(event) {
 }
 
 const fontFamilies = FONT_FAMILIES
+const appThemeOptions = getMarkdownThemeOptions()
 
-const themeOptions = computed(() => [
-  { value: 'light', label: t('settings.light') },
-  { value: 'dark', label: t('settings.dark') }
-])
+const themeCardOptions = computed(() => appThemeOptions.fixed)
+const activeSettingsThemeRef = computed(() => normalizeMarkdownThemeRef(localSettings.value.themeRef || settingsStore.settings.themeRef))
 
 const fontFamilyOptions = computed(() => fontFamilies.map(font => ({
   value: font.value,
@@ -1166,7 +1224,7 @@ const SETTINGS_ROW_GROUPS = {
       titleKey: 'settings.interfaceSettings',
       fallbackZh: '界面设置',
       fallbackEn: 'Interface',
-      rowIds: ['language', 'theme']
+      rowIds: ['language']
     },
     {
       id: 'appearance-font-reading',
@@ -1174,6 +1232,13 @@ const SETTINGS_ROW_GROUPS = {
       fallbackZh: '字体与阅读',
       fallbackEn: 'Font and Reading',
       rowIds: ['ui-font-size']
+    },
+    {
+      id: 'appearance-theme',
+      titleKey: 'settings.theme',
+      fallbackZh: '主题',
+      fallbackEn: 'Theme',
+      rowIds: ['theme']
     }
   ],
   editor: [
@@ -1190,6 +1255,13 @@ const SETTINGS_ROW_GROUPS = {
       fallbackZh: '标签栏',
       fallbackEn: 'Tab Bar',
       rowIds: ['tab-density', 'tab-max-rows']
+    },
+    {
+      id: 'editor-save',
+      titleKey: 'settings.save',
+      fallbackZh: '保存',
+      fallbackEn: 'Save',
+      rowIds: ['auto-save', 'auto-save-delay']
     },
     {
       id: 'editor-display',
@@ -1224,9 +1296,9 @@ const sectionDefinitions = computed(() => [
       {
         id: 'theme',
         title: t('settings.theme'),
-        description: localizeText('settings.themeDesc', '切换应用的明暗主题。', 'Switch between the light and dark application theme.'),
+        description: localizeText('settings.themeDesc', '选择应用和编辑区使用的全局主题。', 'Choose the global theme used by the app and editors.'),
         control: 'theme',
-        aliases: ['theme', 'light', 'dark', '主题']
+        aliases: ['theme', 'global theme', '主题', '配色']
       },
       {
         id: 'ui-font-size',
@@ -1276,6 +1348,20 @@ const sectionDefinitions = computed(() => [
         description: localizeText('settings.unpinnedTabMaxRowsDesc', '未固定标签过多时会自动换到下一行，超过最大行数后在标签区域内滚动。', 'Unpinned tabs wrap into additional rows until this limit, then scroll inside the tab area.'),
         control: 'tab-max-rows',
         aliases: ['tab rows', 'tab max rows', 'tabs wrap', '标签行数', '最大行数']
+      },
+      {
+        id: 'auto-save',
+        title: t('settings.autoSave'),
+        description: localizeText('settings.autoSaveDesc', '开启后，已保存过路径的文件会在编辑停止后自动写入磁盘。', 'Automatically writes named files to disk after editing stops.'),
+        control: 'auto-save',
+        aliases: ['auto save', 'autosave', 'save automatically', '自动保存']
+      },
+      {
+        id: 'auto-save-delay',
+        title: t('settings.autoSaveDelay'),
+        description: localizeText('settings.autoSaveDelayDesc', '停止编辑后等待多少秒再写入磁盘。', 'Seconds to wait after editing stops before writing to disk.'),
+        control: 'auto-save-delay',
+        aliases: ['auto save delay', 'save delay', 'seconds', '自动保存延迟', '秒']
       },
       {
         id: 'word-wrap',
@@ -1383,14 +1469,14 @@ const visibleSections = computed(() => {
     const section = currentSectionDefinition.value
     return section ? [{
       ...section,
-      rows: section.rows.filter(row => matchesRow(row) && matchesShortcutCategory(row, section.id))
+      rows: section.rows.filter(row => shouldShowSettingsRow(row) && matchesRow(row) && matchesShortcutCategory(row, section.id))
     }] : []
   }
 
   return sectionDefinitions.value
     .map(section => ({
       ...section,
-      rows: section.rows.filter(row => matchesRow(row) && matchesShortcutCategory(row, section.id))
+      rows: section.rows.filter(row => shouldShowSettingsRow(row) && matchesRow(row) && matchesShortcutCategory(row, section.id))
     }))
     .filter(section => section.rows.length)
 })
@@ -1473,10 +1559,12 @@ watch(() => props.show, async (newVal) => {
     shortcutCategoryFilter.value = 'all'
     localSettings.value = {
       ...settingsStore.settings,
-      theme: settingsStore.settings.theme || 'light'
+      theme: settingsStore.settings.theme || 'light',
+      themeRef: normalizeMarkdownThemeRef(settingsStore.settings.themeRef)
     }
     syncUiFontSizeInput(localSettings.value.uiFontSize)
     syncFontSizeInput(localSettings.value.fontSize)
+    syncAutoSaveDelayInput(localSettings.value.autoSaveDelay)
     syncUnpinnedTabMaxRowsInput(localSettings.value.unpinnedTabMaxRows)
     shortcutsStore.loadShortcuts()
     const aiSettingsResult = await aiStore.loadSettings()
@@ -1521,9 +1609,13 @@ watch(() => localSettings.value.unpinnedTabMaxRows, (unpinnedTabMaxRows) => {
   syncUnpinnedTabMaxRowsInput(unpinnedTabMaxRows)
 })
 
-watch(() => localSettings.value.theme, (theme) => {
-  if (props.show && theme) {
-    settingsStore.updateSettings({ theme })
+watch(() => localSettings.value.autoSaveDelay, (autoSaveDelay) => {
+  syncAutoSaveDelayInput(autoSaveDelay)
+})
+
+watch(() => localSettings.value.themeRef, (themeRef) => {
+  if (props.show && themeRef) {
+    settingsStore.setThemeRef(themeRef)
   }
 })
 
@@ -1542,11 +1634,13 @@ watch(
     localSettings.value.unicodeHighlight,
     localSettings.value.lineNumbers,
     localSettings.value.minimap,
+    localSettings.value.autoSave,
+    localSettings.value.autoSaveDelay,
     localSettings.value.tabSize
   ],
-  ([wordWrap, unicodeHighlight, lineNumbers, minimap, tabSize]) => {
+  ([wordWrap, unicodeHighlight, lineNumbers, minimap, autoSave, autoSaveDelay, tabSize]) => {
     if (props.show) {
-      settingsStore.updateSettings({ wordWrap, unicodeHighlight, lineNumbers, minimap, tabSize })
+      settingsStore.updateSettings({ wordWrap, unicodeHighlight, lineNumbers, minimap, autoSave, autoSaveDelay, tabSize })
     }
   }
 )
@@ -1677,10 +1771,12 @@ function confirmRestoreDefaults() {
   settingsStore.resetSettings()
   localSettings.value = {
     ...settingsStore.settings,
-    theme: settingsStore.settings.theme || 'light'
+    theme: settingsStore.settings.theme || 'light',
+    themeRef: normalizeMarkdownThemeRef(settingsStore.settings.themeRef)
   }
   syncUiFontSizeInput(localSettings.value.uiFontSize)
   syncFontSizeInput(localSettings.value.fontSize)
+  syncAutoSaveDelayInput(localSettings.value.autoSaveDelay)
   syncUnpinnedTabMaxRowsInput(localSettings.value.unpinnedTabMaxRows)
 }
 
@@ -1942,6 +2038,16 @@ function commitFontSize() {
   fontSizeInput.value = String(nextFontSize)
 }
 
+function syncAutoSaveDelayInput(value) {
+  autoSaveDelayInput.value = String(normalizeAutoSaveDelaySeconds(value, settingsStore.DEFAULT_SETTINGS.autoSaveDelay))
+}
+
+function commitAutoSaveDelay() {
+  const nextAutoSaveDelay = normalizeAutoSaveDelaySeconds(autoSaveDelayInput.value, localSettings.value.autoSaveDelay || settingsStore.DEFAULT_SETTINGS.autoSaveDelay)
+  localSettings.value.autoSaveDelay = nextAutoSaveDelay
+  autoSaveDelayInput.value = String(nextAutoSaveDelay)
+}
+
 function normalizeUnpinnedTabMaxRows(value, fallback = localSettings.value.unpinnedTabMaxRows || settingsStore.DEFAULT_SETTINGS.unpinnedTabMaxRows) {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10)
   if (!Number.isFinite(parsed)) return fallback
@@ -1971,6 +2077,11 @@ function matchesShortcutCategory(row, sectionId) {
   if (sectionId !== 'shortcuts' || isSearching.value || row.control !== 'shortcut-display') return true
   if (shortcutCategoryFilter.value === 'all') return true
   return row.category === shortcutCategoryFilter.value
+}
+
+function shouldShowSettingsRow(row) {
+  if (row?.id === 'auto-save-delay') return Boolean(localSettings.value.autoSave)
+  return true
 }
 
 function shouldShowSectionTitle(section) {
@@ -2514,9 +2625,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   grid-template-columns: 324px minmax(0, 1fr);
   grid-template-rows: var(--titlebar-height) minmax(0, 1fr);
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(232, 248, 255, 0.92), rgba(251, 240, 224, 0.92)),
-    var(--bg-gradient, var(--bg-primary));
+  background: var(--bg-gradient, var(--bg-primary));
   color: var(--text-main);
 }
 
@@ -2550,9 +2659,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   display: flex;
   flex-direction: column;
   border-right: none;
-  background:
-    linear-gradient(180deg, rgba(235, 249, 255, 0.45), rgba(250, 238, 220, 0.42)),
-    transparent;
+  background: color-mix(in srgb, var(--surface-toolbar) 78%, var(--surface-panel-strong));
 }
 
 .settings-page-sidebar {
@@ -2584,8 +2691,8 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .settings-return-button:hover,
 .settings-return-button:focus-visible {
-  background: rgba(255, 255, 255, 0.62);
-  border-color: transparent;
+  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--glass-border) 70%, transparent);
   color: var(--text-main);
   box-shadow: none;
 }
@@ -2655,17 +2762,17 @@ async function testAiConnection(providerId = '', modelId = '') {
 }
 
 .settings-nav-item:hover {
-  background: rgba(255, 255, 255, 0.62);
-  border-color: transparent;
+  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--glass-border) 70%, transparent);
   box-shadow: none;
 }
 
 .settings-nav-item.active {
-  background: rgba(255, 255, 255, 0.86);
-  border-color: rgba(170, 186, 194, 0.28);
+  background: color-mix(in srgb, var(--surface-active) 68%, var(--surface-panel-strong));
+  border-color: color-mix(in srgb, var(--accent-primary) 34%, var(--glass-border));
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.52),
-    0 1px 2px rgba(39, 59, 66, 0.04);
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent),
+    0 1px 2px color-mix(in srgb, var(--shadow-color, #000) 12%, transparent);
 }
 
 .settings-nav-item:focus-visible {
@@ -2796,7 +2903,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   padding: 0 12px 0 34px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--bg-primary) 72%, var(--surface-panel));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--surface-panel-strong) 72%, transparent);
 }
 
 .settings-search-input:disabled {
@@ -2977,6 +3084,21 @@ async function testAiConnection(providerId = '', modelId = '') {
   min-height: 48px;
 }
 
+.settings-row--theme {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 0;
+  padding: 10px 12px;
+}
+
+.settings-row--theme .settings-row-copy {
+  display: none;
+}
+
+.settings-row--theme:hover {
+  background: color-mix(in srgb, var(--surface-hover) 38%, var(--surface-panel));
+}
+
 .settings-row--preview {
   grid-template-columns: minmax(128px, 1fr) minmax(420px, 520px);
   align-items: flex-start;
@@ -3103,6 +3225,92 @@ async function testAiConnection(providerId = '', modelId = '') {
 
 .settings-row-control > .settings-select {
   max-width: 300px;
+}
+
+.settings-row--theme .settings-row-control {
+  justify-content: stretch;
+  align-items: stretch;
+}
+
+.settings-theme-picker {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 6px;
+}
+
+.settings-theme-dot {
+  width: 18px;
+  height: 18px;
+  border: 4px solid color-mix(in srgb, var(--settings-theme-option-surface) 84%, #ffffff);
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  background: var(--settings-theme-option-accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--settings-theme-option-border) 72%, transparent),
+    0 1px 2px rgba(15, 23, 42, 0.2);
+}
+
+.settings-theme-option {
+  width: 100%;
+  min-height: 50px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-interactive);
+}
+
+.settings-theme-option:hover,
+.settings-theme-option:focus-visible {
+  border-color: color-mix(in srgb, var(--settings-theme-option-accent) 36%, var(--glass-border));
+  background: color-mix(in srgb, var(--surface-hover) 70%, var(--surface-panel));
+  outline: none;
+}
+
+.settings-theme-option.active {
+  border-color: color-mix(in srgb, var(--settings-theme-option-accent) 48%, var(--glass-border));
+  background: color-mix(in srgb, var(--surface-active) 68%, var(--surface-panel));
+}
+
+.settings-theme-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-theme-option-title {
+  min-width: 0;
+  color: var(--text-main);
+  font-size: var(--field-font-size);
+  font-weight: var(--ui-font-weight-bold);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-theme-option-desc {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--ui-font-size-xs);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-theme-option-check {
+  color: var(--accent-primary);
 }
 
 .settings-tag-list {
@@ -3460,18 +3668,9 @@ async function testAiConnection(providerId = '', modelId = '') {
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--glass-border);
+  background: var(--surface-panel-strong);
+  color: var(--text-main);
   box-shadow: var(--shadow-subtle);
-}
-
-.live-preview.light {
-  background: #ffffff;
-  color: #1e1e1e;
-}
-
-.live-preview.dark {
-  background: #1f1f1f;
-  color: #d4d4d4;
-  border-color: #3b3b3b;
 }
 
 .live-preview-toolbar {
@@ -3488,11 +3687,7 @@ async function testAiConnection(providerId = '', modelId = '') {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.52);
-}
-
-.live-preview.dark .live-preview-dot {
-  background: rgba(255, 255, 255, 0.34);
+  background: rgba(var(--accent-primary-rgb), 0.42);
 }
 
 .live-preview-content {
@@ -4588,10 +4783,19 @@ async function testAiConnection(providerId = '', modelId = '') {
   }
 
   .settings-row,
+  .settings-row--theme,
   .settings-row--preview {
     grid-template-columns: 1fr;
     gap: 10px;
     padding: 8px 12px;
+  }
+
+  .settings-row--theme {
+    padding: 12px;
+  }
+
+  .settings-theme-picker {
+    grid-template-columns: 1fr;
   }
 
   .settings-row--preview {

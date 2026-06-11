@@ -78,6 +78,102 @@ export const themes = {
 /**
  * 定义所有自定义主题
  */
+function toMonacoHex(value, fallback = '#ffffff') {
+  const raw = String(value || fallback).trim()
+  const hex = raw.match(/^#([0-9a-f]{6})([0-9a-f]{2})?$/i)
+  return hex ? hex[1] + (hex[2] || '') : String(fallback).replace(/^#/, '')
+}
+
+function alphaHex(value, alpha) {
+  const clamped = Math.max(0, Math.min(1, Number(alpha) || 0))
+  return `${toMonacoHex(value)}${Math.round(clamped * 255).toString(16).padStart(2, '0')}`
+}
+
+function getSemanticTokenColors(isDark) {
+  return {
+    comment: '7f8aa3',
+    string: isDark ? '9ece6a' : '2f855a',
+    number: isDark ? 'ffb86c' : 'c05621',
+    keyword: isDark ? 'c4b5fd' : '7c3aed',
+    error: isDark ? 'f87171' : 'dc2626',
+    warn: isDark ? 'fbbf24' : 'b45309',
+    info: isDark ? '4ec9b0' : '2f855a',
+    debug: isDark ? '8b949e' : '7f8aa3'
+  }
+}
+
+export function defineSlimNoteEditorTheme(theme, language = 'plaintext') {
+  const colors = theme?.colors || {}
+  const isDark = theme?.mode === 'dark'
+  const semantic = getSemanticTokenColors(isDark)
+  const themeId = `slimnote-${theme?.id || 'default'}-${language === 'log' ? 'log' : 'editor'}`
+  const background = toMonacoHex(colors.codeBg || colors.pageBg, isDark ? '#0d1117' : '#ffffff')
+  const foreground = toMonacoHex(colors.codeText || colors.textMain, isDark ? '#c9d1d9' : '#24292f')
+  const accent = toMonacoHex(colors.accent, isDark ? '#58a6ff' : '#0969da')
+  const muted = toMonacoHex(colors.textMuted, isDark ? '#8b949e' : '#57606a')
+  const surface = toMonacoHex(colors.surfaceBg || colors.pageBg, isDark ? '#161b22' : '#f6f8fa')
+
+  monaco.editor.defineTheme(themeId, {
+    base: isDark ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: semantic.comment, fontStyle: 'italic' },
+      { token: 'string.key.json', foreground: accent },
+      { token: 'string.value.json', foreground: semantic.string },
+      { token: 'string', foreground: semantic.string },
+      { token: 'number.json', foreground: semantic.number },
+      { token: 'number', foreground: semantic.number },
+      { token: 'keyword.json', foreground: semantic.keyword },
+      { token: 'keyword', foreground: semantic.keyword },
+      { token: 'delimiter.bracket.json', foreground: muted },
+      { token: 'delimiter.array.json', foreground: muted },
+      { token: 'delimiter.colon.json', foreground: accent },
+      { token: 'delimiter.comma.json', foreground: muted },
+      { token: 'custom-info', foreground: semantic.info },
+      { token: 'custom-error', foreground: semantic.error, fontStyle: 'bold' },
+      { token: 'custom-notice', foreground: semantic.warn },
+      { token: 'custom-date', foreground: semantic.string },
+      { token: 'custom-content', foreground: accent },
+      { token: 'custom-debug', foreground: semantic.debug }
+    ],
+    colors: {
+      'editor.background': `#${background}`,
+      'editor.foreground': `#${foreground}`,
+      'editorLineNumber.foreground': `#${alphaHex(colors.textMuted || '#8b949e', isDark ? 0.72 : 0.62)}`,
+      'editorLineNumber.activeForeground': `#${foreground}`,
+      'editorGutter.background': `#${background}`,
+      'editor.lineHighlightBackground': `#${alphaHex(colors.surfaceBg || colors.pageBg || '#ffffff', isDark ? 0.36 : 0.72)}`,
+      'editor.selectionBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.34 : 0.22)}`,
+      'editor.inactiveSelectionBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.2 : 0.14)}`,
+      'editor.wordHighlightBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.18 : 0.12)}`,
+      'editor.wordHighlightStrongBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.28 : 0.18)}`,
+      'editorCursor.foreground': `#${accent}`,
+      'editorWhitespace.foreground': `#${alphaHex(colors.textMuted || '#8b949e', isDark ? 0.34 : 0.24)}`,
+      'editorIndentGuide.background1': `#${alphaHex(colors.textMuted || '#8b949e', isDark ? 0.28 : 0.18)}`,
+      'editorIndentGuide.activeBackground1': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.5 : 0.34)}`,
+      'editorBracketMatch.background': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.22 : 0.14)}`,
+      'editorBracketMatch.border': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.6 : 0.42)}`,
+      'editorBracketHighlight.foreground1': `#${accent}`,
+      'editorBracketHighlight.foreground2': `#${semantic.string}`,
+      'editorBracketHighlight.foreground3': `#${semantic.number}`,
+      'editorBracketHighlight.foreground4': `#${semantic.keyword}`,
+      'editorBracketHighlight.foreground5': `#${semantic.error}`,
+      'editorBracketHighlight.foreground6': `#${semantic.warn}`,
+      'editorBracketHighlight.unexpectedBracket.foreground': `#${semantic.error}`,
+      'editor.findMatchBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.36 : 0.28)}`,
+      'editor.findMatchHighlightBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.2 : 0.16)}`,
+      'editor.hoverHighlightBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.16 : 0.1)}`,
+      'editorWidget.background': `#${surface}`,
+      'editorWidget.border': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.28 : 0.16)}`,
+      'scrollbarSlider.background': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.28 : 0.18)}`,
+      'scrollbarSlider.hoverBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.38 : 0.26)}`,
+      'scrollbarSlider.activeBackground': `#${alphaHex(colors.accent || '#0969da', isDark ? 0.5 : 0.34)}`
+    }
+  })
+
+  return themeId
+}
+
 export function defineCustomThemes() {
   // JsonStudio Dark Theme
   monaco.editor.defineTheme('jsonstudio-dark', {
