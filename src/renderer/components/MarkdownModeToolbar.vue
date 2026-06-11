@@ -112,7 +112,24 @@
         <rect x="9" y="9" width="12" height="12" rx="2"/>
         <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/>
       </svg>
-      <span aria-hidden="true">w</span>
+      <span aria-hidden="true">W</span>
+    </button>
+    <div class="markdown-mode-toolbar-separator"></div>
+    <button
+      class="markdown-mode-toolbar-button markdown-mode-toolbar-button--label"
+      type="button"
+      title="在浏览器中打开渲染后的 Markdown"
+      aria-label="在浏览器中打开渲染后的 Markdown"
+      @click="$emit('open-browser')"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <path d="M8 9h8"/>
+        <path d="M8 13h5"/>
+        <path d="M15 13h3v3"/>
+        <path d="m13 18 5-5"/>
+      </svg>
+      <span aria-hidden="true">HTML</span>
     </button>
     <button
       class="markdown-mode-toolbar-button markdown-mode-toolbar-button--label"
@@ -144,7 +161,7 @@ defineProps({
   }
 })
 
-defineEmits(['set-mode', 'set-split-focus', 'copy-plain', 'copy-rich', 'export-pdf'])
+defineEmits(['set-mode', 'set-split-focus', 'copy-plain', 'copy-rich', 'open-browser', 'export-pdf'])
 </script>
 
 <style scoped>

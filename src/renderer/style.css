@@ -111,7 +111,10 @@
   --btn-height-md: 36px;
   --btn-padding-x: 16px;
   --btn-font-weight: var(--ui-font-weight-medium);
+  --btn-primary-bg: var(--accent-gradient);
+  --btn-primary-hover-bg: var(--accent-primary-hover);
   --btn-primary-shadow: 0 4px 12px rgba(var(--accent-primary-rgb), 0.24);
+  --btn-primary-text: #ffffff;
 
   /* Surface and elevation fallbacks */
   --surface-panel: var(--glass-bg);
@@ -457,15 +460,17 @@ textarea {
 
 .btn-primary,
 .modal-btn.primary {
-  background: var(--accent-gradient);
+  background: var(--btn-primary-bg, var(--accent-gradient));
   border: none;
-  color: #ffffff;
+  color: var(--btn-primary-text, #ffffff);
   font-weight: var(--ui-font-weight-bold);
   box-shadow: var(--btn-primary-shadow);
 }
 
 .btn-primary:hover,
 .modal-btn.primary:hover {
+  background: var(--btn-primary-hover-bg, var(--accent-primary-hover));
+  color: var(--btn-primary-text, #ffffff);
   opacity: 0.95;
   box-shadow: var(--btn-primary-shadow);
   transform: translateY(-1px);

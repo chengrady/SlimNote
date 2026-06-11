@@ -64,6 +64,7 @@ import { resolveRelativeFilePath } from '../utils/fileUrlUtils'
 import { enhanceMarkdownHtml, preprocessMarkdownContent } from '../utils/markdownRenderer'
 import { buildStructuredPlainText, decorateListPrefixes, stripDecoratedListPrefixes } from '../utils/markdownListFormat'
 import { buildMarkdownFragmentClipboardPayload } from '../utils/markdownPdf'
+import { buildMarkdownThemeStyleVars, resolveMarkdownTheme } from '../utils/markdownThemes'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
@@ -85,6 +86,10 @@ const props = defineProps({
   fontSize: {
     type: Number,
     default: 14
+  },
+  markdownTheme: {
+    type: Object,
+    default: null
   }
 })
 
@@ -109,8 +114,10 @@ const MIN_FONT_SIZE = 8
 const MAX_FONT_SIZE = 72
 const FONT_SIZE_STEP = 1
 const normalizedFontSize = computed(() => clampFontSize(props.fontSize || settingsStore.settings.fontSize || 14))
+const resolvedMarkdownTheme = computed(() => props.markdownTheme || settingsStore.effectiveTheme || resolveMarkdownTheme(undefined, settingsStore.settings.theme))
 const previewStyle = computed(() => ({
-  '--markdown-preview-font-size': `${normalizedFontSize.value}px`
+  '--markdown-preview-font-size': `${normalizedFontSize.value}px`,
+  ...buildMarkdownThemeStyleVars(resolvedMarkdownTheme.value)
 }))
 const searchSummary = computed(() => {
   if (!searchQuery.value.trim()) return t('markdown.searchReady')
@@ -642,7 +649,7 @@ async function copySelectionAsRichContent() {
 }
 
 function getMermaidTheme() {
-  return settingsStore.settings.theme === 'dark' ? 'dark' : 'default'
+  return resolvedMarkdownTheme.value?.mode === 'dark' ? 'dark' : 'default'
 }
 
 async function renderMermaidDiagrams() {
@@ -761,7 +768,7 @@ watch(htmlContent, async () => {
   }
 }, { immediate: true })
 
-watch(() => settingsStore.settings.theme, async () => {
+watch(() => `${resolvedMarkdownTheme.value?.id || ''}:${resolvedMarkdownTheme.value?.mode || ''}`, async () => {
   if (previewContent.value) {
     previewContent.value.innerHTML = htmlContent.value
   }
@@ -797,8 +804,8 @@ onUnmounted(() => {
   height: 100%;
   width: 100%;
   min-width: 0;
-  background-color: var(--bg-primary);
-  color: var(--text-main);
+  background-color: var(--md-bg);
+  color: var(--md-text);
   box-sizing: border-box;
   font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
   line-height: 1.6;
@@ -833,9 +840,9 @@ onUnmounted(() => {
   gap: 6px;
   min-height: 32px;
   padding: 4px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(var(--accent-primary-rgb), 0.16));
+  border: 1px solid color-mix(in srgb, var(--md-border) 84%, rgba(var(--md-accent-rgb), 0.16));
   border-radius: 999px;
-  background: var(--surface-popover);
+  background: color-mix(in srgb, var(--md-surface) 92%, transparent);
   box-shadow: var(--menu-card-shadow);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -853,20 +860,20 @@ onUnmounted(() => {
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: var(--field-radius);
-  background: color-mix(in srgb, var(--surface-panel-strong) 86%, transparent);
-  color: var(--text-main);
+  background: color-mix(in srgb, var(--md-bg) 86%, var(--md-surface));
+  color: var(--md-text);
   font-size: 12px;
 }
 
 .preview-search-input:focus {
   outline: none;
-  border-color: rgba(var(--accent-primary-rgb), 0.28);
+  border-color: rgba(var(--md-accent-rgb), 0.28);
   box-shadow: var(--field-focus-ring);
 }
 
 .preview-search-count {
   min-width: 44px;
-  color: var(--text-muted);
+  color: var(--md-muted);
   font-size: 11px;
   text-align: center;
   white-space: nowrap;
@@ -878,7 +885,7 @@ onUnmounted(() => {
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-interactive, var(--text-muted));
+  color: var(--md-muted);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
@@ -886,8 +893,8 @@ onUnmounted(() => {
 }
 
 .preview-tool-btn:hover:not(:disabled) {
-  color: var(--text-interactive-active, var(--accent-primary));
-  background: var(--surface-hover);
+  color: var(--md-accent);
+  background: var(--md-quote-bg);
   box-shadow: var(--interactive-hover-ring);
 }
 
@@ -899,13 +906,13 @@ onUnmounted(() => {
 .markdown-preview-content :deep(mark.preview-search-match) {
   padding: 0 2px;
   border-radius: 3px;
-  background: rgba(255, 204, 0, 0.34);
+  background: var(--md-mark-bg);
   color: inherit;
 }
 
 .markdown-preview-content :deep(mark.preview-search-match.active) {
-  background: rgba(var(--accent-primary-rgb), 0.28);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-primary-rgb), 0.36);
+  background: var(--md-selection-bg);
+  box-shadow: inset 0 0 0 1px rgba(var(--md-accent-rgb), 0.36);
 }
 
 .markdown-preview-content :deep(> :first-child) {
@@ -926,7 +933,7 @@ onUnmounted(() => {
   margin-bottom: var(--space-4);
   font-weight: 600;
   line-height: 1.25;
-  color: var(--text-main);
+  color: var(--md-heading);
   cursor: pointer;
   scroll-margin-top: 18px;
   transition: color var(--transition-fast);
@@ -938,15 +945,15 @@ onUnmounted(() => {
 .markdown-preview-content :deep(h4:hover),
 .markdown-preview-content :deep(h5:hover),
 .markdown-preview-content :deep(h6:hover) {
-  color: var(--accent-primary);
+  color: var(--md-accent);
 }
 
-.markdown-preview-content :deep(h1) { font-size: 2em; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.3em; }
-.markdown-preview-content :deep(h2) { font-size: 1.5em; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.3em; }
+.markdown-preview-content :deep(h1) { font-size: 2em; border-bottom: 1px solid var(--md-border); padding-bottom: 0.3em; }
+.markdown-preview-content :deep(h2) { font-size: 1.5em; border-bottom: 1px solid var(--md-border); padding-bottom: 0.3em; }
 .markdown-preview-content :deep(h3) { font-size: 1.25em; }
 .markdown-preview-content :deep(h4) { font-size: 1em; }
 .markdown-preview-content :deep(h5) { font-size: 0.875em; }
-.markdown-preview-content :deep(h6) { font-size: 0.85em; color: var(--text-muted); }
+.markdown-preview-content :deep(h6) { font-size: 0.85em; color: var(--md-muted); }
 
 .markdown-preview-content :deep(p) {
   margin-top: 0;
@@ -957,7 +964,8 @@ onUnmounted(() => {
   padding: 0.2em 0.4em;
   margin: 0;
   font-size: 85%;
-  background-color: rgba(128, 128, 128, 0.15);
+  background-color: var(--md-code-bg);
+  color: var(--md-inline-code);
   border-radius: 6px;
   font-family: var(--font-family-mono);
 }
@@ -967,8 +975,9 @@ onUnmounted(() => {
   overflow: auto;
   font-size: 0.875em;
   line-height: 1.45;
-  background-color: var(--surface-toolbar);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(var(--accent-primary-rgb), 0.08));
+  background-color: var(--md-code-bg);
+  border: 1px solid color-mix(in srgb, var(--md-border) 84%, rgba(var(--md-accent-rgb), 0.08));
+  color: var(--md-code-text);
   border-radius: var(--radius-md);
   margin-bottom: 16px;
 }
@@ -987,9 +996,9 @@ onUnmounted(() => {
   margin-bottom: 16px;
   padding: 12px;
   overflow-x: auto;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--md-border);
   border-radius: 10px;
-  background: var(--surface-panel);
+  background: var(--md-mermaid-bg);
 }
 
 .markdown-preview-content :deep(.mermaid-block svg) {
@@ -1000,7 +1009,7 @@ onUnmounted(() => {
 }
 
 .markdown-preview-content :deep(.mermaid-error) {
-  color: var(--text-main);
+  color: var(--md-text);
 }
 
 .markdown-preview-content :deep(.mermaid-error-message) {
@@ -1011,15 +1020,15 @@ onUnmounted(() => {
 
 .markdown-preview-content :deep(blockquote) {
   padding: 0 1em;
-  color: var(--text-muted);
-  border-left: 0.25em solid rgba(var(--accent-primary-rgb), 0.28);
+  color: var(--md-muted);
+  border-left: 0.25em solid rgba(var(--md-accent-rgb), 0.36);
   margin: 0 0 16px 0;
-  background: rgba(var(--accent-primary-rgb), 0.04);
+  background: var(--md-quote-bg);
   border-radius: 0 8px 8px 0;
 }
 
 .markdown-preview-content :deep(.markdown-alert) {
-  color: var(--text-main);
+  color: var(--md-text);
   border-left-width: 4px;
 }
 
@@ -1058,9 +1067,9 @@ onUnmounted(() => {
 .markdown-preview-content :deep(.markdown-container) {
   margin: 0 0 16px;
   padding: 10px 14px;
-  border-left: 4px solid rgba(var(--accent-primary-rgb), 0.32);
+  border-left: 4px solid rgba(var(--md-accent-rgb), 0.32);
   border-radius: 0 8px 8px 0;
-  background: rgba(var(--accent-primary-rgb), 0.06);
+  background: var(--md-quote-bg);
 }
 
 .markdown-preview-content :deep(.markdown-container-info),
@@ -1098,7 +1107,7 @@ onUnmounted(() => {
 
 .markdown-preview-content :deep(.footnotes) {
   margin-top: 24px;
-  color: var(--text-muted);
+  color: var(--md-muted);
   font-size: 0.92em;
 }
 
@@ -1120,13 +1129,13 @@ onUnmounted(() => {
 
 .markdown-preview-content :deep(dd) {
   margin: 4px 0 10px 1.5em;
-  color: var(--text-muted);
+  color: var(--md-muted);
 }
 
 .markdown-preview-content :deep(mark) {
   padding: 0 3px;
   border-radius: 3px;
-  background: rgba(255, 214, 10, 0.35);
+  background: var(--md-mark-bg);
   color: inherit;
 }
 
@@ -1168,13 +1177,13 @@ onUnmounted(() => {
 }
 
 .markdown-preview-content :deep(ol li::marker) {
-  color: var(--text-main);
+  color: var(--md-text);
   font-variant-numeric: tabular-nums;
 }
 
 .markdown-preview-content :deep(.slimnote-list-prefix) {
   display: inline;
-  color: var(--text-main);
+  color: var(--md-text);
   font-variant-numeric: tabular-nums;
   white-space: pre-wrap;
 }
@@ -1185,7 +1194,7 @@ onUnmounted(() => {
 }
 
 .markdown-preview-content :deep(a) {
-  color: var(--accent-primary);
+  color: var(--md-accent);
   text-decoration: none;
 }
 
@@ -1203,18 +1212,18 @@ onUnmounted(() => {
 .markdown-preview-content :deep(table th),
 .markdown-preview-content :deep(table td) {
   padding: 6px 13px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--md-border);
 }
 
 .markdown-preview-content :deep(table tr:nth-child(2n)) {
-  background-color: color-mix(in srgb, var(--bg-secondary) 88%, rgba(var(--accent-primary-rgb), 0.03));
+  background-color: var(--md-table-stripe);
 }
 
 .markdown-preview-content :deep(hr) {
   border: 0;
   height: 1px;
   margin: 24px 0;
-  background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+  background: linear-gradient(90deg, transparent, var(--md-border), transparent);
 }
 
 .preview-context-menu {

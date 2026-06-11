@@ -1,5 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } = require('electron')
 const { dirname, join, resolve } = require('path')
+const { execFile } = require('child_process')
+const { promisify } = require('util')
+const http = require('http')
+const { randomUUID } = require('crypto')
 const fs = require('fs')
 const iconv = require('iconv-lite')
 const { watch } = require('chokidar')
@@ -22,6 +26,10 @@ let appClosePromptOpen = false
 let appCloseFallbackTimer = null
 let pendingOpenFilesFlushTimer = null
 let shortcutOverrides = {}
+let markdownBrowserPreviewServer = null
+let markdownBrowserPreviewOrigin = ''
+let markdownBrowserPreviewPages = new Map()
+const execFileAsync = promisify(execFile)
 
 const SELF_WRITE_CHANGE_SUPPRESSION_MS = 1000
 const SHORTCUTS_CONFIG_FILE = 'shortcuts.json'
@@ -29,6 +37,8 @@ const PENDING_OPEN_FILES_FILE = 'pending-open-files.json'
 const OPEN_FILES_DEBUG_LOG_FILE = 'open-files-debug.log'
 const APP_CLOSE_FALLBACK_TIMEOUT_MS = 8000
 const PENDING_OPEN_FILES_LOAD_FLUSH_DELAY_MS = 120
+const MARKDOWN_BROWSER_PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const MARKDOWN_BROWSER_PREVIEW_MAX_COUNT = 24
 const EXTERNAL_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 const SHORTCUT_MODIFIERS = new Set(['alt', 'cmd', 'cmdorctrl', 'command', 'commandorcontrol', 'control', 'ctrl', 'meta', 'option', 'shift'])
 const SHORTCUT_KEYS = new Set(['+', ',', '-', '.', '/', '\\', '`', "'", '=', ';', '[', ']', 'backspace', 'delete', 'del', 'down', 'end', 'enter', 'esc', 'escape', 'home', 'insert', 'left', 'pagedown', 'pageup', 'plus', 'return', 'right', 'space', 'tab', 'up'])
@@ -69,7 +79,7 @@ const locales = {
       resetZoom: '重置缩放',
       zoomIn: '放大',
       zoomOut: '缩小',
-      toggleTheme: '切换主题',
+      toggleTheme: '主题',
       toggleFullscreen: '切换全屏',
       selectAll: '全选',
       find: '查找',
@@ -100,7 +110,7 @@ const locales = {
       resetZoom: 'Reset Zoom',
       zoomIn: 'Zoom In',
       zoomOut: 'Zoom Out',
-      toggleTheme: 'Toggle Theme',
+      toggleTheme: 'Theme',
       toggleFullscreen: 'Toggle Fullscreen',
       selectAll: 'Select All',
       find: 'Find',
@@ -403,6 +413,163 @@ function normalizeExternalUrl(url) {
   }
 }
 
+function sanitizeMarkdownPreviewFileName(title) {
+  const safeName = String(title || 'markdown-preview')
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80)
+
+  return safeName || 'markdown-preview'
+}
+
+function pruneMarkdownBrowserPreviewPages() {
+  const now = Date.now()
+  for (const [token, preview] of markdownBrowserPreviewPages.entries()) {
+    if (now - preview.createdAt > MARKDOWN_BROWSER_PREVIEW_MAX_AGE_MS) {
+      markdownBrowserPreviewPages.delete(token)
+    }
+  }
+
+  if (markdownBrowserPreviewPages.size <= MARKDOWN_BROWSER_PREVIEW_MAX_COUNT) return
+
+  const entries = Array.from(markdownBrowserPreviewPages.entries())
+    .sort(([, left], [, right]) => left.createdAt - right.createdAt)
+
+  for (const [token] of entries.slice(0, markdownBrowserPreviewPages.size - MARKDOWN_BROWSER_PREVIEW_MAX_COUNT)) {
+    markdownBrowserPreviewPages.delete(token)
+  }
+}
+
+function sendMarkdownPreviewResponse(response, statusCode, body, contentType = 'text/plain; charset=utf-8') {
+  response.writeHead(statusCode, {
+    'Content-Type': contentType,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff'
+  })
+  response.end(body)
+}
+
+function handleMarkdownBrowserPreviewRequest(request, response) {
+  if (!['GET', 'HEAD'].includes(request.method || '')) {
+    sendMarkdownPreviewResponse(response, 405, 'Method Not Allowed')
+    return
+  }
+
+  pruneMarkdownBrowserPreviewPages()
+
+  let requestUrl = null
+  try {
+    requestUrl = new URL(request.url || '/', markdownBrowserPreviewOrigin || 'http://127.0.0.1')
+  } catch {
+    sendMarkdownPreviewResponse(response, 400, 'Bad Request')
+    return
+  }
+
+  const routePrefix = '/markdown-preview/'
+  if (!requestUrl.pathname.startsWith(routePrefix)) {
+    sendMarkdownPreviewResponse(response, 404, 'Not Found')
+    return
+  }
+
+  const token = requestUrl.pathname.slice(routePrefix.length)
+  const preview = markdownBrowserPreviewPages.get(token)
+  if (!preview) {
+    sendMarkdownPreviewResponse(response, 404, 'Preview Not Found')
+    return
+  }
+
+  response.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff'
+  })
+  response.end(request.method === 'HEAD' ? '' : preview.html)
+}
+
+async function getMarkdownBrowserPreviewOrigin() {
+  if (markdownBrowserPreviewServer?.listening && markdownBrowserPreviewOrigin) {
+    return markdownBrowserPreviewOrigin
+  }
+
+  markdownBrowserPreviewServer = http.createServer(handleMarkdownBrowserPreviewRequest)
+
+  await new Promise((resolvePromise, rejectPromise) => {
+    const cleanupListeners = () => {
+      markdownBrowserPreviewServer.off('error', handleError)
+      markdownBrowserPreviewServer.off('listening', handleListening)
+    }
+    const handleError = (error) => {
+      cleanupListeners()
+      rejectPromise(error)
+    }
+    const handleListening = () => {
+      cleanupListeners()
+      resolvePromise()
+    }
+
+    markdownBrowserPreviewServer.once('error', handleError)
+    markdownBrowserPreviewServer.once('listening', handleListening)
+    markdownBrowserPreviewServer.listen(0, '127.0.0.1')
+  })
+
+  const address = markdownBrowserPreviewServer.address()
+  if (!address || typeof address === 'string') {
+    throw new Error('Markdown preview server did not return a TCP address')
+  }
+
+  markdownBrowserPreviewServer.unref?.()
+  markdownBrowserPreviewOrigin = `http://127.0.0.1:${address.port}`
+  return markdownBrowserPreviewOrigin
+}
+
+async function openBrowserPreviewUrl(previewUrl) {
+  try {
+    await shell.openExternal(previewUrl)
+    return
+  } catch (primaryError) {
+    if (process.platform !== 'win32') {
+      throw new Error(`Failed to open browser URL: ${primaryError.message || primaryError}`)
+    }
+
+    try {
+      await execFileAsync('cmd.exe', ['/d', '/s', '/c', 'start', '', previewUrl], {
+        windowsHide: true,
+        timeout: 3000
+      })
+      return
+    } catch (fallbackError) {
+      throw new Error(`Failed to open browser URL: ${primaryError.message || primaryError}; Windows Shell fallback failed: ${fallbackError.message}`)
+    }
+  }
+}
+
+async function openMarkdownHtmlInBrowser({ html, title } = {}) {
+  pruneMarkdownBrowserPreviewPages()
+
+  const origin = await getMarkdownBrowserPreviewOrigin()
+  const safeTitle = sanitizeMarkdownPreviewFileName(title)
+  const token = randomUUID().replace(/-/g, '')
+  const previewUrl = `${origin}/markdown-preview/${token}`
+  markdownBrowserPreviewPages.set(token, {
+    html: String(html || ''),
+    title: safeTitle,
+    createdAt: Date.now()
+  })
+
+  try {
+    await openBrowserPreviewUrl(previewUrl)
+  } catch (error) {
+    markdownBrowserPreviewPages.delete(token)
+    throw error
+  }
+
+  return {
+    previewUrl,
+    title: safeTitle
+  }
+}
+
 function clearAppCloseFallbackTimer() {
   if (!appCloseFallbackTimer) return
   clearTimeout(appCloseFallbackTimer)
@@ -493,11 +660,41 @@ const iconPath = isDev
   : join(__dirname, '../dist/logo.ico')
 const rendererIndexPath = join(__dirname, '../dist/index.html')
 const preloadPath = join(__dirname, 'preload.js')
+const FALLBACK_DEV_SERVER_URL = 'http://localhost:5173'
 const RELEASES_PAGE_URL = 'https://github.com/chengrady/SlimNote/releases'
 const UPDATE_FEED = {
   provider: 'github',
   owner: 'chengrady',
   repo: 'SlimNote'
+}
+
+function normalizeRendererHash(hash = '') {
+  const value = String(hash || '').replace(/^#/, '')
+  if (!value) return ''
+  return value.startsWith('/') ? value : `/${value}`
+}
+
+function resolveDevRendererUrl(hash = '') {
+  const devServerUrl = String(process.env.VITE_DEV_SERVER_URL || FALLBACK_DEV_SERVER_URL).trim() || FALLBACK_DEV_SERVER_URL
+  const normalizedHash = normalizeRendererHash(hash)
+  if (!normalizedHash) return devServerUrl
+
+  const url = new URL(devServerUrl)
+  url.hash = normalizedHash
+  return url.toString()
+}
+
+function loadRendererWindow(targetWindow, hash = '') {
+  const normalizedHash = normalizeRendererHash(hash)
+  if (isDev) {
+    targetWindow.loadURL(resolveDevRendererUrl(normalizedHash))
+    return
+  }
+  if (normalizedHash) {
+    targetWindow.loadFile(rendererIndexPath, { hash: normalizedHash })
+  } else {
+    targetWindow.loadFile(rendererIndexPath)
+  }
 }
 
 const appDataRoot = app.getPath('appData')
@@ -1013,11 +1210,7 @@ function createWindow() {
     writeOpenFilesDebugLog('render-process-gone')
   })
 
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173')
-  } else {
-    mainWindow.loadFile(rendererIndexPath)
-  }
+  loadRendererWindow(mainWindow)
 
   mainWindow.on('closed', () => {
     rendererReady = false
@@ -1619,6 +1812,15 @@ function registerIpcHandlers() {
     }
   })
 
+  ipcMain.handle('open-markdown-html-in-browser', async (_event, payload) => {
+    try {
+      return await openMarkdownHtmlInBrowser(payload || {})
+    } catch (error) {
+      console.error('Error opening markdown HTML in browser:', error)
+      throw error
+    }
+  })
+
   ipcMain.handle('open-file-association-settings', async () => {
     return await openFileAssociationSettings()
   })
@@ -1676,11 +1878,7 @@ function registerIpcHandlers() {
     const winId = win.id
     pinWindows.set(winId, win)
 
-    if (isDev) {
-      win.loadURL(`http://localhost:5173/#/pin?id=${winId}`)
-    } else {
-      win.loadFile(rendererIndexPath, { hash: `/pin?id=${winId}` })
-    }
+    loadRendererWindow(win, `/pin?id=${winId}`)
 
     win.webContents.once('did-finish-load', () => {
       win.webContents.send('init-pin-content', { content, theme, language })

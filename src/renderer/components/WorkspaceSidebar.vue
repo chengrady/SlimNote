@@ -70,7 +70,8 @@
           </div>
           <div ref="workspaceTreeShellRef" class="workspace-tree-shell" @contextmenu.prevent="showWorkspaceRootMenu">
             <div v-if="fileTreeNodes.length === 0" class="workspace-tree-empty">{{ t('workspaceSidebar.emptyCurrentDir') }}</div>
-            <div v-else-if="workspaceFilter && !hasFilteredWorkspaceNodes" class="workspace-tree-empty">{{ t('workspaceSidebar.noMatch', { query: workspaceFilter }) }}</div>
+            <div v-else-if="workspaceFilter && workspaceFilterLoading && !hasFilteredWorkspaceNodes" class="workspace-tree-empty">{{ t('workspaceSidebar.filterLoading') }}</div>
+            <div v-else-if="workspaceFilter && !workspaceFilterLoading && !hasFilteredWorkspaceNodes" class="workspace-tree-empty">{{ t('workspaceSidebar.noMatch', { query: workspaceFilter }) }}</div>
             <div v-else class="workspace-tree">
               <FileNode
                 v-for="node in fileTreeNodes"
@@ -290,6 +291,7 @@ const showRecentFoldersSection = ref(true)
 const isRefreshing = ref(false)
 const selectedWorkspacePath = ref('')
 const workspaceFilter = ref('')
+const workspaceFilterLoading = ref(false)
 const recentDrag = ref({ dragPath: null, targetPath: null, position: 'before' })
 const contextMenu = ref({ visible: false, x: 0, y: 0, type: 'recent', file: null, node: null })
 const contextMenuRef = ref(null)
@@ -304,6 +306,7 @@ const dialogState = ref({
   placeholder: ''
 })
 let dialogResolver = null
+let workspaceFilterLoadId = 0
 const CONTEXT_MENU_MARGIN = 8
 const totalRecentCount = computed(() => fileStore.recentFiles.length)
 const recentFolders = computed(() => fileStore.recentFolders)
@@ -877,7 +880,29 @@ watch(currentRootPath, (path) => {
   showRecentFoldersSection.value = !hasWorkspace
   selectedWorkspacePath.value = hasWorkspace ? path : ''
   workspaceFilter.value = ''
+  workspaceFilterLoading.value = false
 }, { immediate: true })
+
+watch(workspaceFilter, async (value) => {
+  workspaceFilterLoadId += 1
+  const loadId = workspaceFilterLoadId
+  const keyword = String(value || '').trim()
+  if (!keyword || !currentRootPath.value) {
+    workspaceFilterLoading.value = false
+    return
+  }
+
+  workspaceFilterLoading.value = true
+  try {
+    await fileStore.loadWorkspaceTreeForSearch()
+  } catch (error) {
+    console.error('Failed to load workspace tree for filter:', error)
+  } finally {
+    if (loadId === workspaceFilterLoadId) {
+      workspaceFilterLoading.value = false
+    }
+  }
+})
 
 watch([currentRootPath, activeFilePath], async () => {
   await revealActiveFileInWorkspace()

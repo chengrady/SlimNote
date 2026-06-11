@@ -1,5 +1,5 @@
 <template>
-  <div class="empty-editor ui-pane">
+  <div class="empty-editor">
     <div class="empty-badge ui-chip">{{ t('app.slogan') }}</div>
     <h2>{{ t('app.name') }}</h2>
     <p>{{ t('welcome.description') }}</p>

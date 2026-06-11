@@ -57,6 +57,52 @@ describe('settings dialog Codex-style layout', () => {
     assert.doesNotMatch(source, /settings-nav-item-dot/)
   })
 
+  it('themes the settings sidebar with global app color variables', () => {
+    const sidebarStyleStart = source.indexOf('.settings-page-shell {')
+    const sidebarStyleEnd = source.indexOf('\n.settings-content-panel {', sidebarStyleStart)
+    const sidebarStyles = source.slice(sidebarStyleStart, sidebarStyleEnd)
+
+    assert.match(sidebarStyles, /background:\s*var\(--bg-gradient,\s*var\(--bg-primary\)\);/)
+    assert.match(sidebarStyles, /\.settings-nav\s*{[\s\S]*background:\s*color-mix\(in srgb,\s*var\(--surface-toolbar\)\s+78%,\s*var\(--surface-panel-strong\)\);/)
+    assert.match(sidebarStyles, /\.settings-return-button:hover,[\s\S]*background:\s*var\(--surface-hover\);/)
+    assert.match(sidebarStyles, /\.settings-nav-item:hover\s*{[\s\S]*background:\s*var\(--surface-hover\);/)
+    assert.match(sidebarStyles, /\.settings-nav-item\.active\s*{[\s\S]*background:\s*color-mix\(in srgb,\s*var\(--surface-active\)[\s\S]*border-color:\s*color-mix\(in srgb,\s*var\(--accent-primary\)/)
+    assert.match(source, /\.settings-search-input\s*{[^}]*box-shadow:\s*inset 0 1px 0 color-mix\(in srgb,\s*var\(--surface-panel-strong\)/)
+    assert.doesNotMatch(sidebarStyles, /rgba\((?:232,\s*248|235,\s*249|250,\s*238|251,\s*240|255,\s*255,\s*255)/)
+    assert.doesNotMatch(source, /\.settings-search-input\s*{[^}]*rgba\(255,\s*255,\s*255/)
+  })
+
+  it('uses compact flat theme options instead of a plain theme select', () => {
+    assert.match(source, /id:\s*'appearance-interface'[\s\S]*rowIds:\s*\['language'\]/)
+    assert.match(source, /id:\s*'appearance-theme'[\s\S]*titleKey:\s*'settings\.theme'[\s\S]*rowIds:\s*\['theme'\]/)
+    assert.match(source, /class="settings-theme-picker"/)
+    assert.match(source, /class="settings-theme-option"/)
+    assert.match(source, /v-for="theme in themeCardOptions"/)
+    assert.match(source, /activeSettingsThemeRef === theme\.id/)
+    assert.match(source, /getThemeOptionStyle\(theme\)/)
+    assert.match(source, /selectSettingsTheme\(theme\.id\)/)
+    assert.match(source, /const themeCardOptions = computed\(\(\) => appThemeOptions\.fixed\)/)
+    assert.match(source, /\.settings-theme-picker\s*{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(185px,\s*1fr\)\);/)
+    assert.match(source, /\.settings-theme-option\s*{[\s\S]*min-height:\s*50px;/)
+    assert.match(source, /\.settings-row--theme\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
+    assert.match(source, /\.settings-row--theme \.settings-row-copy\s*{[\s\S]*display:\s*none;/)
+    assert.doesNotMatch(source, /<SettingsSelect v-model="localSettings\.themeRef"/)
+    assert.doesNotMatch(source, /settings-theme-mode-chip|getThemeModeLabel/)
+    assert.doesNotMatch(source, /settings-theme-menu|themeMenuOpen|toggleThemeMenu/)
+    assert.doesNotMatch(source, /followThemeOptions|跟随系统/)
+  })
+
+  it('places theme settings last in appearance groups', () => {
+    const appearanceGroups = source.match(/appearance:\s*\[[\s\S]*?\n  \],\n  editor:/)?.[0] ?? ''
+    const interfaceIndex = appearanceGroups.indexOf("id: 'appearance-interface'")
+    const fontReadingIndex = appearanceGroups.indexOf("id: 'appearance-font-reading'")
+    const themeIndex = appearanceGroups.indexOf("id: 'appearance-theme'")
+
+    assert.ok(interfaceIndex >= 0)
+    assert.ok(fontReadingIndex > interfaceIndex)
+    assert.ok(themeIndex > fontReadingIndex)
+  })
+
   it('places settings search in the left sidebar between return and navigation', () => {
     const sidebarStart = source.indexOf('<aside class="settings-page-sidebar settings-nav">')
     const returnButton = source.indexOf('class="settings-return-button"', sidebarStart)
@@ -98,7 +144,7 @@ describe('settings dialog Codex-style layout', () => {
     assert.match(source, /<template v-if="isInlineCheckboxControl\(row\.control\)">\s*<label class="settings-toggle">[\s\S]*<input type="checkbox" v-model="localSettings\[getInlineCheckboxSettingKey\(row\.control\)\]" :aria-label="row\.title">[\s\S]*<span class="settings-toggle-track" aria-hidden="true"><\/span>[\s\S]*<\/label>/)
     assert.doesNotMatch(source, /<label v-if="isInlineCheckboxControl\(row\.control\)" class="settings-inline-checkbox">/)
     assert.doesNotMatch(source, /v-if="!isInlineCheckboxControl\(row\.control\)" class="settings-row-control"/)
-    assert.doesNotMatch(source, /\.settings-row--checkbox\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
+    assert.doesNotMatch(source, /\.settings-row--checkbox\s*{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
     assert.match(source, /\.settings-toggle\s*{[\s\S]*justify-self:\s*end;/)
     assert.match(source, /\.settings-toggle input:checked \+ \.settings-toggle-track\s*{[\s\S]*background:\s*var\(--accent-primary\);/)
   })
@@ -316,7 +362,7 @@ describe('settings dialog Codex-style layout', () => {
   })
 
   it('shows only the active settings section while browsing categories', () => {
-    assert.match(source, /if \(!isSearching\.value\) \{[\s\S]*const section = currentSectionDefinition\.value[\s\S]*return section \? \[\{[\s\S]*rows: section\.rows\.filter\(row => matchesRow\(row\) && matchesShortcutCategory\(row, section\.id\)\)[\s\S]*\}\] : \[\][\s\S]*\}/)
+    assert.match(source, /if \(!isSearching\.value\) \{[\s\S]*const section = currentSectionDefinition\.value[\s\S]*return section \? \[\{[\s\S]*rows: section\.rows\.filter\(row => shouldShowSettingsRow\(row\) && matchesRow\(row\) && matchesShortcutCategory\(row, section\.id\)\)[\s\S]*\}\] : \[\][\s\S]*\}/)
     assert.match(source, /async function selectSection\(sectionId\) \{[\s\S]*activeSection\.value = sectionId[\s\S]*settingsContentRef\.value\?\.scrollTo\(\{ top: 0 \}\)/)
   })
 

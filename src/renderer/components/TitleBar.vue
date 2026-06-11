@@ -19,6 +19,21 @@
           {{ menu.label }}
         </button>
       </div>
+
+      <button
+        v-if="showUpdateEntry"
+        type="button"
+        class="title-update-button"
+        :title="layoutLabel('发现新版本，点击查看', 'Update available, click to view')"
+        :aria-label="layoutLabel('发现新版本，点击查看', 'Update available, click to view')"
+        @click="handleUpdateButtonClick"
+      >
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M10 4v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="title-update-dot" aria-hidden="true"></span>
+      </button>
     </div>
 
     <div class="title-drag-spacer" aria-hidden="true"></div>
@@ -131,6 +146,10 @@ defineProps({
   showLayoutControls: {
     type: Boolean,
     default: true
+  },
+  showUpdateEntry: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -238,6 +257,11 @@ function layoutLabel(zhText, enText) {
 
 function requestMenuAction(action) {
   emit('menu-action', action)
+}
+
+function handleUpdateButtonClick() {
+  closeMenu()
+  requestMenuAction('open-update-dialog')
 }
 
 function minimize() {
@@ -409,6 +433,7 @@ onUnmounted(() => {
 .menu-trigger,
 .layout-control-button,
 .control-button,
+.title-update-button,
 .title-menu-item {
   -webkit-app-region: no-drag;
 }
@@ -461,11 +486,46 @@ onUnmounted(() => {
 }
 
 .menu-trigger:focus-visible,
+.title-update-button:focus-visible,
 .layout-control-button:focus-visible,
 .control-button:focus-visible,
 .title-menu-item:focus-visible {
   outline: none;
   box-shadow: var(--field-focus-ring);
+}
+
+.title-update-button {
+  position: relative;
+  width: 30px;
+  height: 28px;
+  margin: auto 0 auto var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--icon-button-radius);
+  background: var(--surface-active);
+  color: var(--accent-primary);
+  cursor: pointer;
+  transition: var(--transition-interactive);
+  flex-shrink: 0;
+}
+
+.title-update-button:hover {
+  background-color: var(--surface-hover);
+  color: var(--text-interactive-hover, var(--accent-primary));
+  box-shadow: var(--interactive-hover-ring);
+}
+
+.title-update-dot {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--error-color, #ef4444);
+  border: 1.5px solid var(--surface-panel-strong);
 }
 
 .layout-controls {

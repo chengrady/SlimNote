@@ -7,7 +7,8 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 import { useSettingsStore } from '../stores/settings'
 import { RENDERER_EVENTS, onRendererEvent } from '../utils/rendererEvents'
-import { defineCustomThemes, applyTheme, getDefaultEditorTheme } from '../utils/monacoThemes'
+import { defineCustomThemes, applyTheme, defineSlimNoteEditorTheme } from '../utils/monacoThemes'
+import { resolveMarkdownTheme } from '../utils/markdownThemes'
 import { isMonospaceFontFamily } from '../utils/fontFamilies'
 import { consumeInlineCompletionLine } from '../utils/aiInlineCompletion'
 
@@ -546,15 +547,12 @@ function applyIndentationOptions(targetEditor, tabSize) {
 }
 
 function resolveMonacoTheme(appTheme = settingsStore.settings.theme, language = props.language, requestedTheme = props.editorTheme) {
-  if (language === 'log') {
-    return appTheme === 'dark' ? 'logThemeDark' : 'logTheme'
-  }
-
   if (requestedTheme) {
     return requestedTheme
   }
 
-  return getDefaultEditorTheme(appTheme, language)
+  const resolvedTheme = settingsStore.effectiveTheme || resolveMarkdownTheme(settingsStore.settings.themeRef, appTheme)
+  return defineSlimNoteEditorTheme(resolvedTheme, language)
 }
 
 const handleUndo = () => {
@@ -689,6 +687,10 @@ onMounted(() => {
     contextmenu: false, // Disable default context menu to use Electron's native one
     automaticLayout: true,
     scrollBeyondLastLine: false,
+    padding: {
+      top: 16,
+      bottom: 32
+    },
     renderWhitespace: 'selection',
     formatOnPaste: true,
     formatOnType: true,

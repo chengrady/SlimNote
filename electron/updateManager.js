@@ -1,9 +1,8 @@
-const { autoUpdater } = require('electron-updater')
 const { dirname, join } = require('path')
 const fs = require('fs')
 
-const DEFAULT_AUTO_CHECK_DELAY_MS = 45 * 1000
-const DEFAULT_AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+const DEFAULT_AUTO_CHECK_DELAY_MS = 0
+const DEFAULT_AUTO_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 const UPDATE_CHECK_STATE_FILE = 'update-check-state.json'
 
 function normalizeUpdateInfo(info = {}) {
@@ -17,6 +16,7 @@ function normalizeUpdateInfo(info = {}) {
 
 function createUpdateManager({
   app,
+  updater,
   getMainWindow,
   releaseUrl,
   feed,
@@ -33,12 +33,13 @@ function createUpdateManager({
   let isChecking = false
   let isDownloading = false
   let hasDownloadedUpdate = false
+  const updateClient = updater || require('electron-updater').autoUpdater
 
-  autoUpdater.autoDownload = false
-  autoUpdater.autoInstallOnAppQuit = false
+  updateClient.autoDownload = false
+  updateClient.autoInstallOnAppQuit = false
 
   if (feed) {
-    autoUpdater.setFeedURL(feed)
+    updateClient.setFeedURL(feed)
   }
 
   function getStatePath() {
@@ -107,7 +108,7 @@ function createUpdateManager({
     return sendState()
   }
 
-  autoUpdater.on('checking-for-update', () => {
+  updateClient.on('checking-for-update', () => {
     setStatus('checking', {
       isChecking: true,
       isDownloading: false,
@@ -116,7 +117,7 @@ function createUpdateManager({
     })
   })
 
-  autoUpdater.on('update-available', (info) => {
+  updateClient.on('update-available', (info) => {
     setStatus('available', {
       updateInfo: info,
       isChecking: false,
@@ -127,7 +128,7 @@ function createUpdateManager({
     })
   })
 
-  autoUpdater.on('update-not-available', (info) => {
+  updateClient.on('update-not-available', (info) => {
     setStatus('not-available', {
       updateInfo: info,
       isChecking: false,
@@ -138,7 +139,7 @@ function createUpdateManager({
     })
   })
 
-  autoUpdater.on('download-progress', (downloadProgress) => {
+  updateClient.on('download-progress', (downloadProgress) => {
     setStatus('downloading', {
       isChecking: false,
       isDownloading: true,
@@ -152,7 +153,7 @@ function createUpdateManager({
     })
   })
 
-  autoUpdater.on('update-downloaded', (info) => {
+  updateClient.on('update-downloaded', (info) => {
     setStatus('downloaded', {
       updateInfo: info,
       isChecking: false,
@@ -163,7 +164,7 @@ function createUpdateManager({
     })
   })
 
-  autoUpdater.on('error', (error) => {
+  updateClient.on('error', (error) => {
     setStatus('error', {
       isChecking: false,
       isDownloading: false,
@@ -194,7 +195,7 @@ function createUpdateManager({
 
     try {
       isChecking = true
-      const result = await autoUpdater.checkForUpdates()
+      const result = await updateClient.checkForUpdates()
       if (!result && status === 'checking') {
         return setStatus('not-supported', {
           isChecking: false,
@@ -221,7 +222,7 @@ function createUpdateManager({
       })
     } finally {
       isChecking = false
-      if (!manual) scheduleAutoCheck()
+      if (!manual) scheduleAutoCheck(autoCheckIntervalMs)
     }
   }
 
@@ -254,7 +255,7 @@ function createUpdateManager({
         },
         message: ''
       })
-      await autoUpdater.downloadUpdate()
+      await updateClient.downloadUpdate()
       return buildState()
     } catch (error) {
       return setStatus('error', {
@@ -273,23 +274,17 @@ function createUpdateManager({
     }
 
     onBeforeInstall?.()
-    autoUpdater.quitAndInstall(false, true)
+    updateClient.quitAndInstall(false, true)
     return { ok: true }
   }
 
-  function scheduleAutoCheck() {
+  function scheduleAutoCheck(delayMs = autoCheckDelayMs) {
     if (!app.isPackaged || checkTimer) return
-
-    const persistedState = readCheckState()
-    const lastCheckAt = Number(persistedState.lastAutomaticCheckAt) || 0
-    const elapsedMs = Date.now() - lastCheckAt
-    const intervalDelayMs = Math.max(0, autoCheckIntervalMs - elapsedMs)
-    const nextDelayMs = Math.max(autoCheckDelayMs, intervalDelayMs)
 
     checkTimer = setTimeout(() => {
       checkTimer = null
       checkForUpdates({ manual: false })
-    }, nextDelayMs)
+    }, Math.max(0, delayMs))
     checkTimer.unref?.()
   }
 

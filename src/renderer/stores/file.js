@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { isSupportedFile } from '../utils/fileSupport'
+import { isSupportedFile } from '../utils/fileSupport.js'
 
 const MAX_RECENT_FILES = 20
 const MAX_RECENT_FOLDERS = 20
@@ -68,6 +68,7 @@ export const useFileStore = defineStore('file', () => {
           path: folder.path,
           isDirectory: true,
           children: [],
+          childrenLoaded: false,
           expanded: false
         })
       }
@@ -103,9 +104,23 @@ export const useFileStore = defineStore('file', () => {
 
     if (!node.expanded || !Array.isArray(node.children) || node.children.length === 0) {
       node.children = await buildFileTree(node.path)
+      node.childrenLoaded = true
     }
 
     node.expanded = true
+  }
+
+  async function loadWorkspaceTreeForSearch(nodes = fileTree.value) {
+    for (const node of nodes || []) {
+      if (!node?.isDirectory) continue
+
+      if (!node.childrenLoaded || !Array.isArray(node.children)) {
+        node.children = await buildFileTree(node.path)
+        node.childrenLoaded = true
+      }
+
+      await loadWorkspaceTreeForSearch(node.children)
+    }
   }
 
   // 添加最近文档
@@ -225,6 +240,7 @@ export const useFileStore = defineStore('file', () => {
     loadLastOpenedFolder,
     closeFolder,
     expandFolder,
+    loadWorkspaceTreeForSearch,
     addRecentFile,
     addRecentFolder,
     moveRecentFile,
